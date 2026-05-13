@@ -8,8 +8,10 @@ import Chip from '@mui/material/Chip'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import HomeIcon from '@mui/icons-material/Home'
+import PaymentsIcon from '@mui/icons-material/Payments'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import PagoDialog from './PagoDialog'
 import type { Gasto, FiltrosGastos } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -31,6 +33,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [pagoGasto, setPagoGasto] = useState<Gasto | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -148,8 +151,14 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       field: 'actions',
       type: 'actions',
       headerName: '',
-      width: 80,
+      width: 110,
       getActions: ({ row }) => [
+        <GridActionsCellItem
+          key="pagar"
+          icon={<PaymentsIcon fontSize="small" />}
+          label="Pagos"
+          onClick={() => setPagoGasto(row as Gasto)}
+        />,
         <GridActionsCellItem
           key="edit"
           icon={<EditIcon fontSize="small" />}
@@ -247,6 +256,23 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
         message="¿Estás seguro que querés eliminar este gasto? Esta acción no se puede deshacer."
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <PagoDialog
+        open={pagoGasto !== null}
+        gasto={pagoGasto}
+        onClose={() => setPagoGasto(null)}
+        onChanged={() => {
+          onDeleted()
+          if (pagoGasto) {
+            fetch(`/api/gastos/${pagoGasto.id}`)
+              .then(r => r.json())
+              .then(updated => {
+                setGastos(prev => prev.map(g => g.id === updated.id ? updated : g))
+                setPagoGasto(updated)
+              })
+          }
+        }}
       />
     </>
   )

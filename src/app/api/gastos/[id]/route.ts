@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
 function toGastoResponse(g: any) {
-  const totalArs = g.totalMoneda * g.tipoCambio
+  const totalArs = Math.round(g.totalMoneda * g.tipoCambio * 100) / 100
+  const pagos = (g.pagos ?? []).map((p: any) => ({
+    id: p.id,
+    gasto_id: p.gastoId,
+    fecha: p.fecha,
+    monto: p.monto,
+    created_at: p.createdAt?.toISOString(),
+  }))
+  const totalPagado = Math.round(pagos.reduce((s: number, p: any) => s + p.monto, 0) * 100) / 100
   return {
     id: g.id,
     casa_id: g.casaId,
@@ -15,9 +23,9 @@ function toGastoResponse(g: any) {
     moneda_simbolo: g.moneda?.simbolo,
     tipo_cambio: g.tipoCambio,
     total_moneda: g.totalMoneda,
-    total_ars: Math.round(totalArs * 100) / 100,
-    total_pagado: g.totalPagado,
-    total_restante: Math.round((totalArs - g.totalPagado) * 100) / 100,
+    total_ars: totalArs,
+    total_pagado: totalPagado,
+    total_restante: Math.round((totalArs - totalPagado) * 100) / 100,
     pasaje_mes_siguiente: g.pasajeMesSiguiente,
     prestamo_a_otro: g.prestamo_a_otro,
     tarjeta_id: g.tarjetaId,
@@ -25,10 +33,11 @@ function toGastoResponse(g: any) {
     mes: g.mes,
     anio: g.anio,
     notas: g.notas,
+    pagos,
   }
 }
 
-const INCLUDE = { casa: true, moneda: true, tarjeta: true }
+const INCLUDE = { casa: true, moneda: true, tarjeta: true, pagos: { orderBy: { createdAt: 'asc' as const } } }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const gasto = await prisma.gasto.findUnique({ where: { id: Number(params.id) }, include: INCLUDE })

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (anio) where.anio = Number(anio)
   if (casa_id) where.casaId = Number(casa_id)
 
-  const gastos = await prisma.gasto.findMany({ where })
+  const gastos = await prisma.gasto.findMany({ where, include: { pagos: true } })
 
   let total_gastos = 0
   let total_pagado = 0
@@ -22,9 +22,10 @@ export async function GET(req: NextRequest) {
 
   for (const g of gastos) {
     const totalArs = g.totalMoneda * g.tipoCambio
-    const restante = totalArs - g.totalPagado
+    const pagado = g.pagos.reduce((s, p) => s + p.monto, 0)
+    const restante = totalArs - pagado
     total_gastos += totalArs
-    total_pagado += g.totalPagado
+    total_pagado += pagado
     total_restante += restante
     if (g.fechaVencimiento === today) pagar_hoy += restante
   }

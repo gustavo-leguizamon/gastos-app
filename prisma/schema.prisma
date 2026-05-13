@@ -47,7 +47,18 @@ model Gasto {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  casa    Casa    @relation(fields: [casaId], references: [id])
-  moneda  Moneda  @relation(fields: [monedaId], references: [id])
+  casa    Casa     @relation(fields: [casaId], references: [id])
+  moneda  Moneda   @relation(fields: [monedaId], references: [id])
   tarjeta Tarjeta? @relation(fields: [tarjetaId], references: [id])
+  pagos   Pago[]
+}
+
+model Pago {
+  id        Int      @id @default(autoincrement())
+  gastoId   Int
+  fecha     String
+  monto     Float
+  createdAt DateTime @default(now())
+
+  gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
 }
