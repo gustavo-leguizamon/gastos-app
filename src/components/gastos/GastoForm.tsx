@@ -24,11 +24,13 @@ const schema = yup.object({
   tipo_pago: yup.string().oneOf(['C', 'D']).required('Requerido'),
   moneda_id: yup.number().required('Requerido').min(1, 'Seleccioná una moneda'),
   tipo_cambio: yup.number().required('Requerido').min(0.0001, 'Debe ser > 0'),
-  total_moneda: yup.number().required('Requerido').min(0.01, 'Debe ser > 0'),
+  total_moneda: yup.number().required('Requerido').min(0, 'Debe ser >= 0'),
   total_pagado: yup.number().min(0, 'Debe ser >= 0').required('Requerido'),
   pasaje_mes_siguiente: yup.number().min(0).required('Requerido'),
   prestamo_a_otro: yup.number().min(0).required('Requerido'),
   tarjeta_id: yup.number().nullable().optional(),
+  cuota_actual: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
+  cuotas_totales: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
   mes: yup.number().required(),
   anio: yup.number().required(),
   notas: yup.string().optional().default(''),
@@ -62,6 +64,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       pasaje_mes_siguiente: gasto?.pasaje_mes_siguiente ?? 0,
       prestamo_a_otro: gasto?.prestamo_a_otro ?? 0,
       tarjeta_id: gasto?.tarjeta_id ?? null,
+      cuota_actual: gasto?.cuota_actual ?? null,
+      cuotas_totales: gasto?.cuotas_totales ?? null,
       mes: gasto?.mes ?? defaultMes,
       anio: gasto?.anio ?? defaultAnio,
       notas: gasto?.notas ?? '',
@@ -112,6 +116,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                 InputLabelProps={{ shrink: true }}
                 error={!!errors.fecha_vencimiento}
                 helperText={errors.fecha_vencimiento?.message}
+                onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
               />
             )}
           />
@@ -210,27 +215,26 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           />
         </Grid>
 
-        {/* Tipo cambio (solo si no es ARS) */}
-        {!esARS && (
-          <Grid item xs={12} sm={6}>
-            <Controller
-              name="tipo_cambio"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  fullWidth
-                  label={`Tipo de Cambio (${monedaSeleccionada?.codigo ?? ''} → ARS)`}
-                  type="number"
-                  size="small"
-                  inputProps={{ step: 0.01, min: 0 }}
-                  error={!!errors.tipo_cambio}
-                  helperText={errors.tipo_cambio?.message}
-                />
-              )}
-            />
-          </Grid>
-        )}
+        {/* Tipo cambio */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="tipo_cambio"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label={esARS ? 'Tipo de Cambio (ARS)' : `Tipo de Cambio (${monedaSeleccionada?.codigo ?? ''} → ARS)`}
+                type="number"
+                size="small"
+                inputProps={{ step: 0.01, min: 0 }}
+                error={!!errors.tipo_cambio}
+                helperText={errors.tipo_cambio?.message}
+                disabled={esARS}
+              />
+            )}
+          />
+        </Grid>
 
         {/* Total en moneda */}
         <Grid item xs={12} sm={6}>
@@ -321,6 +325,48 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                 inputProps={{ step: 0.01, min: 0 }}
                 error={!!errors.prestamo_a_otro}
                 helperText={errors.prestamo_a_otro?.message}
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Cuotas */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="cuota_actual"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                value={field.value ?? ''}
+                onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                fullWidth
+                label="Cuota actual (opcional)"
+                type="number"
+                size="small"
+                inputProps={{ min: 1, step: 1 }}
+                error={!!errors.cuota_actual}
+                helperText={errors.cuota_actual?.message}
+              />
+            )}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="cuotas_totales"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                value={field.value ?? ''}
+                onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                fullWidth
+                label="Total de cuotas (opcional)"
+                type="number"
+                size="small"
+                inputProps={{ min: 1, step: 1 }}
+                error={!!errors.cuotas_totales}
+                helperText={errors.cuotas_totales?.message}
               />
             )}
           />

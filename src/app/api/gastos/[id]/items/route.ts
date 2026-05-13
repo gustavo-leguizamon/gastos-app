@@ -8,6 +8,8 @@ function toItemResponse(i: any) {
     descripcion: i.descripcion,
     monto: i.monto,
     fecha: i.fecha ?? null,
+    cuota_actual: i.cuotaActual ?? null,
+    cuotas_totales: i.cuotasTotales ?? null,
     created_at: i.createdAt.toISOString(),
   }
 }
@@ -28,6 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       descripcion: body.descripcion,
       monto: body.monto,
       fecha: body.fecha || null,
+      cuotaActual: body.cuota_actual ?? null,
+      cuotasTotales: body.cuotas_totales ?? null,
     },
   })
   return NextResponse.json(toItemResponse(item), { status: 201 })

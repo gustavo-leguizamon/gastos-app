@@ -13,13 +13,25 @@ import IconButton from '@mui/material/IconButton'
 import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
-import type { Gasto } from '@/lib/types'
+import type { Gasto, GastoItem } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
+}
+
+type EditState = {
+  id: number
+  descripcion: string
+  monto: string
+  fecha: string
+  cuota_actual: string
+  cuotas_totales: string
 }
 
 interface Props {
@@ -33,36 +45,75 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState('')
+  const [cuotaActual, setCuotaActual] = useState('')
+  const [cuotasTotales, setCuotasTotales] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<EditState | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   if (!gasto) return null
 
-  const items = gasto.items ?? []
+  const items: GastoItem[] = gasto.items ?? []
   const totalItems = items.reduce((s, i) => s + i.monto, 0)
 
+  const startEdit = (item: GastoItem) => setEditing({
+    id: item.id,
+    descripcion: item.descripcion,
+    monto: String(item.monto),
+    fecha: item.fecha ?? '',
+    cuota_actual: item.cuota_actual != null ? String(item.cuota_actual) : '',
+    cuotas_totales: item.cuotas_totales != null ? String(item.cuotas_totales) : '',
+  })
+
+  const handleSaveEdit = async () => {
+    if (!editing || !editing.descripcion.trim() || !editing.monto) return
+    const montoNum = parseFloat(editing.monto)
+    if (isNaN(montoNum) || montoNum < 0) { toast.error('Monto inválido'); return }
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/gastos/${gasto.id}/items/${editing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descripcion: editing.descripcion.trim(),
+          monto: montoNum,
+          fecha: editing.fecha || null,
+          cuota_actual: editing.cuota_actual ? Number(editing.cuota_actual) : null,
+          cuotas_totales: editing.cuotas_totales ? Number(editing.cuotas_totales) : null,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Item actualizado')
+      setEditing(null)
+      onChanged()
+    } catch {
+      toast.error('Error al actualizar item')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const handleAdd = async () => {
-    if (!descripcion.trim() || !monto) {
-      toast.error('Descripción y monto son requeridos')
-      return
-    }
+    if (!descripcion.trim() || !monto) { toast.error('Descripción y monto son requeridos'); return }
     const montoNum = parseFloat(monto)
-    if (isNaN(montoNum) || montoNum <= 0) {
-      toast.error('Ingresá un monto válido')
-      return
-    }
+    if (isNaN(montoNum) || montoNum < 0) { toast.error('Ingresá un monto válido'); return }
     setSaving(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ descripcion: descripcion.trim(), monto: montoNum, fecha: fecha || null }),
+        body: JSON.stringify({
+          descripcion: descripcion.trim(),
+          monto: montoNum,
+          fecha: fecha || null,
+          cuota_actual: cuotaActual ? Number(cuotaActual) : null,
+          cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
+        }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
-      setDescripcion('')
-      setMonto('')
-      setFecha('')
+      setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -123,32 +174,82 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         ) : (
           <Box sx={{ mb: 2 }}>
             {items.map(item => (
-              <Box
-                key={item.id}
-                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
-                  <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap>{item.descripcion}</Typography>
-                    {item.fecha && (
-                      <Typography variant="caption" color="text.secondary">{item.fecha}</Typography>
-                    )}
+              <Box key={item.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
+                {editing?.id === item.id ? (
+                  /* Inline edit form */
+                  <Box sx={{ py: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <TextField
+                      size="small" fullWidth autoFocus label="Descripción"
+                      value={editing.descripcion}
+                      onChange={e => setEditing(p => p ? { ...p, descripcion: e.target.value } : p)}
+                    />
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+                        value={editing.monto}
+                        onChange={e => setEditing(p => p ? { ...p, monto: e.target.value } : p)}
+                        inputProps={{ min: 0, step: 0.01 }}
+                      />
+                      <TextField
+                        size="small" label="Fecha (opcional)" type="date" sx={{ width: 150 }}
+                        value={editing.fecha}
+                        onChange={e => setEditing(p => p ? { ...p, fecha: e.target.value } : p)}
+                        onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <TextField
+                        size="small" label="Cuota actual" type="number" sx={{ flex: 1 }}
+                        value={editing.cuota_actual}
+                        onChange={e => setEditing(p => p ? { ...p, cuota_actual: e.target.value } : p)}
+                        inputProps={{ min: 1, step: 1 }}
+                      />
+                      <TextField
+                        size="small" label="Total cuotas" type="number" sx={{ flex: 1 }}
+                        value={editing.cuotas_totales}
+                        onChange={e => setEditing(p => p ? { ...p, cuotas_totales: e.target.value } : p)}
+                        inputProps={{ min: 1, step: 1 }}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small" variant="contained" startIcon={savingEdit ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
+                        onClick={handleSaveEdit} disabled={savingEdit}
+                      >
+                        Guardar
+                      </Button>
+                      <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditing(null)}>
+                        Cancelar
+                      </Button>
+                    </Box>
                   </Box>
-                  <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>
-                    {fmtARS(item.monto)}
-                  </Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  sx={{ ml: 1 }}
-                  onClick={() => handleDelete(item.id)}
-                  disabled={deletingId === item.id}
-                >
-                  {deletingId === item.id
-                    ? <CircularProgress size={14} />
-                    : <DeleteIcon fontSize="small" />}
-                </IconButton>
+                ) : (
+                  /* Display row */
+                  <Box sx={{ display: 'flex', alignItems: 'center', py: 0.75, gap: 1 }}>
+                    <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" noWrap>{item.descripcion}</Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5 }}>
+                        {item.fecha && <Typography variant="caption" color="text.secondary">{item.fecha}</Typography>}
+                        {item.cuota_actual != null && (
+                          <Typography variant="caption" color="primary.main">
+                            Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                    <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>
+                      {fmtARS(item.monto)}
+                    </Typography>
+                    <IconButton size="small" onClick={() => startEdit(item)}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDelete(item.id)} disabled={deletingId === item.id}>
+                      {deletingId === item.id ? <CircularProgress size={14} /> : <DeleteIcon fontSize="small" />}
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
             ))}
           </Box>
@@ -160,40 +261,40 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         <Typography variant="subtitle2" fontWeight={700} mb={1}>Agregar sub-item</Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <TextField
-            size="small"
-            label="Descripción"
-            fullWidth
-            value={descripcion}
-            onChange={e => setDescripcion(e.target.value)}
+            size="small" label="Descripción" fullWidth
+            value={descripcion} onChange={e => setDescripcion(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
           />
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <TextField
-              size="small"
-              label="Monto (ARS)"
-              type="number"
-              value={monto}
-              onChange={e => setMonto(e.target.value)}
+              size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+              value={monto} onChange={e => setMonto(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              inputProps={{ min: 0.01, step: 0.01 }}
-              sx={{ flex: 1 }}
+              inputProps={{ min: 0, step: 0.01 }}
             />
             <TextField
-              size="small"
-              label="Fecha (opcional)"
-              type="date"
-              value={fecha}
-              onChange={e => setFecha(e.target.value)}
+              size="small" label="Fecha (opcional)" type="date" sx={{ width: 160 }}
+              value={fecha} onChange={e => setFecha(e.target.value)}
               onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
               InputLabelProps={{ shrink: true }}
-              sx={{ width: 160 }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <TextField
+              size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
+              value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
+              inputProps={{ min: 1, step: 1 }}
+            />
+            <TextField
+              size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
+              value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
+              inputProps={{ min: 1, step: 1 }}
             />
           </Box>
           <Button
             variant="contained"
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-            onClick={handleAdd}
-            disabled={saving}
+            onClick={handleAdd} disabled={saving}
           >
             Agregar
           </Button>

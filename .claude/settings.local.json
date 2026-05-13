@@ -1,7 +1,12 @@
 {
+  "env": {
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1"
+  },
   "permissions": {
     "allow": [
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(del *)"
     ]
-  }
+  },
+  "defaultShell": "powershell"
 }

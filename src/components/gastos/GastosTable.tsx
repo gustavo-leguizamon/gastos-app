@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid'
+import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import HomeIcon from '@mui/icons-material/Home'
@@ -98,14 +99,16 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         const hasItems = (row.items?.length ?? 0) > 0
         if (!hasItems) return null
         const expanded = expandedIds.has(row.id)
         return (
-          <IconButton size="small" onClick={() => toggleExpand(row.id)}>
-            {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-          </IconButton>
+          <Tooltip title={expanded ? 'Ocultar sub-items' : 'Ver sub-items'}>
+            <IconButton size="small" onClick={() => toggleExpand(row.id)}>
+              {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
         )
       },
     },
@@ -114,6 +117,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Vencimiento',
       width: 110,
       renderCell: ({ value, row }) => {
+        if (row._type === 'items_total') return null
         if (row._type === 'item') return (
           <Typography variant="caption" color="text.disabled" sx={{ pl: 1 }}>{row._fecha ?? ''}</Typography>
         )
@@ -132,6 +136,19 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       flex: 1,
       minWidth: 150,
       renderCell: ({ value, row }) => {
+        if (row._type === 'items_total') {
+          const matches = row._matches
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pl: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                TOTAL SUB-ITEMS
+              </Typography>
+              <Typography variant="caption" sx={{ color: matches ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                {matches ? '✓ Coincide' : '✗ No coincide'}
+              </Typography>
+            </Box>
+          )
+        }
         if (row._type === 'item') return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 1 }}>
             <SubdirectoryArrowRightIcon sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0 }} />
@@ -146,7 +163,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Pago',
       width: 90,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         return (
           <Chip
             label={value === 'C' ? 'Crédito' : 'Débito'}
@@ -162,7 +179,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Total Moneda',
       width: 130,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         return fmtNum(value, row.moneda_simbolo ?? '$')
       },
     },
@@ -171,7 +188,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'T. Cambio',
       width: 100,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         return row.moneda_codigo === 'ARS' ? '-' : `$${new Intl.NumberFormat('es-AR').format(value)}`
       },
     },
@@ -180,8 +197,20 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Total ARS',
       width: 130,
       renderCell: ({ value, row }) => {
+        if (row._type === 'items_total') return (
+          <span style={{ color: row._matches ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+            {fmtARS(row._itemsTotal)}
+          </span>
+        )
         if (row._type === 'item') return (
-          <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
+          <Box>
+            <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
+            {row._cuota_actual != null && (
+              <Typography variant="caption" display="block" color="primary.main">
+                {row._cuota_actual}{row._cuotas_totales != null ? `/${row._cuotas_totales}` : ''}
+              </Typography>
+            )}
+          </Box>
         )
         return <span style={{ fontWeight: 600 }}>{fmtARS(value)}</span>
       },
@@ -191,7 +220,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Pagado',
       width: 120,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         return <span style={{ color: '#22c55e' }}>{fmtARS(value)}</span>
       },
     },
@@ -200,7 +229,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Restante',
       width: 120,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return null
         return (
           <span style={{ color: value > 0 ? '#f59e0b' : '#22c55e', fontWeight: 600 }}>
             {fmtARS(value)}
@@ -213,7 +242,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Pasaje',
       width: 110,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return '-'
         return value > 0 ? <span style={{ color: '#ec4899' }}>{fmtARS(value)}</span> : '-'
       },
     },
@@ -222,53 +251,64 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Préstamo',
       width: 110,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
+        if (row._type === 'item' || row._type === 'items_total') return '-'
         return value > 0 ? <span style={{ color: '#8b5cf6' }}>{fmtARS(value)}</span> : '-'
+      },
+    },
+    {
+      field: 'cuota_actual',
+      headerName: 'Cuotas',
+      width: 80,
+      renderCell: ({ row }) => {
+        if (row._type === 'item' || row._type === 'items_total') return null
+        if (!row.cuota_actual && !row.cuotas_totales) return '-'
+        const actual = row.cuota_actual ?? '?'
+        const total = row.cuotas_totales ?? '?'
+        return <span style={{ fontWeight: 600 }}>{actual}/{total}</span>
       },
     },
     {
       field: 'tarjeta_nombre',
       headerName: 'Tarjeta',
-      width: 130,
+      width: 160,
       renderCell: ({ value, row }) => {
-        if (row._type === 'item') return null
-        return value ?? '-'
+        if (row._type === 'item' || row._type === 'items_total') return null
+        if (!value) return '-'
+        return row.tarjeta_banco ? `${value} (${row.tarjeta_banco})` : value
       },
     },
     {
       field: 'actions',
-      type: 'actions',
       headerName: '',
-      width: 110,
-      getActions: ({ row }) => {
-        if (row._type === 'item') return []
-        return [
-          <GridActionsCellItem
-            key="items"
-            icon={<ViewListIcon fontSize="small" />}
-            label="Sub-items"
-            onClick={() => setItemGasto(row as Gasto)}
-          />,
-          <GridActionsCellItem
-            key="pagar"
-            icon={<PaymentsIcon fontSize="small" />}
-            label="Pagos"
-            onClick={() => setPagoGasto(row as Gasto)}
-          />,
-          <GridActionsCellItem
-            key="edit"
-            icon={<EditIcon fontSize="small" />}
-            label="Editar"
-            onClick={() => onEdit(row as Gasto)}
-          />,
-          <GridActionsCellItem
-            key="delete"
-            icon={<DeleteIcon fontSize="small" />}
-            label="Eliminar"
-            onClick={() => setDeleteId(row.id)}
-            showInMenu={false}
-          />,
-        ]
+      width: 130,
+      sortable: false,
+      disableColumnMenu: true,
+      renderCell: ({ row }) => {
+        if (row._type === 'item' || row._type === 'items_total') return null
+        return (
+          <Box sx={{ display: 'flex', gap: 0.25 }}>
+            <Tooltip title="Sub-items">
+              <IconButton size="small" onClick={() => setItemGasto(row as Gasto)}>
+                <ViewListIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Pagos">
+              <IconButton size="small" onClick={() => setPagoGasto(row as Gasto)}>
+                <PaymentsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Editar">
+              <IconButton size="small" onClick={() => onEdit(row as Gasto)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Eliminar">
+              <IconButton size="small" onClick={() => setDeleteId(row.id)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )
       },
     },
   ]
@@ -287,6 +327,11 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     '& .row-subitem': {
       bgcolor: 'rgba(255,255,255,0.03)',
       '&:hover': { bgcolor: 'rgba(99,102,241,0.04)' },
+    },
+    '& .row-items-total': {
+      bgcolor: 'rgba(255,255,255,0.06)',
+      borderTop: '1px solid rgba(255,255,255,0.1)',
+      '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
     },
   }
 
@@ -315,8 +360,20 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
             descripcion: item.descripcion,
             _monto: item.monto,
             _fecha: item.fecha,
+            _cuota_actual: item.cuota_actual,
+            _cuotas_totales: item.cuotas_totales,
           })
         }
+        const itemsTotal = g.items.reduce((s, i) => s + i.monto, 0)
+        const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
+        result.push({
+          id: `total_${g.id}`,
+          _type: 'items_total',
+          _parentId: g.id,
+          _itemsTotal: itemsTotal,
+          _gastoTotal: g.total_ars,
+          _matches: matches,
+        })
       }
     }
     return result
@@ -366,7 +423,10 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
                 density="compact"
                 hideFooter={rows.length <= 25}
                 getRowId={row => row.id}
-                getRowClassName={({ row }) => row._type === 'item' ? 'row-subitem' : ''}
+                getRowClassName={({ row }) =>
+                  row._type === 'item' ? 'row-subitem' :
+                  row._type === 'items_total' ? 'row-items-total' : ''
+                }
                 isRowSelectable={() => false}
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
                 pageSizeOptions={[25, 50, 100]}

@@ -1,20 +1,19 @@
 'use client'
 
 import Box from '@mui/material/Box'
-import Sidebar from './Sidebar'
-
-const SIDEBAR_WIDTH = 220
+import Toolbar from '@mui/material/Toolbar'
+import TopBar from './TopBar'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Sidebar width={SIDEBAR_WIDTH} />
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <TopBar />
+      <Toolbar />
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           p: 3,
-          minHeight: '100vh',
           overflow: 'auto',
         }}
       >

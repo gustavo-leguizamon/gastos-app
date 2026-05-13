@@ -22,6 +22,8 @@ export interface GastoItem {
   descripcion: string
   monto: number
   fecha: string | null
+  cuota_actual: number | null
+  cuotas_totales: number | null
   created_at: string
 }
 
@@ -52,6 +54,9 @@ export interface Gasto {
   prestamo_a_otro: number
   tarjeta_id: number | null
   tarjeta_nombre?: string | null
+  tarjeta_banco?: string | null
+  cuota_actual: number | null
+  cuotas_totales: number | null
   mes: number
   anio: number
   notas: string | null
@@ -73,6 +78,8 @@ export interface GastoFormData {
   pasaje_mes_siguiente: number
   prestamo_a_otro: number
   tarjeta_id: number | null
+  cuota_actual: number | null
+  cuotas_totales: number | null
   mes: number
   anio: number
   notas: string

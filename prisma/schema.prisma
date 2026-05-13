@@ -41,6 +41,8 @@ model Gasto {
   pasajeMesSiguiente   Float    @default(0)
   prestamo_a_otro      Float    @default(0)
   tarjetaId            Int?
+  cuotaActual          Int?
+  cuotasTotales        Int?
   mes                  Int
   anio                 Int
   notas                String?
@@ -55,12 +57,14 @@ model Gasto {
 }
 
 model GastoItem {
-  id          Int      @id @default(autoincrement())
-  gastoId     Int
-  descripcion String
-  monto       Float
-  fecha       String?
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  gastoId       Int
+  descripcion   String
+  monto         Float
+  fecha         String?
+  cuotaActual   Int?
+  cuotasTotales Int?
+  createdAt     DateTime @default(now())
 
   gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
 }
