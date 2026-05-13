@@ -1,0 +1,34 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+
+function toItemResponse(i: any) {
+  return {
+    id: i.id,
+    gasto_id: i.gastoId,
+    descripcion: i.descripcion,
+    monto: i.monto,
+    fecha: i.fecha ?? null,
+    created_at: i.createdAt.toISOString(),
+  }
+}
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const items = await prisma.gastoItem.findMany({
+    where: { gastoId: Number(params.id) },
+    orderBy: { createdAt: 'asc' },
+  })
+  return NextResponse.json(items.map(toItemResponse))
+}
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json()
+  const item = await prisma.gastoItem.create({
+    data: {
+      gastoId: Number(params.id),
+      descripcion: body.descripcion,
+      monto: body.monto,
+      fecha: body.fecha || null,
+    },
+  })
+  return NextResponse.json(toItemResponse(item), { status: 201 })
+}

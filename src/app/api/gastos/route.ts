@@ -36,10 +36,24 @@ function toGastoResponse(g: any) {
     created_at: g.createdAt?.toISOString(),
     updated_at: g.updatedAt?.toISOString(),
     pagos,
+    items: (g.items ?? []).map((i: any) => ({
+      id: i.id,
+      gasto_id: i.gastoId,
+      descripcion: i.descripcion,
+      monto: i.monto,
+      fecha: i.fecha ?? null,
+      created_at: i.createdAt?.toISOString(),
+    })),
   }
 }
 
-const INCLUDE = { casa: true, moneda: true, tarjeta: true, pagos: { orderBy: { createdAt: 'asc' as const } } }
+const INCLUDE = {
+  casa: true,
+  moneda: true,
+  tarjeta: true,
+  pagos: { orderBy: { createdAt: 'asc' as const } },
+  items: { orderBy: { createdAt: 'asc' as const } },
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)

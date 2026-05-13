@@ -34,10 +34,24 @@ function toGastoResponse(g: any) {
     anio: g.anio,
     notas: g.notas,
     pagos,
+    items: (g.items ?? []).map((i: any) => ({
+      id: i.id,
+      gasto_id: i.gastoId,
+      descripcion: i.descripcion,
+      monto: i.monto,
+      fecha: i.fecha ?? null,
+      created_at: i.createdAt?.toISOString(),
+    })),
   }
 }
 
-const INCLUDE = { casa: true, moneda: true, tarjeta: true, pagos: { orderBy: { createdAt: 'asc' as const } } }
+const INCLUDE = {
+  casa: true,
+  moneda: true,
+  tarjeta: true,
+  pagos: { orderBy: { createdAt: 'asc' as const } },
+  items: { orderBy: { createdAt: 'asc' as const } },
+}
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const gasto = await prisma.gasto.findUnique({ where: { id: Number(params.id) }, include: INCLUDE })

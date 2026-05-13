@@ -51,6 +51,18 @@ model Gasto {
   moneda  Moneda   @relation(fields: [monedaId], references: [id])
   tarjeta Tarjeta? @relation(fields: [tarjetaId], references: [id])
   pagos   Pago[]
+  items   GastoItem[]
+}
+
+model GastoItem {
+  id          Int      @id @default(autoincrement())
+  gastoId     Int
+  descripcion String
+  monto       Float
+  fecha       String?
+  createdAt   DateTime @default(now())
+
+  gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
 }
 
 model Pago {

@@ -16,6 +16,15 @@ export interface Tarjeta {
   banco: string | null
 }
 
+export interface GastoItem {
+  id: number
+  gasto_id: number
+  descripcion: string
+  monto: number
+  fecha: string | null
+  created_at: string
+}
+
 export interface Pago {
   id: number
   gasto_id: number
@@ -49,6 +58,7 @@ export interface Gasto {
   created_at: string
   updated_at: string
   pagos: Pago[]
+  items: GastoItem[]
 }
 
 export interface GastoFormData {
