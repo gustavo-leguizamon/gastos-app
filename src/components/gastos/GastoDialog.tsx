@@ -9,6 +9,7 @@ import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import toast from 'react-hot-toast'
 import GastoForm from './GastoForm'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { Gasto, GastoFormData, FiltrosGastos } from '@/lib/types'
 
 interface Props {
@@ -23,6 +24,11 @@ const FORM_ID = 'gasto-form'
 
 export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false)
+  const [confirmClose, setConfirmClose] = useState(false)
+
+  const handleRequestClose = () => {
+    if (!loading) setConfirmClose(true)
+  }
 
   const handleSubmit = async (data: GastoFormData) => {
     setLoading(true)
@@ -46,31 +52,43 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>
-        {gasto ? 'Editar Gasto' : 'Nuevo Gasto'}
-      </DialogTitle>
-      <DialogContent dividers sx={{ pt: 2 }}>
-        <GastoForm
-          gasto={gasto}
-          defaultMes={filtros.mes}
-          defaultAnio={filtros.anio}
-          onSubmit={handleSubmit}
-          formId={FORM_ID}
-        />
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} disabled={loading}>Cancelar</Button>
-        <Button
-          type="submit"
-          form={FORM_ID}
-          variant="contained"
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={16} /> : undefined}
-        >
-          {loading ? 'Guardando...' : 'Guardar'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <>
+      <Dialog open={open} onClose={handleRequestClose} maxWidth="md" fullWidth disableEscapeKeyDown={loading}>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {gasto ? 'Editar Gasto' : 'Nuevo Gasto'}
+        </DialogTitle>
+        <DialogContent dividers sx={{ pt: 2 }}>
+          <GastoForm
+            gasto={gasto}
+            defaultMes={filtros.mes}
+            defaultAnio={filtros.anio}
+            onSubmit={handleSubmit}
+            formId={FORM_ID}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={handleRequestClose} disabled={loading}>Cancelar</Button>
+          <Button
+            type="submit"
+            form={FORM_ID}
+            variant="contained"
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={16} /> : undefined}
+          >
+            {loading ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmClose}
+        title="¿Cerrar sin guardar?"
+        message="Perdés los datos ingresados. ¿Querés cerrar de todas formas?"
+        confirmLabel="Cerrar"
+        confirmColor="warning"
+        onConfirm={() => { setConfirmClose(false); onClose() }}
+        onCancel={() => setConfirmClose(false)}
+      />
+    </>
   )
 }
