@@ -1,0 +1,56 @@
+{
+  "env": {
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(*)",
+      "Bash(ls:*)",
+      "Bash(pnpm add:*)",
+      "Bash(head:*)",
+      "Bash(az boards:*)",
+      "Bash(az repos:*)",
+      "Bash(az devops:*)",
+      "Bash(python3:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm dlx:*)",
+      "Bash(git worktree:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npx tsc:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit.*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-commit-check.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash(az repos pr create.*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-pr.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

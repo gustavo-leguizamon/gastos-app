@@ -1,0 +1,241 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
+import Grid from '@mui/material/Grid'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import CardHeader from '@mui/material/CardHeader'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
+import DeleteIcon from '@mui/icons-material/Delete'
+import AddIcon from '@mui/icons-material/Add'
+import EditIcon from '@mui/icons-material/Edit'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
+import toast from 'react-hot-toast'
+import type { Casa, Moneda, Tarjeta } from '@/lib/types'
+
+function useSimpleCrud<T extends { id: number }>(endpoint: string) {
+  const [items, setItems] = useState<T[]>([])
+
+  const load = () => fetch(endpoint).then(r => r.json()).then(setItems)
+  useEffect(() => { load() }, [])
+
+  const add = async (body: object) => {
+    const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) throw new Error()
+    await load()
+  }
+
+  const update = async (id: number, body: object) => {
+    const res = await fetch(`${endpoint}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) throw new Error()
+    await load()
+  }
+
+  const remove = async (id: number) => {
+    await fetch(`${endpoint}/${id}`, { method: 'DELETE' })
+    await load()
+  }
+
+  return { items, add, update, remove }
+}
+
+export default function ConfiguracionPage() {
+  // Casas
+  const { items: casas, add: addCasa, update: updateCasa, remove: removeCasa } = useSimpleCrud<Casa>('/api/casas')
+  const [nuevaCasa, setNuevaCasa] = useState('')
+  const [editingCasa, setEditingCasa] = useState<{ id: number; nombre: string } | null>(null)
+
+  // Monedas
+  const { items: monedas, add: addMoneda, update: updateMoneda, remove: removeMoneda } = useSimpleCrud<Moneda>('/api/monedas')
+  const [nuevaMoneda, setNuevaMoneda] = useState({ codigo: '', nombre: '', simbolo: '' })
+  const [editingMoneda, setEditingMoneda] = useState<Moneda | null>(null)
+
+  // Tarjetas
+  const { items: tarjetas, add: addTarjeta, update: updateTarjeta, remove: removeTarjeta } = useSimpleCrud<Tarjeta>('/api/tarjetas')
+  const [nuevaTarjeta, setNuevaTarjeta] = useState({ nombre: '', banco: '' })
+  const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
+
+  const handleAddCasa = async () => {
+    if (!nuevaCasa.trim()) return
+    try { await addCasa({ nombre: nuevaCasa.trim() }); setNuevaCasa(''); toast.success('Casa agregada') }
+    catch { toast.error('Error al agregar casa') }
+  }
+
+  const handleSaveCasa = async () => {
+    if (!editingCasa || !editingCasa.nombre.trim()) return
+    try { await updateCasa(editingCasa.id, { nombre: editingCasa.nombre.trim() }); setEditingCasa(null); toast.success('Casa actualizada') }
+    catch { toast.error('Error al actualizar casa') }
+  }
+
+  const handleAddMoneda = async () => {
+    if (!nuevaMoneda.codigo || !nuevaMoneda.nombre || !nuevaMoneda.simbolo) return
+    try { await addMoneda(nuevaMoneda); setNuevaMoneda({ codigo: '', nombre: '', simbolo: '' }); toast.success('Moneda agregada') }
+    catch { toast.error('Error al agregar moneda') }
+  }
+
+  const handleSaveMoneda = async () => {
+    if (!editingMoneda || !editingMoneda.codigo || !editingMoneda.nombre || !editingMoneda.simbolo) return
+    try { await updateMoneda(editingMoneda.id, editingMoneda); setEditingMoneda(null); toast.success('Moneda actualizada') }
+    catch { toast.error('Error al actualizar moneda') }
+  }
+
+  const handleAddTarjeta = async () => {
+    if (!nuevaTarjeta.nombre.trim()) return
+    try { await addTarjeta(nuevaTarjeta); setNuevaTarjeta({ nombre: '', banco: '' }); toast.success('Tarjeta agregada') }
+    catch { toast.error('Error al agregar tarjeta') }
+  }
+
+  const handleSaveTarjeta = async () => {
+    if (!editingTarjeta || !editingTarjeta.nombre.trim()) return
+    try { await updateTarjeta(editingTarjeta.id, editingTarjeta); setEditingTarjeta(null); toast.success('Tarjeta actualizada') }
+    catch { toast.error('Error al actualizar tarjeta') }
+  }
+
+  return (
+    <Box>
+      <Typography variant="h5" fontWeight={700} mb={3}>Configuración</Typography>
+
+      <Grid container spacing={3}>
+        {/* Casas */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader title="Casas" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardContent>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <TextField
+                  size="small" fullWidth
+                  label="Nombre de la casa"
+                  value={nuevaCasa}
+                  onChange={e => setNuevaCasa(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddCasa()}
+                />
+                <IconButton onClick={handleAddCasa} color="primary"><AddIcon /></IconButton>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <List dense disablePadding>
+                {casas.map(c => (
+                  <ListItem key={c.id} disablePadding sx={{ py: 0.5 }}
+                    secondaryAction={
+                      editingCasa?.id === c.id ? (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" color="primary" onClick={handleSaveCasa}><CheckIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setEditingCasa(null)}><CloseIcon fontSize="small" /></IconButton>
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" onClick={() => setEditingCasa({ id: c.id, nombre: c.nombre })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeCasa(c.id); toast.success('Casa eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                        </Box>
+                      )
+                    }
+                  >
+                    {editingCasa?.id === c.id ? (
+                      <TextField
+                        size="small" fullWidth autoFocus
+                        value={editingCasa.nombre}
+                        onChange={e => setEditingCasa(p => p ? { ...p, nombre: e.target.value } : p)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveCasa(); if (e.key === 'Escape') setEditingCasa(null) }}
+                        sx={{ mr: 9 }}
+                      />
+                    ) : (
+                      <ListItemText primary={c.nombre} sx={{ pr: 9 }} />
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Monedas */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader title="Monedas" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                <TextField size="small" label="Código (ej: USD)" value={nuevaMoneda.codigo} onChange={e => setNuevaMoneda(p => ({ ...p, codigo: e.target.value.toUpperCase() }))} />
+                <TextField size="small" label="Nombre" value={nuevaMoneda.nombre} onChange={e => setNuevaMoneda(p => ({ ...p, nombre: e.target.value }))} />
+                <TextField size="small" label="Símbolo (ej: US$)" value={nuevaMoneda.simbolo} onChange={e => setNuevaMoneda(p => ({ ...p, simbolo: e.target.value }))} />
+                <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddMoneda} size="small">Agregar</Button>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <List dense disablePadding>
+                {monedas.map(m => (
+                  <ListItem key={m.id} disablePadding sx={{ py: 0.5, flexDirection: 'column', alignItems: 'stretch' }}>
+                    {editingMoneda?.id === m.id ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
+                        <TextField size="small" label="Código" autoFocus value={editingMoneda.codigo} onChange={e => setEditingMoneda(p => p ? { ...p, codigo: e.target.value.toUpperCase() } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveMoneda(); if (e.key === 'Escape') setEditingMoneda(null) }} />
+                        <TextField size="small" label="Nombre" value={editingMoneda.nombre} onChange={e => setEditingMoneda(p => p ? { ...p, nombre: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveMoneda(); if (e.key === 'Escape') setEditingMoneda(null) }} />
+                        <TextField size="small" label="Símbolo" value={editingMoneda.simbolo} onChange={e => setEditingMoneda(p => p ? { ...p, simbolo: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveMoneda(); if (e.key === 'Escape') setEditingMoneda(null) }} />
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={handleSaveMoneda}>Guardar</Button>
+                          <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingMoneda(null)}>Cancelar</Button>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <ListItemText primary={`${m.simbolo} ${m.codigo}`} secondary={m.nombre} />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                          <IconButton size="small" onClick={() => setEditingMoneda({ ...m })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeMoneda(m.id); toast.success('Moneda eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                        </Box>
+                      </Box>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Tarjetas */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader title="Tarjetas de Crédito" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                <TextField size="small" label="Nombre de la tarjeta" value={nuevaTarjeta.nombre} onChange={e => setNuevaTarjeta(p => ({ ...p, nombre: e.target.value }))} />
+                <TextField size="small" label="Banco (opcional)" value={nuevaTarjeta.banco} onChange={e => setNuevaTarjeta(p => ({ ...p, banco: e.target.value }))} />
+                <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTarjeta} size="small">Agregar</Button>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <List dense disablePadding>
+                {tarjetas.map(t => (
+                  <ListItem key={t.id} disablePadding sx={{ py: 0.5, flexDirection: 'column', alignItems: 'stretch' }}>
+                    {editingTarjeta?.id === t.id ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
+                        <TextField size="small" label="Nombre" autoFocus value={editingTarjeta.nombre} onChange={e => setEditingTarjeta(p => p ? { ...p, nombre: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveTarjeta(); if (e.key === 'Escape') setEditingTarjeta(null) }} />
+                        <TextField size="small" label="Banco (opcional)" value={editingTarjeta.banco ?? ''} onChange={e => setEditingTarjeta(p => p ? { ...p, banco: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveTarjeta(); if (e.key === 'Escape') setEditingTarjeta(null) }} />
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={handleSaveTarjeta}>Guardar</Button>
+                          <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingTarjeta(null)}>Cancelar</Button>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                          <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                        </Box>
+                      </Box>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Box>
+  )
+}

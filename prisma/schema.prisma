@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/gastos.db"
+}
+
+model Moneda {
+  id      Int     @id @default(autoincrement())
+  codigo  String  @unique
+  nombre  String
+  simbolo String
+  gastos  Gasto[]
+}
+
+model Casa {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  gastos Gasto[]
+}
+
+model Tarjeta {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  banco  String?
+  gastos Gasto[]
+}
+
+model Gasto {
+  id                   Int      @id @default(autoincrement())
+  casaId               Int
+  descripcion          String
+  fechaVencimiento     String
+  tipoPago             String
+  monedaId             Int
+  tipoCambio           Float    @default(1)
+  totalMoneda          Float
+  totalPagado          Float    @default(0)
+  pasajeMesSiguiente   Float    @default(0)
+  prestamo_a_otro      Float    @default(0)
+  tarjetaId            Int?
+  mes                  Int
+  anio                 Int
+  notas                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  casa    Casa    @relation(fields: [casaId], references: [id])
+  moneda  Moneda  @relation(fields: [monedaId], references: [id])
+  tarjeta Tarjeta? @relation(fields: [tarjetaId], references: [id])
+}
