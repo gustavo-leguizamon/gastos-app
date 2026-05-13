@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid'
+import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import HomeIcon from '@mui/icons-material/Home'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { Gasto, FiltrosGastos } from '@/lib/types'
@@ -73,7 +76,6 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       },
     },
     { field: 'descripcion', headerName: 'Descripción', flex: 1, minWidth: 150 },
-    { field: 'casa_nombre', headerName: 'Casa', width: 130 },
     {
       field: 'tipo_pago',
       headerName: 'Pago',
@@ -165,32 +167,80 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     },
   ]
 
+  const gridSx = {
+    border: '1px solid',
+    borderColor: 'divider',
+    borderRadius: 2,
+    '& .MuiDataGrid-columnHeader': {
+      bgcolor: 'background.paper',
+      fontWeight: 700,
+      fontSize: 12,
+      color: 'text.secondary',
+    },
+    '& .MuiDataGrid-row:hover': { bgcolor: 'rgba(99,102,241,0.06)' },
+  }
+
+  // Agrupar por casa
+  const groups = gastos.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
+    const key = String(g.casa_id ?? 'sin-casa')
+    if (!acc[key]) acc[key] = { nombre: g.casa_nombre ?? 'Sin casa', rows: [] }
+    acc[key].rows.push(g)
+    return acc
+  }, {})
+
+  const groupEntries = Object.values(groups)
+
+  if (loading) {
+    return <DataGrid rows={[]} columns={columns} loading autoHeight sx={gridSx} />
+  }
+
+  if (groupEntries.length === 0) {
+    return (
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">No hay gastos para el período seleccionado.</Typography>
+      </Box>
+    )
+  }
+
   return (
     <>
-      <DataGrid
-        rows={gastos}
-        columns={columns}
-        loading={loading}
-        autoHeight
-        disableRowSelectionOnClick
-        density="compact"
-        initialState={{
-          pagination: { paginationModel: { pageSize: 25 } },
-        }}
-        pageSizeOptions={[25, 50, 100]}
-        sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-          '& .MuiDataGrid-columnHeader': {
-            bgcolor: 'background.paper',
-            fontWeight: 700,
-            fontSize: 12,
-            color: 'text.secondary',
-          },
-          '& .MuiDataGrid-row:hover': { bgcolor: 'rgba(99,102,241,0.06)' },
-        }}
-      />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {groupEntries.map(({ nombre, rows }) => {
+          const totalARS = rows.reduce((s, r) => s + r.total_ars, 0)
+          const totalRestante = rows.reduce((s, r) => s + r.total_restante, 0)
+          return (
+            <Box key={nombre}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, px: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <HomeIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                  <Typography fontWeight={700} fontSize={15}>{nombre}</Typography>
+                  <Chip label={`${rows.length} gasto${rows.length !== 1 ? 's' : ''}`} size="small" variant="outlined" />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Total: <strong style={{ color: '#fff' }}>{fmtARS(totalARS)}</strong>
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Restante: <strong style={{ color: totalRestante > 0 ? '#f59e0b' : '#22c55e' }}>{fmtARS(totalRestante)}</strong>
+                  </Typography>
+                </Box>
+              </Box>
+              <DataGrid
+                rows={rows}
+                columns={columns}
+                autoHeight
+                disableRowSelectionOnClick
+                density="compact"
+                hideFooter={rows.length <= 25}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                pageSizeOptions={[25, 50, 100]}
+                sx={gridSx}
+              />
+            </Box>
+          )
+        })}
+      </Box>
+
       <ConfirmDialog
         open={deleteId !== null}
         title="Eliminar gasto"

@@ -13,7 +13,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         component="main"
         sx={{
           flexGrow: 1,
-          ml: `${SIDEBAR_WIDTH}px`,
           p: 3,
           minHeight: '100vh',
           overflow: 'auto',
