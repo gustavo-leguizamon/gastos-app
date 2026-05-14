@@ -36,6 +36,7 @@ function toGastoResponse(g: any) {
     mes: g.mes,
     anio: g.anio,
     notas: g.notas,
+    confirmado: g.confirmado,
     created_at: g.createdAt?.toISOString(),
     updated_at: g.updatedAt?.toISOString(),
     pagos,
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
       mes: body.mes,
       anio: body.anio,
       notas: body.notas || null,
+      confirmado: body.confirmado ?? true,
     },
     include: INCLUDE,
   })

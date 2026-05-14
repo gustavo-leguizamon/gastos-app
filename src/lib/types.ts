@@ -62,6 +62,7 @@ export interface Gasto {
   mes: number
   anio: number
   notas: string | null
+  confirmado: boolean
   created_at: string
   updated_at: string
   pagos: Pago[]
@@ -85,6 +86,7 @@ export interface GastoFormData {
   mes: number
   anio: number
   notas: string
+  confirmado: boolean
 }
 
 export interface Resumen {

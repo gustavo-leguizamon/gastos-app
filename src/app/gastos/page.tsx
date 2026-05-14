@@ -4,15 +4,19 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import AddIcon from '@mui/icons-material/Add'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import { useState } from 'react'
 import { useGastosStore } from '@/store/gastosStore'
 import ResumenCards from '@/components/gastos/ResumenCards'
 import FiltrosGastos from '@/components/gastos/FiltrosGastos'
 import GastosTable from '@/components/gastos/GastosTable'
 import GastoDialog from '@/components/gastos/GastoDialog'
+import CopiarMesDialog from '@/components/gastos/CopiarMesDialog'
 import type { Gasto } from '@/lib/types'
 
 export default function GastosPage() {
   const { filtros, setFiltros, dialogOpen, gastoEditando, openDialog, closeDialog, refreshKey, triggerRefresh } = useGastosStore()
+  const [copiarMesOpen, setCopiarMesOpen] = useState(false)
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -26,11 +30,12 @@ export default function GastosPage() {
           </Typography>
         </Box>
         <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openDialog()}
+          variant="outlined"
+          startIcon={<ContentCopyIcon />}
+          onClick={() => setCopiarMesOpen(true)}
+          size="small"
         >
-          Nuevo Gasto
+          Copiar mes
         </Button>
       </Box>
 
@@ -41,6 +46,22 @@ export default function GastosPage() {
         refreshKey={refreshKey}
         onEdit={(gasto: Gasto) => openDialog(gasto)}
         onDeleted={triggerRefresh}
+      />
+
+      <Button
+        variant="contained"
+        startIcon={<AddIcon />}
+        onClick={() => openDialog()}
+        sx={{ position: 'fixed', top: 12, right: 24, zIndex: 1200 }}
+      >
+        Nuevo Gasto
+      </Button>
+
+      <CopiarMesDialog
+        open={copiarMesOpen}
+        filtros={filtros}
+        onClose={() => setCopiarMesOpen(false)}
+        onCopied={triggerRefresh}
       />
 
       <GastoDialog

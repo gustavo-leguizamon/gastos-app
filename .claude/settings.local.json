@@ -5,7 +5,8 @@
   "permissions": {
     "allow": [
       "PowerShell(git *)",
-      "Bash(del *)"
+      "Bash(del *)",
+      "Bash(npx prisma *)"
     ]
   },
   "defaultShell": "powershell"

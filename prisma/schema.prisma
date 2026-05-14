@@ -46,6 +46,7 @@ model Gasto {
   mes                  Int
   anio                 Int
   notas                String?
+  confirmado           Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

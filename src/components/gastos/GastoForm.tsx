@@ -15,6 +15,8 @@ import ToggleButton from '@mui/material/ToggleButton'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import FormHelperText from '@mui/material/FormHelperText'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Checkbox from '@mui/material/Checkbox'
 import type { Casa, Moneda, Tarjeta, Gasto, GastoFormData } from '@/lib/types'
 
 const schema = yup.object({
@@ -34,6 +36,7 @@ const schema = yup.object({
   mes: yup.number().required(),
   anio: yup.number().required(),
   notas: yup.string().optional().default(''),
+  confirmado: yup.boolean().required().default(true),
 })
 
 interface Props {
@@ -69,6 +72,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       mes: gasto?.mes ?? defaultMes,
       anio: gasto?.anio ?? defaultAnio,
       notas: gasto?.notas ?? '',
+      confirmado: gasto?.confirmado ?? true,
     },
   })
 
@@ -94,6 +98,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const tipoCambio = watch('tipo_cambio')
   const totalMoneda = watch('total_moneda')
 
+  const isEditing = !!gasto
   const monedaSeleccionada = useMemo(() => monedas.find(m => m.id === monedaId), [monedas, monedaId])
   const esARS = monedaSeleccionada?.codigo === 'ARS'
   const totalARS = (totalMoneda || 0) * (esARS ? 1 : (tipoCambio || 1))
@@ -270,65 +275,67 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           </Grid>
         )}
 
-        {/* Total pagado */}
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="total_pagado"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Total Pagado (ARS)"
-                type="number"
-                size="small"
-                inputProps={{ step: 0.01, min: 0 }}
-                error={!!errors.total_pagado}
-                helperText={errors.total_pagado?.message}
+        {/* Total pagado / Pasaje / Préstamo — solo en edición */}
+        {isEditing && (
+          <>
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="total_pagado"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Total Pagado (ARS)"
+                    type="number"
+                    size="small"
+                    inputProps={{ step: 0.01, min: 0 }}
+                    error={!!errors.total_pagado}
+                    helperText={errors.total_pagado?.message}
+                  />
+                )}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        {/* Pasaje mes siguiente */}
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="pasaje_mes_siguiente"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Pasaje Mes Siguiente (ARS)"
-                type="number"
-                size="small"
-                inputProps={{ step: 0.01, min: 0 }}
-                error={!!errors.pasaje_mes_siguiente}
-                helperText={errors.pasaje_mes_siguiente?.message}
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="pasaje_mes_siguiente"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Pasaje Mes Siguiente (ARS)"
+                    type="number"
+                    size="small"
+                    inputProps={{ step: 0.01, min: 0 }}
+                    error={!!errors.pasaje_mes_siguiente}
+                    helperText={errors.pasaje_mes_siguiente?.message}
+                  />
+                )}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
 
-        {/* Prestamo a otro */}
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="prestamo_a_otro"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Préstamo a otra persona (ARS)"
-                type="number"
-                size="small"
-                inputProps={{ step: 0.01, min: 0 }}
-                error={!!errors.prestamo_a_otro}
-                helperText={errors.prestamo_a_otro?.message}
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="prestamo_a_otro"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Préstamo a otra persona (ARS)"
+                    type="number"
+                    size="small"
+                    inputProps={{ step: 0.01, min: 0 }}
+                    error={!!errors.prestamo_a_otro}
+                    helperText={errors.prestamo_a_otro?.message}
+                  />
+                )}
               />
-            )}
-          />
-        </Grid>
+            </Grid>
+          </>
+        )}
 
         {/* Cuotas */}
         <Grid item xs={12} sm={6}>
@@ -385,6 +392,33 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                 multiline
                 rows={2}
                 size="small"
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Confirmado */}
+        <Grid item xs={12}>
+          <Controller
+            name="confirmado"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!field.value}
+                    onChange={e => field.onChange(e.target.checked)}
+                    color="warning"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2">Gasto confirmado</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Desmarcá si el monto aún no está confirmado
+                    </Typography>
+                  </Box>
+                }
               />
             )}
           />

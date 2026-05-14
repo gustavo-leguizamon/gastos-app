@@ -36,6 +36,7 @@ function toGastoResponse(g: any) {
     mes: g.mes,
     anio: g.anio,
     notas: g.notas,
+    confirmado: g.confirmado,
     pagos,
     items: (g.items ?? []).map((i: any) => ({
       id: i.id,
@@ -88,6 +89,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       mes: body.mes,
       anio: body.anio,
       notas: body.notas || null,
+      confirmado: body.confirmado ?? true,
     },
     include: INCLUDE,
   })

@@ -15,12 +15,15 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import Checkbox from '@mui/material/Checkbox'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
+import CopiarGastoDialog from './CopiarGastoDialog'
 import type { Gasto, FiltrosGastos } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -46,6 +49,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
   const [pagoGasto, setPagoGasto] = useState<Gasto | null>(null)
   const [itemGasto, setItemGasto] = useState<Gasto | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
+  const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
 
   const loadGastos = () => {
     setLoading(true)
@@ -117,20 +121,28 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     {
       field: '_expand',
       headerName: '',
-      width: 40,
+      width: 60,
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
         if (row._type === 'item' || row._type === 'items_total') return null
         const hasItems = (row.items?.length ?? 0) > 0
-        if (!hasItems) return null
         const expanded = expandedIds.has(row.id)
         return (
-          <Tooltip title={expanded ? 'Ocultar sub-items' : 'Ver sub-items'}>
-            <IconButton size="small" onClick={() => toggleExpand(row.id)}>
-              {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {row.confirmado === false && (
+              <Tooltip title="Gasto no confirmado">
+                <WarningAmberIcon sx={{ fontSize: 16, color: '#f59e0b' }} />
+              </Tooltip>
+            )}
+            {hasItems && (
+              <Tooltip title={expanded ? 'Ocultar sub-items' : 'Ver sub-items'}>
+                <IconButton size="small" onClick={() => toggleExpand(row.id)}>
+                  {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         )
       },
     },
@@ -354,7 +366,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     {
       field: 'actions',
       headerName: '',
-      width: 130,
+      width: 160,
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
@@ -369,6 +381,11 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
             <Tooltip title="Pagos">
               <IconButton size="small" onClick={() => setPagoGasto(row as Gasto)}>
                 <PaymentsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Copiar a otro mes">
+              <IconButton size="small" onClick={() => setCopiarGasto(row as Gasto)}>
+                <ContentCopyIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Editar">
@@ -407,6 +424,14 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       borderTop: '1px solid rgba(255,255,255,0.1)',
       '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
     },
+    '& .row-unconfirmed': {
+      bgcolor: 'rgba(245,158,11,0.12)',
+      '&:hover': { bgcolor: 'rgba(245,158,11,0.2)' },
+    },
+    '& .row-unconfirmed-sub': {
+      bgcolor: 'rgba(245,158,11,0.07)',
+      '&:hover': { bgcolor: 'rgba(245,158,11,0.14)' },
+    },
   }
 
   // Agrupar por casa
@@ -431,6 +456,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
             _type: 'item',
             _itemId: item.id,
             _parentId: g.id,
+            _parentConfirmado: g.confirmado,
             descripcion: item.descripcion,
             _monto: item.monto,
             _fecha: item.fecha,
@@ -446,6 +472,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
           id: `total_${g.id}`,
           _type: 'items_total',
           _parentId: g.id,
+          _parentConfirmado: g.confirmado,
           _itemsTotal: itemsTotal,
           _gastoTotal: g.total_ars,
           _matches: matches,
@@ -499,10 +526,12 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
                 density="compact"
                 hideFooter={rows.length <= 25}
                 getRowId={row => row.id}
-                getRowClassName={({ row }) =>
-                  row._type === 'item' ? 'row-subitem' :
-                  row._type === 'items_total' ? 'row-items-total' : ''
-                }
+                getRowClassName={({ row }) => {
+                  if (row._type === 'gasto') return row.confirmado === false ? 'row-unconfirmed' : ''
+                  if (row._type === 'item') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-subitem' : 'row-subitem'
+                  if (row._type === 'items_total') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-items-total' : 'row-items-total'
+                  return ''
+                }}
                 isRowSelectable={() => false}
                 initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
                 pageSizeOptions={[25, 50, 100]}
@@ -533,6 +562,13 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
         gasto={itemGasto}
         onClose={() => setItemGasto(null)}
         onChanged={() => refreshGasto(itemGasto!.id, updated => setItemGasto(updated))}
+      />
+
+      <CopiarGastoDialog
+        open={copiarGasto !== null}
+        gasto={copiarGasto}
+        onClose={() => setCopiarGasto(null)}
+        onCopied={() => { setCopiarGasto(null); onDeleted() }}
       />
     </>
   )
