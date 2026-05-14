@@ -49,11 +49,16 @@ The Prisma schema uses **camelCase** fields (`casaId`, `tipoPago`, `totalMoneda`
 - `total_pagado = SUM(pagos.monto)` — computed from the `Pago` relation, **not** from `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
-The `/api/resumen` route computes these aggregates server-side for the summary cards.
+The `/api/resumen` route computes these aggregates server-side for the summary cards. It also returns:
+- `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas`
+- `total_prestamos = SUM(prestamo_a_otro)`
+- `total_tarjetas = SUM(total_ars) for gastos with a tarjetaId`
+
+These are shown as a secondary breakdown inside the "Total Gastos" card (only rendered when at least one of the sub-totals is non-zero).
 
 ### Payment system
 
-Payments are tracked via the `Pago` model (separate table), not the legacy `Gasto.totalPagado` field. The `totalPagado` column still exists in the DB for backwards compatibility but is ignored in all display calculations. API routes for payments: `GET|POST /api/gastos/[id]/pagos`, `DELETE /api/gastos/[id]/pagos/[pagoId]`.
+Payments are tracked via the `Pago` model (separate table), not the legacy `Gasto.totalPagado` field. The `totalPagado` column still exists in the DB for backwards compatibility but is ignored in all display calculations. API routes for payments: `GET|POST /api/gastos/[id]/pagos`, `PUT|DELETE /api/gastos/[id]/pagos/[pagoId]`. The `PUT` endpoint accepts `{ fecha, monto }` to edit an existing payment inline from `PagoDialog`.
 
 ### Sub-items (GastoItem)
 
@@ -63,7 +68,11 @@ Each `GastoItem` has two boolean flags:
 - `incluye_en_total` (`incluyeEnTotal` in DB, default `true`) — whether the item's monto counts toward the sub-items totals row in the table.
 - `incluye_en_vencimiento` (`incluyeEnVencimiento` in DB, default `false`) — whether the item (using its own `fecha`) contributes to the "Pagar hoy" card when its date matches today. Only applies when the parent gasto's `fechaVencimiento` is not today (to avoid double-counting).
 
-These flags can be toggled inline via `PATCH` (partial update) without reloading the table. Toggling `incluye_en_vencimiento` calls `triggerResumenRefresh()` to refresh only the summary cards, not the full gastos table.
+These flags are rendered as checkboxes inside the actions column of sub-item rows (not as separate columns). They can be toggled inline via `PATCH` (partial update) without reloading the table. Toggling `incluye_en_vencimiento` calls `triggerResumenRefresh()` to refresh only the summary cards, not the full gastos table.
+
+Sub-items are sorted by `fecha` ascending (nulls last) in `buildFlatRows` on the client side.
+
+Both `Gasto` and `GastoItem` have an optional `lugarId` FK to the `Lugar` model. Lugar can be set in the gasto form and sub-item dialog, and is displayed as a column in the grid.
 
 ### State management
 
@@ -72,6 +81,13 @@ These flags can be toggled inline via `PATCH` (partial update) without reloading
 - Dialog state (`dialogOpen`, `gastoEditando`) for the create/edit form
 - `refreshKey` / `triggerRefresh()` — reloads both the gastos table and the summary cards (used on create/edit/delete/pay)
 - `resumenRefreshKey` / `triggerResumenRefresh()` — reloads only `ResumenCards` without touching the gastos table (used for lightweight updates like checkbox toggles)
+
+### Copy dialogs
+
+- **`CopiarGastoDialog`** — copies a single gasto (+ its sub-items) to a chosen month/year. Resets all payments to zero, sets `confirmado: false`, adjusts `fechaVencimiento` to the same day in the target month.
+- **`CopiarMesDialog`** — copies all gastos of a source month/year to a target month/year. Source defaults to the active filter; target defaults to next month. Shows a count preview before copying and a `LinearProgress` during the sequential copy loop.
+
+Both dialogs call `triggerRefresh()` on completion to reload the full table.
 
 ### Key domain concepts
 
@@ -82,6 +98,8 @@ These flags can be toggled inline via `PATCH` (partial update) without reloading
 | `prestamo_a_otro` | Amount loaned to another person |
 | `tipo_cambio` | Exchange rate to ARS; always 1 when `moneda.codigo === 'ARS'` |
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
+| `confirmado` | Whether the gasto amount is confirmed. Defaults to `true` on new gastos; always set to `false` when copying. Unconfirmed rows render with an orange background and a warning icon in the expand column. |
+| `lugar_id` | Optional FK to `Lugar` — the physical location of the expense. Available on both `Gasto` and `GastoItem`. |
 
 ### API surface
 
@@ -90,13 +108,14 @@ These flags can be toggled inline via `PATCH` (partial update) without reloading
 | `GET/POST /api/gastos` | List (with filters) / create gastos |
 | `GET/PUT/DELETE /api/gastos/[id]` | Single gasto CRUD |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |
-| `DELETE /api/gastos/[id]/pagos/[pagoId]` | Remove a payment |
+| `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
-| `DELETE /api/gastos/[id]/items/[itemId]` | Remove a sub-item |
+| `PUT/PATCH/DELETE /api/gastos/[id]/items/[itemId]` | Full edit / partial toggle / remove a sub-item |
 | `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
+| `GET/POST /api/lugares` | Locations CRUD |
 
 All `/api/gastos` responses include the full `pagos` and `items` arrays via the shared `INCLUDE` constant and `toGastoResponse()` mapper defined in each route file.
 

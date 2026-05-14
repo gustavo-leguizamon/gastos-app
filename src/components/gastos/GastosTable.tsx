@@ -237,14 +237,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
           </span>
         )
         if (row._type === 'item') return (
-          <Box>
-            <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
-            {row._cuota_actual != null && (
-              <Typography variant="caption" display="block" color="primary.main">
-                {row._cuota_actual}{row._cuotas_totales != null ? `/${row._cuotas_totales}` : ''}
-              </Typography>
-            )}
-          </Box>
+          <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
         )
         return <span style={{ fontWeight: 600 }}>{fmtARS(value)}</span>
       },
@@ -294,7 +287,13 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       headerName: 'Cuotas',
       width: 80,
       renderCell: ({ row }) => {
-        if (row._type === 'item' || row._type === 'items_total') return null
+        if (row._type === 'items_total') return null
+        if (row._type === 'item') {
+          if (row._cuota_actual == null && row._cuotas_totales == null) return null
+          const actual = row._cuota_actual ?? '?'
+          const total = row._cuotas_totales ?? '?'
+          return <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>{actual}/{total}</Typography>
+        }
         if (!row.cuota_actual && !row.cuotas_totales) return '-'
         const actual = row.cuota_actual ?? '?'
         const total = row.cuotas_totales ?? '?'
@@ -513,7 +512,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
                 autoHeight
                 disableRowSelectionOnClick
                 density="compact"
-                hideFooter={rows.length <= 25}
+                hideFooter
                 getRowId={row => row.id}
                 getRowClassName={({ row }) => {
                   if (row._type === 'gasto') return row.confirmado === false ? 'row-unconfirmed' : ''
@@ -522,8 +521,6 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
                   return ''
                 }}
                 isRowSelectable={() => false}
-                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-                pageSizeOptions={[25, 50, 100]}
                 sx={gridSx}
               />
             </Box>

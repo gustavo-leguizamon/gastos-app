@@ -55,7 +55,7 @@ interface Props {
 
 export default function ResumenCards({ filtros, refreshKey }: Props) {
   const resumenRefreshKey = useGastosStore(s => s.resumenRefreshKey)
-  const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_restante: 0, total_pagado: 0, pagar_hoy: 0 })
+  const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_gastos_neto: 0, total_prestamos: 0, total_tarjetas: 0, total_restante: 0, total_pagado: 0, pagar_hoy: 0 })
 
   useEffect(() => {
     const d = new Date()
@@ -88,6 +88,23 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
               <Typography variant="h6" fontWeight={700} sx={{ color: card.color }}>
                 {formatARS(resumen[card.key])}
               </Typography>
+              {card.key === 'total_gastos' && (resumen.total_prestamos > 0 || resumen.total_tarjetas > 0) && (
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Neto: <strong>{formatARS(resumen.total_gastos_neto)}</strong>
+                  </Typography>
+                  {resumen.total_prestamos > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Préstamos: {formatARS(resumen.total_prestamos)}
+                    </Typography>
+                  )}
+                  {resumen.total_tarjetas > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Tarjetas: {formatARS(resumen.total_tarjetas)}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

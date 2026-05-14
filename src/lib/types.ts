@@ -101,6 +101,9 @@ export interface GastoFormData {
 
 export interface Resumen {
   total_gastos: number
+  total_gastos_neto: number
+  total_prestamos: number
+  total_tarjetas: number
   total_restante: number
   total_pagado: number
   pagar_hoy: number

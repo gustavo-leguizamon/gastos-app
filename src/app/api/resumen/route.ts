@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
   let total_pagado = 0
   let total_restante = 0
   let pagar_hoy = 0
+  let total_prestamos = 0
+  let total_tarjetas = 0
 
   for (const g of gastos) {
     const totalArs = g.totalMoneda * g.tipoCambio
@@ -29,6 +31,8 @@ export async function GET(req: NextRequest) {
     total_gastos += totalArs
     total_pagado += pagado
     total_restante += restante
+    total_prestamos += g.prestamo_a_otro ?? 0
+    if (g.tarjetaId) total_tarjetas += totalArs
     if (g.fechaVencimiento === today) {
       pagar_hoy += restante
     } else {
@@ -39,10 +43,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const r = (n: number) => Math.round(n * 100) / 100
   return NextResponse.json({
-    total_gastos: Math.round(total_gastos * 100) / 100,
-    total_restante: Math.round(total_restante * 100) / 100,
-    total_pagado: Math.round(total_pagado * 100) / 100,
-    pagar_hoy: Math.round(pagar_hoy * 100) / 100,
+    total_gastos: r(total_gastos),
+    total_gastos_neto: r(total_gastos - total_prestamos - total_tarjetas),
+    total_prestamos: r(total_prestamos),
+    total_tarjetas: r(total_tarjetas),
+    total_restante: r(total_restante),
+    total_pagado: r(total_pagado),
+    pagar_hoy: r(pagar_hoy),
   })
 }
