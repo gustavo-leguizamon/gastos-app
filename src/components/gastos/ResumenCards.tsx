@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useGastosStore } from '@/store/gastosStore'
 import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -53,18 +54,22 @@ interface Props {
 }
 
 export default function ResumenCards({ filtros, refreshKey }: Props) {
+  const resumenRefreshKey = useGastosStore(s => s.resumenRefreshKey)
   const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_restante: 0, total_pagado: 0, pagar_hoy: 0 })
 
   useEffect(() => {
+    const d = new Date()
+    const todayLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const params = new URLSearchParams({
       mes: String(filtros.mes),
       anio: String(filtros.anio),
+      today: todayLocal,
       ...(filtros.casa_id ? { casa_id: String(filtros.casa_id) } : {}),
     })
-    fetch(`/api/resumen?${params}`)
+    fetch(`/api/resumen?${params}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then(setResumen)
-  }, [filtros, refreshKey])
+  }, [filtros, refreshKey, resumenRefreshKey])
 
   return (
     <Grid container spacing={2} sx={{ mb: 3 }}>

@@ -62,9 +62,11 @@ model GastoItem {
   descripcion   String
   monto         Float
   fecha         String?
-  cuotaActual   Int?
-  cuotasTotales Int?
-  createdAt     DateTime @default(now())
+  cuotaActual          Int?
+  cuotasTotales        Int?
+  incluyeEnTotal       Boolean  @default(true)
+  incluyeEnVencimiento Boolean  @default(false)
+  createdAt            DateTime @default(now())
 
   gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
 }

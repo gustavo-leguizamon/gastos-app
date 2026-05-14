@@ -57,14 +57,21 @@ Payments are tracked via the `Pago` model (separate table), not the legacy `Gast
 
 ### Sub-items (GastoItem)
 
-Each `Gasto` can have informational sub-items (`GastoItem`) to break down what comprises the total — e.g. individual credit card charges under a single card bill. Sub-items do **not** affect payment calculations; they are display-only. API routes: `GET|POST /api/gastos/[id]/items`, `DELETE /api/gastos/[id]/items/[itemId]`.
+Each `Gasto` can have informational sub-items (`GastoItem`) to break down what comprises the total — e.g. individual credit card charges under a single card bill. Sub-items do **not** affect payment calculations; they are display-only. API routes: `GET|POST /api/gastos/[id]/items`, `PUT|PATCH|DELETE /api/gastos/[id]/items/[itemId]`.
+
+Each `GastoItem` has two boolean flags:
+- `incluye_en_total` (`incluyeEnTotal` in DB, default `true`) — whether the item's monto counts toward the sub-items totals row in the table.
+- `incluye_en_vencimiento` (`incluyeEnVencimiento` in DB, default `false`) — whether the item (using its own `fecha`) contributes to the "Pagar hoy" card when its date matches today. Only applies when the parent gasto's `fechaVencimiento` is not today (to avoid double-counting).
+
+These flags can be toggled inline via `PATCH` (partial update) without reloading the table. Toggling `incluye_en_vencimiento` calls `triggerResumenRefresh()` to refresh only the summary cards, not the full gastos table.
 
 ### State management
 
 `src/store/gastosStore.ts` (Zustand) holds:
 - Active filters (`mes`, `anio`, `casa_id`, `tipo_pago`) — initialized to current month/year
 - Dialog state (`dialogOpen`, `gastoEditando`) for the create/edit form
-- `refreshKey` — incremented via `triggerRefresh()` to force refetches in child components that use it as a `useEffect` dependency
+- `refreshKey` / `triggerRefresh()` — reloads both the gastos table and the summary cards (used on create/edit/delete/pay)
+- `resumenRefreshKey` / `triggerResumenRefresh()` — reloads only `ResumenCards` without touching the gastos table (used for lightweight updates like checkbox toggles)
 
 ### Key domain concepts
 
@@ -86,12 +93,21 @@ Each `Gasto` can have informational sub-items (`GastoItem`) to break down what c
 | `DELETE /api/gastos/[id]/pagos/[pagoId]` | Remove a payment |
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
 | `DELETE /api/gastos/[id]/items/[itemId]` | Remove a sub-item |
-| `GET /api/resumen` | Aggregated summary cards (total, pagado, restante, pagar hoy) |
+| `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 
 All `/api/gastos` responses include the full `pagos` and `items` arrays via the shared `INCLUDE` constant and `toGastoResponse()` mapper defined in each route file.
+
+### Dates and timezones
+
+**Never use `new Date().toISOString().split('T')[0]` to get today's date** — `toISOString()` returns UTC, which causes off-by-one errors for timezones behind UTC (e.g. Argentina UTC-3 can show tomorrow's date after 21hs local). Always compute local date using:
+```ts
+const d = new Date()
+const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+```
+Client components pass `today` as a query param to `/api/resumen` so the server uses the user's local date rather than server UTC.
 
 ### Path alias
 

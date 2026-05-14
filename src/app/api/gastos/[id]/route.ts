@@ -45,6 +45,8 @@ function toGastoResponse(g: any) {
       fecha: i.fecha ?? null,
       cuota_actual: i.cuotaActual ?? null,
       cuotas_totales: i.cuotasTotales ?? null,
+      incluye_en_total: i.incluyeEnTotal,
+      incluye_en_vencimiento: i.incluyeEnVencimiento,
       created_at: i.createdAt?.toISOString(),
     })),
   }

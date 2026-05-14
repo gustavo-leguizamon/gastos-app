@@ -10,6 +10,8 @@ function toItemResponse(i: any) {
     fecha: i.fecha ?? null,
     cuota_actual: i.cuotaActual ?? null,
     cuotas_totales: i.cuotasTotales ?? null,
+    incluye_en_total: i.incluyeEnTotal,
+    incluye_en_vencimiento: i.incluyeEnVencimiento,
     created_at: i.createdAt.toISOString(),
   }
 }
@@ -32,6 +34,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       fecha: body.fecha || null,
       cuotaActual: body.cuota_actual ?? null,
       cuotasTotales: body.cuotas_totales ?? null,
+      incluyeEnTotal: body.incluye_en_total ?? true,
+      incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
     },
   })
   return NextResponse.json(toItemResponse(item), { status: 201 })

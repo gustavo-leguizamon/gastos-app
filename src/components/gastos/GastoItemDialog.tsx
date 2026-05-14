@@ -12,6 +12,8 @@ import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Checkbox from '@mui/material/Checkbox'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -32,6 +34,8 @@ type EditState = {
   fecha: string
   cuota_actual: string
   cuotas_totales: string
+  incluye_en_total: boolean
+  incluye_en_vencimiento: boolean
 }
 
 interface Props {
@@ -47,6 +51,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [fecha, setFecha] = useState('')
   const [cuotaActual, setCuotaActual] = useState('')
   const [cuotasTotales, setCuotasTotales] = useState('')
+  const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
+  const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -64,6 +70,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     fecha: item.fecha ?? '',
     cuota_actual: item.cuota_actual != null ? String(item.cuota_actual) : '',
     cuotas_totales: item.cuotas_totales != null ? String(item.cuotas_totales) : '',
+    incluye_en_total: item.incluye_en_total,
+    incluye_en_vencimiento: item.incluye_en_vencimiento,
   })
 
   const handleSaveEdit = async () => {
@@ -81,6 +89,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           fecha: editing.fecha || null,
           cuota_actual: editing.cuota_actual ? Number(editing.cuota_actual) : null,
           cuotas_totales: editing.cuotas_totales ? Number(editing.cuotas_totales) : null,
+          incluye_en_total: editing.incluye_en_total,
+          incluye_en_vencimiento: editing.incluye_en_vencimiento,
         }),
       })
       if (!res.ok) throw new Error()
@@ -109,11 +119,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           fecha: fecha || null,
           cuota_actual: cuotaActual ? Number(cuotaActual) : null,
           cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
+          incluye_en_total: incluyeEnTotal,
+          incluye_en_vencimiento: incluyeEnVencimiento,
         }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
       setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
+      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false)
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -212,6 +225,16 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         inputProps={{ min: 1, step: 1 }}
                       />
                     </Box>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <FormControlLabel
+                        control={<Checkbox size="small" checked={editing.incluye_en_total} onChange={e => setEditing(p => p ? { ...p, incluye_en_total: e.target.checked } : p)} />}
+                        label={<Typography variant="caption">Incluir en total</Typography>}
+                      />
+                      <FormControlLabel
+                        control={<Checkbox size="small" checked={editing.incluye_en_vencimiento} onChange={e => setEditing(p => p ? { ...p, incluye_en_vencimiento: e.target.checked } : p)} />}
+                        label={<Typography variant="caption">Incluir en vencimiento</Typography>}
+                      />
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button
                         size="small" variant="contained" startIcon={savingEdit ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
@@ -289,6 +312,16 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
               size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
               value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
               inputProps={{ min: 1, step: 1 }}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <FormControlLabel
+              control={<Checkbox size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)} />}
+              label={<Typography variant="caption">Incluir en total</Typography>}
+            />
+            <FormControlLabel
+              control={<Checkbox size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)} />}
+              label={<Typography variant="caption">Incluir en vencimiento</Typography>}
             />
           </Box>
           <Button

@@ -24,6 +24,8 @@ export interface GastoItem {
   fecha: string | null
   cuota_actual: number | null
   cuotas_totales: number | null
+  incluye_en_total: boolean
+  incluye_en_vencimiento: boolean
   created_at: string
 }
 

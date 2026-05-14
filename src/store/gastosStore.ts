@@ -10,6 +10,8 @@ interface GastosStore {
   closeDialog: () => void
   refreshKey: number
   triggerRefresh: () => void
+  resumenRefreshKey: number
+  triggerResumenRefresh: () => void
 }
 
 const now = new Date()
@@ -29,5 +31,7 @@ export const useGastosStore = create<GastosStore>((set) => ({
   closeDialog: () => set({ dialogOpen: false, gastoEditando: null }),
 
   refreshKey: 0,
-  triggerRefresh: () => set((s) => ({ refreshKey: s.refreshKey + 1 })),
+  triggerRefresh: () => set((s) => ({ refreshKey: s.refreshKey + 1, resumenRefreshKey: s.resumenRefreshKey + 1 })),
+  resumenRefreshKey: 0,
+  triggerResumenRefresh: () => set((s) => ({ resumenRefreshKey: s.resumenRefreshKey + 1 })),
 }))

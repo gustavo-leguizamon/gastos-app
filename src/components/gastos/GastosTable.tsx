@@ -15,7 +15,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
+import Checkbox from '@mui/material/Checkbox'
 import toast from 'react-hot-toast'
+import { useGastosStore } from '@/store/gastosStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
@@ -37,6 +39,7 @@ interface Props {
 }
 
 export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: Props) {
+  const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -80,6 +83,24 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     })
   }
 
+  const handleToggleItemField = async (gastoId: number, itemId: number, field: 'incluye_en_total' | 'incluye_en_vencimiento', value: boolean) => {
+    try {
+      const res = await fetch(`/api/gastos/${gastoId}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (!res.ok) throw new Error()
+      setGastos(prev => prev.map(g => {
+        if (g.id !== gastoId) return g
+        return { ...g, items: g.items.map(i => i.id === itemId ? { ...i, [field]: value } : i) }
+      }))
+      if (field === 'incluye_en_vencimiento') triggerResumenRefresh()
+    } catch {
+      toast.error('Error al actualizar')
+    }
+  }
+
   const refreshGasto = (gastoId: number, updateDialog?: (g: Gasto) => void) => {
     fetch(`/api/gastos/${gastoId}`)
       .then(r => r.json())
@@ -89,7 +110,8 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       })
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
   const columns: GridColDef[] = [
     {
@@ -278,6 +300,58 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       },
     },
     {
+      field: '_incluye_en_total',
+      headerName: 'En total',
+      width: 75,
+      sortable: false,
+      disableColumnMenu: true,
+      renderHeader: () => (
+        <Tooltip title="Sumar al total de sub-items">
+          <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap>En total</Typography>
+        </Tooltip>
+      ),
+      renderCell: ({ row }) => {
+        if (row._type !== 'item') return null
+        return (
+          <Tooltip title={row._incluye_en_total ? 'Incluido en total' : 'Excluido del total'}>
+            <Checkbox
+              size="small"
+              checked={!!row._incluye_en_total}
+              onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_total', e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              sx={{ p: 0.5 }}
+            />
+          </Tooltip>
+        )
+      },
+    },
+    {
+      field: '_incluye_en_vencimiento',
+      headerName: 'En venc.',
+      width: 75,
+      sortable: false,
+      disableColumnMenu: true,
+      renderHeader: () => (
+        <Tooltip title="Considerar en vencimientos del día">
+          <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap>En venc.</Typography>
+        </Tooltip>
+      ),
+      renderCell: ({ row }) => {
+        if (row._type !== 'item') return null
+        return (
+          <Tooltip title={row._incluye_en_vencimiento ? 'Incluido en vencimientos' : 'Excluido de vencimientos'}>
+            <Checkbox
+              size="small"
+              checked={!!row._incluye_en_vencimiento}
+              onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_vencimiento', e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              sx={{ p: 0.5 }}
+            />
+          </Tooltip>
+        )
+      },
+    },
+    {
       field: 'actions',
       headerName: '',
       width: 130,
@@ -362,9 +436,11 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
             _fecha: item.fecha,
             _cuota_actual: item.cuota_actual,
             _cuotas_totales: item.cuotas_totales,
+            _incluye_en_total: item.incluye_en_total,
+            _incluye_en_vencimiento: item.incluye_en_vencimiento,
           })
         }
-        const itemsTotal = g.items.reduce((s, i) => s + i.monto, 0)
+        const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
         const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
         result.push({
           id: `total_${g.id}`,

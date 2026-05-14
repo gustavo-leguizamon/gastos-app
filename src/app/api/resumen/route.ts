@@ -6,14 +6,16 @@ export async function GET(req: NextRequest) {
   const mes = searchParams.get('mes')
   const anio = searchParams.get('anio')
   const casa_id = searchParams.get('casa_id')
-  const today = new Date().toISOString().split('T')[0]
+  const todayParam = searchParams.get('today')
+  const d = new Date()
+  const today = todayParam ?? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
   const where: any = {}
   if (mes) where.mes = Number(mes)
   if (anio) where.anio = Number(anio)
   if (casa_id) where.casaId = Number(casa_id)
 
-  const gastos = await prisma.gasto.findMany({ where, include: { pagos: true } })
+  const gastos = await prisma.gasto.findMany({ where, include: { pagos: true, items: true } })
 
   let total_gastos = 0
   let total_pagado = 0
@@ -27,7 +29,14 @@ export async function GET(req: NextRequest) {
     total_gastos += totalArs
     total_pagado += pagado
     total_restante += restante
-    if (g.fechaVencimiento === today) pagar_hoy += restante
+    if (g.fechaVencimiento === today) {
+      pagar_hoy += restante
+    } else {
+      const itemsHoy = g.items
+        .filter((i: any) => i.incluyeEnVencimiento && i.fecha === today)
+        .reduce((s: number, i: any) => s + i.monto, 0)
+      pagar_hoy += itemsHoy
+    }
   }
 
   return NextResponse.json({
