@@ -17,7 +17,7 @@ import Box from '@mui/material/Box'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Checkbox from '@mui/material/Checkbox'
-import type { Casa, Moneda, Tarjeta, Gasto, GastoFormData } from '@/lib/types'
+import type { Casa, Moneda, Tarjeta, Lugar, Gasto, GastoFormData } from '@/lib/types'
 
 const schema = yup.object({
   fecha_vencimiento: yup.string().required('Requerido'),
@@ -37,6 +37,7 @@ const schema = yup.object({
   anio: yup.number().required(),
   notas: yup.string().optional().default(''),
   confirmado: yup.boolean().required().default(true),
+  lugar_id: yup.number().nullable().optional(),
 })
 
 interface Props {
@@ -51,6 +52,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [casas, setCasas] = useState<Casa[]>([])
   const [monedas, setMonedas] = useState<Moneda[]>([])
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
+  const [lugares, setLugares] = useState<Lugar[]>([])
   const now = new Date()
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<GastoFormData>({
@@ -73,6 +75,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       anio: gasto?.anio ?? defaultAnio,
       notas: gasto?.notas ?? '',
       confirmado: gasto?.confirmado ?? true,
+      lugar_id: gasto?.lugar_id ?? null,
     },
   })
 
@@ -81,10 +84,12 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       fetch('/api/casas').then(r => r.json()),
       fetch('/api/monedas').then(r => r.json()),
       fetch('/api/tarjetas').then(r => r.json()),
-    ]).then(([c, m, t]) => {
+      fetch('/api/lugares').then(r => r.json()),
+    ]).then(([c, m, t, l]) => {
       setCasas(c)
       setMonedas(m)
       setTarjetas(t)
+      setLugares(l)
       if (!gasto) {
         if (c.length === 1) setValue('casa_id', c[0].id)
         const ars = m.find((x: Moneda) => x.codigo === 'ARS')
@@ -393,6 +398,28 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                 rows={2}
                 size="small"
               />
+            )}
+          />
+        </Grid>
+
+        {/* Lugar */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="lugar_id"
+            control={control}
+            render={({ field }) => (
+              <FormControl fullWidth size="small">
+                <InputLabel>Lugar (opcional)</InputLabel>
+                <Select
+                  {...field}
+                  label="Lugar (opcional)"
+                  value={field.value ?? ''}
+                  onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                >
+                  <MenuItem value="">Sin especificar</MenuItem>
+                  {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                </Select>
+              </FormControl>
             )}
           />
         </Grid>

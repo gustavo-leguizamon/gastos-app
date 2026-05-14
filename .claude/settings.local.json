@@ -6,7 +6,10 @@
     "allow": [
       "PowerShell(git *)",
       "Bash(del *)",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(Get-ChildItem -Path \"src\\\\app\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"src\\\\components\" -Recurse)"
     ]
   },
   "defaultShell": "powershell"

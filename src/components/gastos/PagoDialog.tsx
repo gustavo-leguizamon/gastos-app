@@ -13,6 +13,9 @@ import IconButton from '@mui/material/IconButton'
 import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+import CheckIcon from '@mui/icons-material/Check'
+import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
 import toast from 'react-hot-toast'
 import type { Gasto, Pago } from '@/lib/types'
@@ -20,6 +23,13 @@ import type { Gasto, Pago } from '@/lib/types'
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
 }
+
+function localToday() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+type EditState = { id: number; fecha: string; monto: string }
 
 interface Props {
   open: boolean
@@ -29,11 +39,12 @@ interface Props {
 }
 
 export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
-  const today = new Date().toISOString().split('T')[0]
-  const [fecha, setFecha] = useState(today)
+  const [fecha, setFecha] = useState(localToday())
   const [monto, setMonto] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<EditState | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   if (!gasto) return null
 
@@ -41,12 +52,33 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   const totalPagado = pagos.reduce((s, p) => s + p.monto, 0)
   const restante = gasto.total_ars - totalPagado
 
+  const startEdit = (p: Pago) => setEditing({ id: p.id, fecha: p.fecha, monto: String(p.monto) })
+
+  const handleSaveEdit = async () => {
+    if (!editing) return
+    const montoNum = parseFloat(editing.monto)
+    if (!editing.fecha || isNaN(montoNum) || montoNum <= 0) { toast.error('Fecha y monto válidos requeridos'); return }
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/gastos/${gasto.id}/pagos/${editing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: editing.fecha, monto: montoNum }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Pago actualizado')
+      setEditing(null)
+      onChanged()
+    } catch {
+      toast.error('Error al actualizar el pago')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const handleAdd = async () => {
     const montoNum = parseFloat(monto)
-    if (!fecha || isNaN(montoNum) || montoNum <= 0) {
-      toast.error('Ingresá una fecha y un monto válido')
-      return
-    }
+    if (!fecha || isNaN(montoNum) || montoNum <= 0) { toast.error('Ingresá una fecha y un monto válido'); return }
     setSaving(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/pagos`, {
@@ -57,7 +89,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
       if (!res.ok) throw new Error()
       toast.success('Pago registrado')
       setMonto('')
-      setFecha(today)
+      setFecha(localToday())
       onChanged()
     } catch {
       toast.error('Error al registrar el pago')
@@ -82,9 +114,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>
-        Pagos — {gasto.descripcion}
-      </DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700 }}>Pagos — {gasto.descripcion}</DialogTitle>
 
       <DialogContent dividers>
         {/* Resumen */}
@@ -115,23 +145,48 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
         ) : (
           <Box sx={{ mb: 2 }}>
             {pagos.map(p => (
-              <Box
-                key={p.id}
-                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.75, borderBottom: '1px solid', borderColor: 'divider' }}
-              >
-                <Box sx={{ display: 'flex', gap: 3 }}>
-                  <Typography variant="body2" color="text.secondary">{p.fecha}</Typography>
-                  <Typography variant="body2" fontWeight={600}>{fmtARS(p.monto)}</Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDelete(p.id)}
-                  disabled={deletingId === p.id}
-                >
-                  {deletingId === p.id
-                    ? <CircularProgress size={14} />
-                    : <DeleteIcon fontSize="small" />}
-                </IconButton>
+              <Box key={p.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
+                {editing?.id === p.id ? (
+                  <Box sx={{ py: 1.5, display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <TextField
+                      size="small" label="Fecha" type="date" autoFocus
+                      value={editing.fecha}
+                      onChange={e => setEditing(s => s ? { ...s, fecha: e.target.value } : s)}
+                      onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ width: 155 }}
+                    />
+                    <TextField
+                      size="small" label="Monto (ARS)" type="number"
+                      value={editing.monto}
+                      onChange={e => setEditing(s => s ? { ...s, monto: e.target.value } : s)}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                      inputProps={{ min: 0.01, step: 0.01 }}
+                      sx={{ flex: 1 }}
+                    />
+                    <IconButton size="small" color="primary" onClick={handleSaveEdit} disabled={savingEdit}>
+                      {savingEdit ? <CircularProgress size={14} /> : <CheckIcon fontSize="small" />}
+                    </IconButton>
+                    <IconButton size="small" onClick={() => setEditing(null)}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.75 }}>
+                    <Box sx={{ display: 'flex', gap: 3 }}>
+                      <Typography variant="body2" color="text.secondary">{p.fecha}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{fmtARS(p.monto)}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex' }}>
+                      <IconButton size="small" onClick={() => startEdit(p)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDelete(p.id)} disabled={deletingId === p.id}>
+                        {deletingId === p.id ? <CircularProgress size={14} /> : <DeleteIcon fontSize="small" />}
+                      </IconButton>
+                    </Box>
+                  </Box>
+                )}
               </Box>
             ))}
           </Box>
@@ -143,9 +198,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
         <Typography variant="subtitle2" fontWeight={700} mb={1}>Registrar pago</Typography>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
           <TextField
-            size="small"
-            label="Fecha"
-            type="date"
+            size="small" label="Fecha" type="date"
             value={fecha}
             onChange={e => setFecha(e.target.value)}
             onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
@@ -153,9 +206,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
             sx={{ width: 160 }}
           />
           <TextField
-            size="small"
-            label="Monto (ARS)"
-            type="number"
+            size="small" label="Monto (ARS)" type="number"
             value={monto}
             onChange={e => setMonto(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}

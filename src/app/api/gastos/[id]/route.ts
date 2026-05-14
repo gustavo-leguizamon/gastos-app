@@ -31,6 +31,8 @@ function toGastoResponse(g: any) {
     tarjeta_id: g.tarjetaId,
     tarjeta_nombre: g.tarjeta?.nombre ?? null,
     tarjeta_banco: g.tarjeta?.banco ?? null,
+    lugar_id: g.lugarId ?? null,
+    lugar_nombre: g.lugar?.nombre ?? null,
     cuota_actual: g.cuotaActual ?? null,
     cuotas_totales: g.cuotasTotales ?? null,
     mes: g.mes,
@@ -48,6 +50,8 @@ function toGastoResponse(g: any) {
       cuotas_totales: i.cuotasTotales ?? null,
       incluye_en_total: i.incluyeEnTotal,
       incluye_en_vencimiento: i.incluyeEnVencimiento,
+      lugar_id: i.lugarId ?? null,
+      lugar_nombre: i.lugar?.nombre ?? null,
       created_at: i.createdAt?.toISOString(),
     })),
   }
@@ -57,8 +61,9 @@ const INCLUDE = {
   casa: true,
   moneda: true,
   tarjeta: true,
+  lugar: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
-  items: { orderBy: { createdAt: 'asc' as const } },
+  items: { orderBy: { createdAt: 'asc' as const }, include: { lugar: true } },
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -90,6 +95,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       anio: body.anio,
       notas: body.notas || null,
       confirmado: body.confirmado ?? true,
+      lugarId: body.lugar_id ?? null,
     },
     include: INCLUDE,
   })

@@ -20,7 +20,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
-import type { Casa, Moneda, Tarjeta } from '@/lib/types'
+import type { Casa, Lugar, Moneda, Tarjeta } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -64,6 +64,11 @@ export default function ConfiguracionPage() {
   const [nuevaTarjeta, setNuevaTarjeta] = useState({ nombre: '', banco: '' })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
+  // Lugares
+  const { items: lugares, add: addLugar, update: updateLugar, remove: removeLugar } = useSimpleCrud<Lugar>('/api/lugares')
+  const [nuevoLugar, setNuevoLugar] = useState('')
+  const [editingLugar, setEditingLugar] = useState<{ id: number; nombre: string } | null>(null)
+
   const handleAddCasa = async () => {
     if (!nuevaCasa.trim()) return
     try { await addCasa({ nombre: nuevaCasa.trim() }); setNuevaCasa(''); toast.success('Casa agregada') }
@@ -86,6 +91,18 @@ export default function ConfiguracionPage() {
     if (!editingMoneda || !editingMoneda.codigo || !editingMoneda.nombre || !editingMoneda.simbolo) return
     try { await updateMoneda(editingMoneda.id, editingMoneda); setEditingMoneda(null); toast.success('Moneda actualizada') }
     catch { toast.error('Error al actualizar moneda') }
+  }
+
+  const handleAddLugar = async () => {
+    if (!nuevoLugar.trim()) return
+    try { await addLugar({ nombre: nuevoLugar.trim() }); setNuevoLugar(''); toast.success('Lugar agregado') }
+    catch { toast.error('Error al agregar lugar') }
+  }
+
+  const handleSaveLugar = async () => {
+    if (!editingLugar || !editingLugar.nombre.trim()) return
+    try { await updateLugar(editingLugar.id, { nombre: editingLugar.nombre.trim() }); setEditingLugar(null); toast.success('Lugar actualizado') }
+    catch { toast.error('Error al actualizar lugar') }
   }
 
   const handleAddTarjeta = async () => {
@@ -189,6 +206,57 @@ export default function ConfiguracionPage() {
                           <IconButton size="small" onClick={() => { removeMoneda(m.id); toast.success('Moneda eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
                         </Box>
                       </Box>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Lugares */}
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader title="Lugares de Carga" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardContent>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <TextField
+                  size="small" fullWidth
+                  label="Ej: Amazon, MercadoLibre"
+                  value={nuevoLugar}
+                  onChange={e => setNuevoLugar(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddLugar()}
+                />
+                <IconButton onClick={handleAddLugar} color="primary"><AddIcon /></IconButton>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <List dense disablePadding>
+                {lugares.map(l => (
+                  <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
+                    secondaryAction={
+                      editingLugar?.id === l.id ? (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" color="primary" onClick={handleSaveLugar}><CheckIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setEditingLugar(null)}><CloseIcon fontSize="small" /></IconButton>
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" onClick={() => setEditingLugar({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeLugar(l.id); toast.success('Lugar eliminado') }}><DeleteIcon fontSize="small" /></IconButton>
+                        </Box>
+                      )
+                    }
+                  >
+                    {editingLugar?.id === l.id ? (
+                      <TextField
+                        size="small" fullWidth autoFocus
+                        value={editingLugar.nombre}
+                        onChange={e => setEditingLugar(p => p ? { ...p, nombre: e.target.value } : p)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveLugar(); if (e.key === 'Escape') setEditingLugar(null) }}
+                        sx={{ mr: 9 }}
+                      />
+                    ) : (
+                      <ListItemText primary={l.nombre} sx={{ pr: 9 }} />
                     )}
                   </ListItem>
                 ))}

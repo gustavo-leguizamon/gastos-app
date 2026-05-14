@@ -12,14 +12,19 @@ function toItemResponse(i: any) {
     cuotas_totales: i.cuotasTotales ?? null,
     incluye_en_total: i.incluyeEnTotal,
     incluye_en_vencimiento: i.incluyeEnVencimiento,
+    lugar_id: i.lugarId ?? null,
+    lugar_nombre: i.lugar?.nombre ?? null,
     created_at: i.createdAt.toISOString(),
   }
 }
+
+const ITEM_INCLUDE = { lugar: true }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const items = await prisma.gastoItem.findMany({
     where: { gastoId: Number(params.id) },
     orderBy: { createdAt: 'asc' },
+    include: ITEM_INCLUDE,
   })
   return NextResponse.json(items.map(toItemResponse))
 }
@@ -36,7 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       cuotasTotales: body.cuotas_totales ?? null,
       incluyeEnTotal: body.incluye_en_total ?? true,
       incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
+      lugarId: body.lugar_id ?? null,
     },
+    include: ITEM_INCLUDE,
   })
   return NextResponse.json(toItemResponse(item), { status: 201 })
 }

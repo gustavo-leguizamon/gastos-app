@@ -16,6 +16,11 @@ export interface Tarjeta {
   banco: string | null
 }
 
+export interface Lugar {
+  id: number
+  nombre: string
+}
+
 export interface GastoItem {
   id: number
   gasto_id: number
@@ -26,6 +31,8 @@ export interface GastoItem {
   cuotas_totales: number | null
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
+  lugar_id: number | null
+  lugar_nombre?: string | null
   created_at: string
 }
 
@@ -57,6 +64,8 @@ export interface Gasto {
   tarjeta_id: number | null
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
+  lugar_id: number | null
+  lugar_nombre?: string | null
   cuota_actual: number | null
   cuotas_totales: number | null
   mes: number
@@ -87,6 +96,7 @@ export interface GastoFormData {
   anio: number
   notas: string
   confirmado: boolean
+  lugar_id: number | null
 }
 
 export interface Resumen {

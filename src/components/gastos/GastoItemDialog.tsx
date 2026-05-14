@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -14,6 +14,10 @@ import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Checkbox from '@mui/material/Checkbox'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -21,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
-import type { Gasto, GastoItem } from '@/lib/types'
+import type { Gasto, GastoItem, Lugar } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -36,6 +40,7 @@ type EditState = {
   cuotas_totales: string
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
+  lugar_id: number | null
 }
 
 interface Props {
@@ -53,10 +58,16 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [cuotasTotales, setCuotasTotales] = useState('')
   const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
+  const [lugarId, setLugarId] = useState<number | null>(null)
+  const [lugares, setLugares] = useState<Lugar[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/lugares').then(r => r.json()).then(setLugares)
+  }, [])
 
   if (!gasto) return null
 
@@ -72,6 +83,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     cuotas_totales: item.cuotas_totales != null ? String(item.cuotas_totales) : '',
     incluye_en_total: item.incluye_en_total,
     incluye_en_vencimiento: item.incluye_en_vencimiento,
+    lugar_id: item.lugar_id ?? null,
   })
 
   const handleSaveEdit = async () => {
@@ -91,6 +103,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: editing.cuotas_totales ? Number(editing.cuotas_totales) : null,
           incluye_en_total: editing.incluye_en_total,
           incluye_en_vencimiento: editing.incluye_en_vencimiento,
+          lugar_id: editing.lugar_id,
         }),
       })
       if (!res.ok) throw new Error()
@@ -121,12 +134,13 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
           incluye_en_total: incluyeEnTotal,
           incluye_en_vencimiento: incluyeEnVencimiento,
+          lugar_id: lugarId,
         }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
       setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
-      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false)
+      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setLugarId(null)
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -225,6 +239,17 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         inputProps={{ min: 1, step: 1 }}
                       />
                     </Box>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Lugar (opcional)</InputLabel>
+                      <Select
+                        label="Lugar (opcional)"
+                        value={editing.lugar_id ?? ''}
+                        onChange={e => setEditing(p => p ? { ...p, lugar_id: e.target.value === '' ? null : Number(e.target.value) } : p)}
+                      >
+                        <MenuItem value="">Sin especificar</MenuItem>
+                        {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                      </Select>
+                    </FormControl>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <FormControlLabel
                         control={<Checkbox size="small" checked={editing.incluye_en_total} onChange={e => setEditing(p => p ? { ...p, incluye_en_total: e.target.checked } : p)} />}
@@ -253,11 +278,16 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                     <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="body2" noWrap>{item.descripcion}</Typography>
-                      <Box sx={{ display: 'flex', gap: 1.5 }}>
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                         {item.fecha && <Typography variant="caption" color="text.secondary">{item.fecha}</Typography>}
                         {item.cuota_actual != null && (
                           <Typography variant="caption" color="primary.main">
                             Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
+                          </Typography>
+                        )}
+                        {item.lugar_nombre && (
+                          <Typography variant="caption" color="text.secondary">
+                            📍 {item.lugar_nombre}
                           </Typography>
                         )}
                       </Box>
@@ -314,6 +344,17 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
               inputProps={{ min: 1, step: 1 }}
             />
           </Box>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Lugar (opcional)</InputLabel>
+            <Select
+              label="Lugar (opcional)"
+              value={lugarId ?? ''}
+              onChange={e => setLugarId(e.target.value === '' ? null : Number(e.target.value))}
+            >
+              <MenuItem value="">Sin especificar</MenuItem>
+              {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+            </Select>
+          </FormControl>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <FormControlLabel
               control={<Checkbox size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)} />}
