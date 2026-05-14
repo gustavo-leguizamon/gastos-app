@@ -312,55 +312,15 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       },
     },
     {
-      field: '_incluye_en_total',
-      headerName: 'En total',
-      width: 75,
-      sortable: false,
-      disableColumnMenu: true,
-      renderHeader: () => (
-        <Tooltip title="Sumar al total de sub-items">
-          <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap>En total</Typography>
-        </Tooltip>
-      ),
-      renderCell: ({ row }) => {
-        if (row._type !== 'item') return null
-        return (
-          <Tooltip title={row._incluye_en_total ? 'Incluido en total' : 'Excluido del total'}>
-            <Checkbox
-              size="small"
-              checked={!!row._incluye_en_total}
-              onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_total', e.target.checked)}
-              onClick={(e) => e.stopPropagation()}
-              sx={{ p: 0.5 }}
-            />
-          </Tooltip>
-        )
-      },
-    },
-    {
-      field: '_incluye_en_vencimiento',
-      headerName: 'En venc.',
-      width: 75,
-      sortable: false,
-      disableColumnMenu: true,
-      renderHeader: () => (
-        <Tooltip title="Considerar en vencimientos del día">
-          <Typography variant="caption" fontWeight={700} color="text.secondary" noWrap>En venc.</Typography>
-        </Tooltip>
-      ),
-      renderCell: ({ row }) => {
-        if (row._type !== 'item') return null
-        return (
-          <Tooltip title={row._incluye_en_vencimiento ? 'Incluido en vencimientos' : 'Excluido de vencimientos'}>
-            <Checkbox
-              size="small"
-              checked={!!row._incluye_en_vencimiento}
-              onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_vencimiento', e.target.checked)}
-              onClick={(e) => e.stopPropagation()}
-              sx={{ p: 0.5 }}
-            />
-          </Tooltip>
-        )
+      field: 'lugar_nombre',
+      headerName: 'Lugar',
+      width: 130,
+      renderCell: ({ value, row }) => {
+        if (row._type === 'items_total') return null
+        if (row._type === 'item') return row._lugar_nombre
+          ? <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>{row._lugar_nombre}</Typography>
+          : null
+        return value || '-'
       },
     },
     {
@@ -370,7 +330,29 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
-        if (row._type === 'item' || row._type === 'items_total') return null
+        if (row._type === 'items_total') return null
+        if (row._type === 'item') return (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={row._incluye_en_total ? 'Incluido en total' : 'Excluido del total'}>
+              <Checkbox
+                size="small"
+                checked={!!row._incluye_en_total}
+                onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_total', e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                sx={{ p: 0.5 }}
+              />
+            </Tooltip>
+            <Tooltip title={row._incluye_en_vencimiento ? 'Incluido en vencimientos' : 'Excluido de vencimientos'}>
+              <Checkbox
+                size="small"
+                checked={!!row._incluye_en_vencimiento}
+                onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_vencimiento', e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                sx={{ p: 0.5 }}
+              />
+            </Tooltip>
+          </Box>
+        )
         return (
           <Box sx={{ display: 'flex', gap: 0.25 }}>
             <Tooltip title="Sub-items">
@@ -450,7 +432,13 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     for (const g of gastoRows) {
       result.push({ ...g, _type: 'gasto' })
       if (expandedIds.has(g.id) && g.items?.length) {
-        for (const item of g.items) {
+        const sortedItems = [...g.items].sort((a, b) => {
+          if (!a.fecha && !b.fecha) return 0
+          if (!a.fecha) return 1
+          if (!b.fecha) return -1
+          return a.fecha.localeCompare(b.fecha)
+        })
+        for (const item of sortedItems) {
           result.push({
             id: `item_${item.id}`,
             _type: 'item',
@@ -464,6 +452,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
             _cuotas_totales: item.cuotas_totales,
             _incluye_en_total: item.incluye_en_total,
             _incluye_en_vencimiento: item.incluye_en_vencimiento,
+            _lugar_nombre: item.lugar_nombre ?? null,
           })
         }
         const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
