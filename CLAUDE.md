@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation policy (regla obligatoria)
+
+Cada vez que el usuario pida un cambio en el comportamiento de la app (nuevas funcionalidades, cambios en cómo se calculan totales, nuevos campos, nuevas rutas API, cambios en filtros, dialogs, flujos de pago/sub-items, etc.), **al final de la tarea debes actualizar esta `CLAUDE.md`** para reflejar el nuevo comportamiento en la sección correspondiente (Architecture, API surface, Key domain concepts, etc.). Si el cambio es puramente cosmético (color, label, typo) o solo refactor interno sin cambio de comportamiento observable, no hace falta tocar la doc — pero al menos confirmá explícitamente que la doc sigue vigente.
+
+El hook `Stop` (`.claude/settings.local.json` → `.claude/hooks/check-docs.ps1`) verifica que `CLAUDE.md` haya sido actualizada cuando hay cambios más recientes en `src/` o `prisma/`. Si la doc quedó desactualizada, el turno se reanuda automáticamente con un recordatorio.
+
 ## Commands
 
 ```bash
@@ -126,8 +132,10 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 | `GET/POST /api/lugares` | Locations CRUD |
-| `GET/POST /api/inversiones` | List (sorted by `fecha` asc) / create inversiones |
-| `PUT/DELETE /api/inversiones/[id]` | Single inversion edit / delete |
+| `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
+| `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes its movimientos) |
+| `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos for an inversion |
+| `PUT/DELETE /api/inversiones/[id]/movimientos/[movId]` | Edit / remove a movimiento |
 
 All `/api/gastos` responses include the full `pagos` and `items` arrays via the shared `INCLUDE` constant and `toGastoResponse()` mapper defined in each route file.
 
@@ -135,13 +143,24 @@ All `/api/gastos` responses include the full `pagos` and `items` arrays via the 
 
 Standalone section (`/inversiones`, navigated from `TopBar`) for tracking investment balance snapshots over time. Independent from the gastos domain — does not share casa/moneda/tarjeta relations.
 
-`Inversion` model fields: `id`, `fecha`, `montoActual`, `montoExtra`, `createdAt`. API responses use snake_case (`monto_actual`, `monto_extra`) per the project's naming convention.
+**Two-level model:**
+- `Inversion` (parent): `id`, `nombre`, `createdAt`. Represents a logical investment/account that groups snapshots. Managed via inline ABM on the page (no separate /configuracion section).
+- `Movimiento` (child): `id`, `inversionId`, `fecha`, `montoActual`, `montoExtra`, `createdAt`. Each row is a balance snapshot of its parent inversion. `onDelete: Cascade` — deleting an inversion removes all its movimientos.
 
-Two computed columns in the grid (not stored, derived client-side after sorting by `fecha` asc, ties broken by `id`):
+API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per the project's naming convention.
+
+**Computed columns in the movimientos grid** (not stored, derived client-side after sorting by `fecha` asc, ties broken by `id`):
 - `monto_actualizado = monto_actual + monto_extra`
 - `cambio = monto_actualizado(current row) - monto_actualizado(previous row)` — `null` for the first row (rendered as `—`). Positive values are green, negative red.
+- `dia` — Spanish weekday name parsed from `fecha` as a **local** date (split on `-` and `new Date(y, m-1, d)` to avoid timezone shift).
 
-The page (`src/app/inversiones/page.tsx`) shows a form on top (Fecha / Monto actual / Monto extra) that doubles as create and edit (Editar button on a row loads its values; "Cancelar" exits edit mode). The DataGrid below has Editar / Eliminar actions per row.
+**UI** (`src/app/inversiones/page.tsx`):
+- Tabs at the top, one per inversion. To the right: edit/delete icons act on the active tab; **+** button opens the create dialog. Tab selection drives which movimientos are loaded.
+- Form below tabs (Fecha / Monto actual / Monto extra) doubles as create/edit (Editar on a row loads its values; "Cancelar" exits edit mode). Submitting creates/updates a movimiento under the active inversion.
+- DataGrid below the form. **Default sort: `fecha` descending.** The `cambio` computation always runs in ascending order internally (in the `rows` memo), independent of the visual sort, so values stay correct regardless of how the user sorts.
+- When no inversiones exist, the page shows an empty-state card prompting the user to create one with the **+** button.
+
+**Migration note:** the original `Inversion` table (single-level, with `fecha`/`montoActual`/`montoExtra` directly) was migrated via `prisma/migrate-inversiones.sql`. That script renames the old table to `Movimiento`, creates a new `Inversion` parent with a default row named "General", and back-fills `inversionId = 1` for all existing snapshots. Kept in the repo as a one-shot historical migration — do not re-run.
 
 **Nav menus:** the visible menu is `TopBar.tsx`. `Sidebar.tsx` exists but is currently not rendered by `AppLayout` — keep both NAV arrays in sync when adding routes.
 

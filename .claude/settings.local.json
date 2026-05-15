@@ -18,7 +18,31 @@
       "PowerShell(npx prisma generate)",
       "Bash(where sqlite3 *)",
       "PowerShell(Get-Command *)",
-      "PowerShell(npx prisma db execute --file prisma/migrate-inversiones.sql --schema prisma/schema.prisma)"
+      "PowerShell(npx prisma db execute --file prisma/migrate-inversiones.sql --schema prisma/schema.prisma)",
+      "Skill(update-config)",
+      "Bash(Get-ChildItem .claude -Force -ErrorAction Stop)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('settings.local.json OK'\\)\")",
+      "Bash('{\"session_id\":\"test\",\"stop_hook_active\":false}')",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-docs.ps1)",
+      "Bash(Get-Content *)",
+      "PowerShell(Out-Null *)",
+      "PowerShell(Remove-Item *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-docs.ps1",
+            "shell": "powershell",
+            "timeout": 20,
+            "statusMessage": "Verificando si CLAUDE.md esta al dia..."
+          }
+        ]
+      }
     ]
   },
   "defaultShell": "powershell"
