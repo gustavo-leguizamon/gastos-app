@@ -162,7 +162,15 @@ API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per
 
 **Migration note:** the original `Inversion` table (single-level, with `fecha`/`montoActual`/`montoExtra` directly) was migrated via `prisma/migrate-inversiones.sql`. That script renames the old table to `Movimiento`, creates a new `Inversion` parent with a default row named "General", and back-fills `inversionId = 1` for all existing snapshots. Kept in the repo as a one-shot historical migration — do not re-run.
 
-**Nav menus:** the visible menu is `TopBar.tsx`. `Sidebar.tsx` exists but is currently not rendered by `AppLayout` — keep both NAV arrays in sync when adding routes.
+**Nav menus:** navigation is handled solely by `TopBar.tsx` (horizontal AppBar). `Sidebar.tsx` has been deleted. When adding new routes, update only the `NAV` array in `TopBar.tsx`.
+
+**`AppDataGrid` (`src/components/shared/AppDataGrid.tsx`):** generic wrapper around MUI `DataGrid` that all grids in the project must use. Provides: `density="compact"`, base `sx` styles (border, borderRadius, hover), row selection management, and keyboard Delete support. Key props:
+- `onDeleteKeyPress(id)` — called when `Delete` key is pressed on the selected row; enables selection and the keyboard listener. Each grid's parent calls `setDeleteId(id)` here to open its existing `ConfirmDialog`.
+- `selectedRowId` + `onSelectedRowChange` — controlled selection for multi-grid pages (e.g. GastosTable has one grid per casa group; they share a single `selectedGastoId` state so pressing Delete targets the most-recently-clicked row). When omitted, selection is managed internally per grid instance.
+- `isRowSelectable` — forwarded to DataGrid; GastosTable passes `({ row }) => row._type === 'gasto'` so sub-item and totals rows are excluded.
+- Additional `sx` is deep-merged with the base styles.
+
+The `document` keydown listener in `AppDataGrid` only fires if the selected row belongs to that grid instance (checked via `rows.some(r => id === r.id)`), preventing double-trigger when multiple grids are on the same page.
 
 ### Dates and timezones
 

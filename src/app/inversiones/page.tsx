@@ -15,7 +15,8 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { GridColDef } from '@mui/x-data-grid'
+import AppDataGrid from '@/components/shared/AppDataGrid'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -337,12 +338,14 @@ export default function InversionesPage() {
           </Card>
 
           <Box sx={{ height: 560, width: '100%', '& .cell-strong': { fontWeight: 600 } }}>
-            <DataGrid
+            <AppDataGrid
               rows={rows}
               columns={columns}
-              density="compact"
-              disableRowSelectionOnClick
               initialState={{ sorting: { sortModel: [{ field: 'fecha', sort: 'desc' }] } }}
+              onDeleteKeyPress={(id) => {
+                const row = rows.find(r => r.id === id)
+                if (row) setToDelete(row._raw)
+              }}
             />
           </Box>
         </>

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { DataGrid, GridColDef } from '@mui/x-data-grid'
+import { GridColDef } from '@mui/x-data-grid'
+import AppDataGrid from '@/components/shared/AppDataGrid'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
@@ -52,6 +53,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [itemGasto, setItemGasto] = useState<Gasto | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
+  const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
 
   const loadGastos = () => {
     setLoading(true)
@@ -375,16 +377,6 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   ]
 
   const gridSx = {
-    border: '1px solid',
-    borderColor: 'divider',
-    borderRadius: 2,
-    '& .MuiDataGrid-columnHeader': {
-      bgcolor: 'background.paper',
-      fontWeight: 700,
-      fontSize: 12,
-      color: 'text.secondary',
-    },
-    '& .MuiDataGrid-row:hover': { bgcolor: 'rgba(99,102,241,0.06)' },
     '& .row-subitem': {
       bgcolor: 'rgba(255,255,255,0.03)',
       '&:hover': { bgcolor: 'rgba(99,102,241,0.04)' },
@@ -470,7 +462,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }
 
   if (loading) {
-    return <DataGrid rows={[]} columns={columns} loading autoHeight sx={gridSx} />
+    return <AppDataGrid rows={[]} columns={columns} loading autoHeight sx={gridSx} />
   }
 
   if (groupEntries.length === 0) {
@@ -507,12 +499,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   </Typography>
                 </Box>
               </Box>
-              <DataGrid
+              <AppDataGrid
                 rows={flatRows}
                 columns={columns}
                 autoHeight
-                disableRowSelectionOnClick
-                density="compact"
                 hideFooter
                 getRowId={row => row.id}
                 getRowClassName={({ row }) => {
@@ -521,7 +511,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   if (row._type === 'items_total') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-items-total' : 'row-items-total'
                   return ''
                 }}
-                isRowSelectable={() => false}
+                isRowSelectable={({ row }) => row._type === 'gasto'}
+                selectedRowId={selectedGastoId}
+                onSelectedRowChange={(id) => setSelectedGastoId(id as number | null)}
+                onDeleteKeyPress={(id) => setDeleteId(id as number)}
                 sx={gridSx}
               />
             </Box>
