@@ -10,8 +10,11 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
+import TextField from '@mui/material/TextField'
+import InputAdornment from '@mui/material/InputAdornment'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import SearchIcon from '@mui/icons-material/Search'
 import type { Casa, FiltrosGastos } from '@/lib/types'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -21,9 +24,11 @@ interface Props {
   setFiltros: (f: Partial<FiltrosGastos>) => void
   estadoPago: 'todos' | 'pendiente' | 'saldado'
   setEstadoPago: (v: 'todos' | 'pendiente' | 'saldado') => void
+  busqueda: string
+  setBusqueda: (v: string) => void
 }
 
-export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago }: Props) {
+export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda }: Props) {
   const [casas, setCasas] = useState<Casa[]>([])
 
   useEffect(() => {
@@ -88,6 +93,24 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
         <ToggleButton value="pendiente">Pendientes</ToggleButton>
         <ToggleButton value="saldado">Saldados</ToggleButton>
       </ToggleButtonGroup>
+
+      {/* Búsqueda */}
+      <TextField
+        size="small"
+        placeholder="Buscar..."
+        value={busqueda}
+        onChange={e => setBusqueda(e.target.value)}
+        sx={{ width: 180 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 16 }} />
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
     </Box>
   )
 }

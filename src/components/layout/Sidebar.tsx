@@ -13,9 +13,11 @@ import Divider from '@mui/material/Divider'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SettingsIcon from '@mui/icons-material/Settings'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon /> },
+  { label: 'Inversiones', href: '/inversiones', icon: <TrendingUpIcon /> },
   { label: 'Configuración', href: '/configuracion', icon: <SettingsIcon /> },
 ]
 

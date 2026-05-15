@@ -83,6 +83,24 @@ model GastoItem {
   lugar Lugar? @relation(fields: [lugarId], references: [id])
 }
 
+model Inversion {
+  id          Int          @id @default(autoincrement())
+  nombre      String
+  createdAt   DateTime     @default(now())
+  movimientos Movimiento[]
+}
+
+model Movimiento {
+  id          Int      @id @default(autoincrement())
+  inversionId Int
+  fecha       String
+  montoActual Float
+  montoExtra  Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  inversion Inversion @relation(fields: [inversionId], references: [id], onDelete: Cascade)
+}
+
 model Pago {
   id        Int      @id @default(autoincrement())
   gastoId   Int

@@ -10,7 +10,6 @@ import TextField from '@mui/material/TextField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
-import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Checkbox from '@mui/material/Checkbox'
@@ -163,48 +162,119 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     }
   }
 
+  const sortedItems = [...items].sort((a, b) => {
+    if (!a.fecha && !b.fecha) return 0
+    if (!a.fecha) return 1
+    if (!b.fecha) return -1
+    return a.fecha.localeCompare(b.fecha)
+  })
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { height: '90vh' } }}>
       <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
         <SubdirectoryArrowRightIcon color="primary" />
         Sub-items — {gasto.descripcion}
       </DialogTitle>
 
-      <DialogContent dividers>
-        {/* Resumen */}
-        <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Total gasto</Typography>
-            <Typography fontWeight={700}>{fmtARS(gasto.total_ars)}</Typography>
+      <DialogContent dividers sx={{ p: 0, display: 'flex', overflow: 'hidden' }}>
+        {/* Columna izquierda: resumen + formulario */}
+        <Box sx={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid', borderColor: 'divider', overflowY: 'auto' }}>
+          {/* Resumen */}
+          <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Total gasto</Typography>
+              <Typography fontWeight={700} fontSize={13}>{fmtARS(gasto.total_ars)}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Suma sub-items</Typography>
+              <Typography fontWeight={700} fontSize={13} color={totalItems > gasto.total_ars ? 'error.main' : 'text.primary'}>
+                {fmtARS(totalItems)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Sin asignar</Typography>
+              <Typography fontWeight={700} fontSize={13} color="text.secondary">
+                {fmtARS(gasto.total_ars - totalItems)}
+              </Typography>
+            </Box>
           </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Suma sub-items</Typography>
-            <Typography fontWeight={700} color={totalItems > gasto.total_ars ? 'error.main' : 'text.primary'}>
-              {fmtARS(totalItems)}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary">Sin asignar</Typography>
-            <Typography fontWeight={700} color="text.secondary">
-              {fmtARS(gasto.total_ars - totalItems)}
-            </Typography>
+
+          {/* Formulario nuevo item */}
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight={700}>Agregar sub-item</Typography>
+            <TextField
+              size="small" label="Descripción" fullWidth
+              value={descripcion} onChange={e => setDescripcion(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            />
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <TextField
+                size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+                value={monto} onChange={e => setMonto(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+              <TextField
+                size="small" label="Fecha (opcional)" type="date" sx={{ width: 155 }}
+                value={fecha} onChange={e => setFecha(e.target.value)}
+                onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <TextField
+                size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
+                value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
+                inputProps={{ min: 1, step: 1 }}
+              />
+              <TextField
+                size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
+                value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
+                inputProps={{ min: 1, step: 1 }}
+              />
+            </Box>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Lugar (opcional)</InputLabel>
+              <Select
+                label="Lugar (opcional)"
+                value={lugarId ?? ''}
+                onChange={e => setLugarId(e.target.value === '' ? null : Number(e.target.value))}
+              >
+                <MenuItem value="">Sin especificar</MenuItem>
+                {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <FormControlLabel
+                control={<Checkbox size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)} />}
+                label={<Typography variant="caption">Incluir en total</Typography>}
+              />
+              <FormControlLabel
+                control={<Checkbox size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)} />}
+                label={<Typography variant="caption">Incluir en vencimiento</Typography>}
+              />
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+              onClick={handleAdd} disabled={saving}
+            >
+              Agregar
+            </Button>
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
-
-        {/* Lista de items */}
-        {items.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            No hay sub-items cargados aún.
-          </Typography>
-        ) : (
-          <Box sx={{ mb: 2 }}>
-            {items.map(item => (
+        {/* Columna derecha: lista de items */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
+          {sortedItems.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+              No hay sub-items cargados aún.
+            </Typography>
+          ) : (
+            sortedItems.map(item => (
               <Box key={item.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 {editing?.id === item.id ? (
-                  /* Inline edit form */
-                  <Box sx={{ py: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ py: 1.5, px: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                     <TextField
                       size="small" fullWidth autoFocus label="Descripción"
                       value={editing.descripcion}
@@ -262,7 +332,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button
-                        size="small" variant="contained" startIcon={savingEdit ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
+                        size="small" variant="contained"
+                        startIcon={savingEdit ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
                         onClick={handleSaveEdit} disabled={savingEdit}
                       >
                         Guardar
@@ -273,8 +344,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                     </Box>
                   </Box>
                 ) : (
-                  /* Display row */
-                  <Box sx={{ display: 'flex', alignItems: 'center', py: 0.75, gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', py: 0.75, px: 1, gap: 1 }}>
                     <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="body2" noWrap>{item.descripcion}</Typography>
@@ -304,74 +374,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                   </Box>
                 )}
               </Box>
-            ))}
-          </Box>
-        )}
-
-        <Divider sx={{ mb: 2 }} />
-
-        {/* Formulario nuevo item */}
-        <Typography variant="subtitle2" fontWeight={700} mb={1}>Agregar sub-item</Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <TextField
-            size="small" label="Descripción" fullWidth
-            value={descripcion} onChange={e => setDescripcion(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          />
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <TextField
-              size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
-              value={monto} onChange={e => setMonto(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-            <TextField
-              size="small" label="Fecha (opcional)" type="date" sx={{ width: 160 }}
-              value={fecha} onChange={e => setFecha(e.target.value)}
-              onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <TextField
-              size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
-              value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
-              inputProps={{ min: 1, step: 1 }}
-            />
-            <TextField
-              size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
-              value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
-              inputProps={{ min: 1, step: 1 }}
-            />
-          </Box>
-          <FormControl size="small" fullWidth>
-            <InputLabel>Lugar (opcional)</InputLabel>
-            <Select
-              label="Lugar (opcional)"
-              value={lugarId ?? ''}
-              onChange={e => setLugarId(e.target.value === '' ? null : Number(e.target.value))}
-            >
-              <MenuItem value="">Sin especificar</MenuItem>
-              {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <FormControlLabel
-              control={<Checkbox size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)} />}
-              label={<Typography variant="caption">Incluir en total</Typography>}
-            />
-            <FormControlLabel
-              control={<Checkbox size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)} />}
-              label={<Typography variant="caption">Incluir en vencimiento</Typography>}
-            />
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-            onClick={handleAdd} disabled={saving}
-          >
-            Agregar
-          </Button>
+            ))
+          )}
         </Box>
       </DialogContent>
 

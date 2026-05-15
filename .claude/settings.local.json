@@ -9,7 +9,16 @@
       "Bash(npx prisma *)",
       "Bash(Get-ChildItem -Path \"src\\\\app\" -Recurse)",
       "Bash(Select-Object FullName)",
-      "Bash(Get-ChildItem -Path \"src\\\\components\" -Recurse)"
+      "Bash(Get-ChildItem -Path \"src\\\\components\" -Recurse)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3001)",
+      "Bash(cat C:\\\\\\\\Users\\\\\\\\GUSTAV~1\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-GustavoLeguizamon-Desktop-app-gapp-gastos-app\\\\\\\\77e2ebe4-bc7a-4786-8699-959e2b6fe0ec\\\\\\\\tasks\\\\\\\\bph8yfmqk.output)",
+      "Bash(timeout 30 cat -)",
+      "PowerShell(npx prisma db push --skip-generate)",
+      "PowerShell(npx prisma generate)",
+      "Bash(where sqlite3 *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(npx prisma db execute --file prisma/migrate-inversiones.sql --schema prisma/schema.prisma)"
     ]
   },
   "defaultShell": "powershell"

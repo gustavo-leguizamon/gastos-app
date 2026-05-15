@@ -109,6 +109,21 @@ export interface Resumen {
   pagar_hoy: number
 }
 
+export interface Inversion {
+  id: number
+  nombre: string
+  created_at: string
+}
+
+export interface Movimiento {
+  id: number
+  inversion_id: number
+  fecha: string
+  monto_actual: number
+  monto_extra: number
+  created_at: string
+}
+
 export interface FiltrosGastos {
   mes: number
   anio: number

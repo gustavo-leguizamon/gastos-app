@@ -38,11 +38,12 @@ interface Props {
   filtros: FiltrosGastos
   refreshKey: number
   estadoPago: 'todos' | 'pendiente' | 'saldado'
+  busqueda: string
   onEdit: (gasto: Gasto) => void
   onDeleted: () => void
 }
 
-export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, onDeleted }: Props) {
+export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(false)
@@ -233,6 +234,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
         if (row._type === 'item') return (
           <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
         )
+        if (!row.confirmado && row.items?.length > 0) {
+          const itemsTotal = row.items.filter((i: any) => i.incluye_en_total).reduce((s: number, i: any) => s + i.monto, 0)
+          return <span style={{ fontWeight: 600, color: '#f59e0b' }}>{fmtARS(itemsTotal)}</span>
+        }
         return <span style={{ fontWeight: 600 }}>{fmtARS(value)}</span>
       },
     },
@@ -400,9 +405,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
   }
 
   const gastosFiltrados = gastos.filter(g => {
-    if (estadoPago === 'saldado') return g.total_restante <= 0
-    if (estadoPago === 'pendiente') return g.total_restante > 0
+    if (estadoPago === 'saldado') return g.total_restante <= 0 && g.confirmado
+    if (estadoPago === 'pendiente') return g.total_restante > 0 || !g.confirmado
     return true
+  }).filter(g => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return g.descripcion.toLowerCase().includes(q) || g.lugar_nombre?.toLowerCase().includes(q)
   })
 
   // Agrupar por casa
@@ -427,6 +436,17 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
           if (!b.fecha) return -1
           return a.fecha.localeCompare(b.fecha)
         })
+        const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+        const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
+        result.push({
+          id: `total_${g.id}`,
+          _type: 'items_total',
+          _parentId: g.id,
+          _parentConfirmado: g.confirmado,
+          _itemsTotal: itemsTotal,
+          _gastoTotal: g.total_ars,
+          _matches: matches,
+        })
         for (const item of sortedItems) {
           result.push({
             id: `item_${item.id}`,
@@ -444,17 +464,6 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
             _lugar_nombre: item.lugar_nombre ?? null,
           })
         }
-        const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
-        const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
-        result.push({
-          id: `total_${g.id}`,
-          _type: 'items_total',
-          _parentId: g.id,
-          _parentConfirmado: g.confirmado,
-          _itemsTotal: itemsTotal,
-          _gastoTotal: g.total_ars,
-          _matches: matches,
-        })
       }
     }
     return result
@@ -467,7 +476,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
   if (groupEntries.length === 0) {
     return (
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 4, textAlign: 'center' }}>
-        <Typography color="text.secondary">No hay gastos para el período seleccionado.</Typography>
+        <Typography color="text.secondary">
+          {busqueda.trim() ? 'No se encontraron gastos para esa búsqueda.' : 'No hay gastos para el período seleccionado.'}
+        </Typography>
       </Box>
     )
   }
@@ -487,7 +498,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
                   <Typography fontWeight={700} fontSize={15}>{nombre}</Typography>
                   <Chip label={`${rows.length} gasto${rows.length !== 1 ? 's' : ''}`} size="small" variant="outlined" />
                 </Box>
-                <Box sx={{ display: 'flex', gap: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Typography variant="body2" color="text.secondary">
                     Total: <strong style={{ color: '#fff' }}>{fmtARS(totalARS)}</strong>
                   </Typography>
@@ -537,7 +548,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, o
         open={itemGasto !== null}
         gasto={itemGasto}
         onClose={() => setItemGasto(null)}
-        onChanged={() => refreshGasto(itemGasto!.id, updated => setItemGasto(updated))}
+        onChanged={() => { refreshGasto(itemGasto!.id, updated => setItemGasto(updated)); triggerResumenRefresh() }}
       />
 
       <CopiarGastoDialog

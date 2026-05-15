@@ -10,9 +10,11 @@ import Typography from '@mui/material/Typography'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SettingsIcon from '@mui/icons-material/Settings'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
+  { label: 'Inversiones', href: '/inversiones', icon: <TrendingUpIcon fontSize="small" /> },
   { label: 'Configuración', href: '/configuracion', icon: <SettingsIcon fontSize="small" /> },
 ]
 

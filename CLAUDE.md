@@ -52,9 +52,11 @@ The Prisma schema uses **camelCase** fields (`casaId`, `tipoPago`, `totalMoneda`
 The `/api/resumen` route computes these aggregates server-side for the summary cards. It also returns:
 - `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas`
 - `total_prestamos = SUM(prestamo_a_otro)`
-- `total_tarjetas = SUM(total_ars) for gastos with a tarjetaId`
+- `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C'` (credit, regardless of tarjetaId)
 
 These are shown as a secondary breakdown inside the "Total Gastos" card (only rendered when at least one of the sub-totals is non-zero).
+
+**Unconfirmed gastos in resumen:** gastos where `confirmado = false` are excluded from all resumen totals, **except** when they have sub-items — in that case, the sum of their sub-items with `incluyeEnTotal = true` is used instead of the gasto's own total. This allows partial/estimated amounts to contribute to the summary via their breakdown items.
 
 ### Payment system
 
@@ -70,9 +72,13 @@ Each `GastoItem` has two boolean flags:
 
 These flags are rendered as checkboxes inside the actions column of sub-item rows (not as separate columns). They can be toggled inline via `PATCH` (partial update) without reloading the table. Toggling `incluye_en_vencimiento` calls `triggerResumenRefresh()` to refresh only the summary cards, not the full gastos table.
 
-Sub-items are sorted by `fecha` ascending (nulls last) in `buildFlatRows` on the client side.
+Sub-items are sorted by `fecha` ascending (nulls last) — both in `buildFlatRows` (grid) and in `GastoItemDialog` (right-column list). The sub-items total row appears **before** the individual items when expanded in the grid.
 
 Both `Gasto` and `GastoItem` have an optional `lugarId` FK to the `Lugar` model. Lugar can be set in the gasto form and sub-item dialog, and is displayed as a column in the grid.
+
+`GastoItemDialog` uses a two-column layout (`maxWidth="md"`, height 90vh): left column (340px) shows the resumen (Total gasto / Suma sub-items / Sin asignar) and the add form; right column shows the scrollable items list. Both columns handle overflow independently.
+
+When sub-items are added/edited/deleted, `triggerResumenRefresh()` is called alongside `refreshGasto()` so summary cards reflect the change immediately (important for unconfirmed gastos whose totals are derived from items).
 
 ### State management
 
@@ -80,7 +86,11 @@ Both `Gasto` and `GastoItem` have an optional `lugarId` FK to the `Lugar` model.
 - Active filters (`mes`, `anio`, `casa_id`, `tipo_pago`) — initialized to current month/year
 - Dialog state (`dialogOpen`, `gastoEditando`) for the create/edit form
 - `refreshKey` / `triggerRefresh()` — reloads both the gastos table and the summary cards (used on create/edit/delete/pay)
-- `resumenRefreshKey` / `triggerResumenRefresh()` — reloads only `ResumenCards` without touching the gastos table (used for lightweight updates like checkbox toggles)
+- `resumenRefreshKey` / `triggerResumenRefresh()` — reloads only `ResumenCards` without touching the gastos table (used for lightweight updates like checkbox toggles, payment edits, and sub-item changes)
+
+Client-side filters in `gastos/page.tsx` (lifted state, passed as props):
+- `estadoPago: 'todos' | 'pendiente' | 'saldado'` — defaults to `'pendiente'` on load. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
+- `busqueda: string` — free-text search filtering by `descripcion` and `lugar_nombre` across all casa groups. Rendered in `FiltrosGastos` alongside the other toggles.
 
 ### Copy dialogs
 
@@ -98,7 +108,7 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `prestamo_a_otro` | Amount loaned to another person |
 | `tipo_cambio` | Exchange rate to ARS; always 1 when `moneda.codigo === 'ARS'` |
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
-| `confirmado` | Whether the gasto amount is confirmed. Defaults to `true` on new gastos; always set to `false` when copying. Unconfirmed rows render with an orange background and a warning icon in the expand column. |
+| `confirmado` | Whether the gasto amount is confirmed. Defaults to `true` on new gastos; always set to `false` when copying. Unconfirmed rows render with an orange background and a warning icon in the expand column. The "Total ARS" cell shows the sub-items sum (in orange) instead of `totalMoneda × tipoCambio` when unconfirmed and items exist. |
 | `lugar_id` | Optional FK to `Lugar` — the physical location of the expense. Available on both `Gasto` and `GastoItem`. |
 
 ### API surface
@@ -116,8 +126,24 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 | `GET/POST /api/lugares` | Locations CRUD |
+| `GET/POST /api/inversiones` | List (sorted by `fecha` asc) / create inversiones |
+| `PUT/DELETE /api/inversiones/[id]` | Single inversion edit / delete |
 
 All `/api/gastos` responses include the full `pagos` and `items` arrays via the shared `INCLUDE` constant and `toGastoResponse()` mapper defined in each route file.
+
+### Inversiones
+
+Standalone section (`/inversiones`, navigated from `TopBar`) for tracking investment balance snapshots over time. Independent from the gastos domain — does not share casa/moneda/tarjeta relations.
+
+`Inversion` model fields: `id`, `fecha`, `montoActual`, `montoExtra`, `createdAt`. API responses use snake_case (`monto_actual`, `monto_extra`) per the project's naming convention.
+
+Two computed columns in the grid (not stored, derived client-side after sorting by `fecha` asc, ties broken by `id`):
+- `monto_actualizado = monto_actual + monto_extra`
+- `cambio = monto_actualizado(current row) - monto_actualizado(previous row)` — `null` for the first row (rendered as `—`). Positive values are green, negative red.
+
+The page (`src/app/inversiones/page.tsx`) shows a form on top (Fecha / Monto actual / Monto extra) that doubles as create and edit (Editar button on a row loads its values; "Cancelar" exits edit mode). The DataGrid below has Editar / Eliminar actions per row.
+
+**Nav menus:** the visible menu is `TopBar.tsx`. `Sidebar.tsx` exists but is currently not rendered by `AppLayout` — keep both NAV arrays in sync when adding routes.
 
 ### Dates and timezones
 
