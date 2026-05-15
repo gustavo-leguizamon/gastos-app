@@ -25,14 +25,17 @@ export async function GET(req: NextRequest) {
   let total_tarjetas = 0
 
   for (const g of gastos) {
-    const totalArs = g.totalMoneda * g.tipoCambio
+    if (!g.confirmado && g.items.length === 0) continue
+    const totalArs = g.confirmado
+      ? g.totalMoneda * g.tipoCambio
+      : g.items.filter((i: any) => i.incluyeEnTotal).reduce((s: number, i: any) => s + i.monto, 0)
     const pagado = g.pagos.reduce((s, p) => s + p.monto, 0)
     const restante = totalArs - pagado
     total_gastos += totalArs
     total_pagado += pagado
     total_restante += restante
     total_prestamos += g.prestamo_a_otro ?? 0
-    if (g.tarjetaId) total_tarjetas += totalArs
+    if (g.tipoPago === 'C') total_tarjetas += totalArs
     if (g.fechaVencimiento === today) {
       pagar_hoy += restante
     } else {

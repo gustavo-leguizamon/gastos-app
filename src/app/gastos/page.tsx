@@ -17,6 +17,7 @@ import type { Gasto } from '@/lib/types'
 export default function GastosPage() {
   const { filtros, setFiltros, dialogOpen, gastoEditando, openDialog, closeDialog, refreshKey, triggerRefresh } = useGastosStore()
   const [copiarMesOpen, setCopiarMesOpen] = useState(false)
+  const [estadoPago, setEstadoPago] = useState<'todos' | 'pendiente' | 'saldado'>('pendiente')
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -40,10 +41,11 @@ export default function GastosPage() {
       </Box>
 
       <ResumenCards filtros={filtros} refreshKey={refreshKey} />
-      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} />
+      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} />
       <GastosTable
         filtros={filtros}
         refreshKey={refreshKey}
+        estadoPago={estadoPago}
         onEdit={(gasto: Gasto) => openDialog(gasto)}
         onDeleted={triggerRefresh}
       />

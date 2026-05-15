@@ -37,11 +37,12 @@ function fmtNum(n: number, simbolo: string) {
 interface Props {
   filtros: FiltrosGastos
   refreshKey: number
+  estadoPago: 'todos' | 'pendiente' | 'saldado'
   onEdit: (gasto: Gasto) => void
   onDeleted: () => void
 }
 
-export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: Props) {
+export default function GastosTable({ filtros, refreshKey, estadoPago, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(false)
@@ -211,19 +212,12 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     {
       field: 'total_moneda',
       headerName: 'Total Moneda',
-      width: 130,
+      width: 160,
       renderCell: ({ value, row }) => {
         if (row._type === 'item' || row._type === 'items_total') return null
-        return fmtNum(value, row.moneda_simbolo ?? '$')
-      },
-    },
-    {
-      field: 'tipo_cambio',
-      headerName: 'T. Cambio',
-      width: 100,
-      renderCell: ({ value, row }) => {
-        if (row._type === 'item' || row._type === 'items_total') return null
-        return row.moneda_codigo === 'ARS' ? '-' : `$${new Intl.NumberFormat('es-AR').format(value)}`
+        const base = fmtNum(value, row.moneda_simbolo ?? '$')
+        if (row.moneda_codigo === 'ARS') return base
+        return `${base} ($${new Intl.NumberFormat('es-AR').format(row.tipo_cambio)})`
       },
     },
     {
@@ -298,16 +292,6 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
         const actual = row.cuota_actual ?? '?'
         const total = row.cuotas_totales ?? '?'
         return <span style={{ fontWeight: 600 }}>{actual}/{total}</span>
-      },
-    },
-    {
-      field: 'tarjeta_nombre',
-      headerName: 'Tarjeta',
-      width: 160,
-      renderCell: ({ value, row }) => {
-        if (row._type === 'item' || row._type === 'items_total') return null
-        if (!value) return '-'
-        return row.tarjeta_banco ? `${value} (${row.tarjeta_banco})` : value
       },
     },
     {
@@ -415,8 +399,14 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
     },
   }
 
+  const gastosFiltrados = gastos.filter(g => {
+    if (estadoPago === 'saldado') return g.total_restante <= 0
+    if (estadoPago === 'pendiente') return g.total_restante > 0
+    return true
+  })
+
   // Agrupar por casa
-  const groups = gastos.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
+  const groups = gastosFiltrados.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
     const key = String(g.casa_id ?? 'sin-casa')
     if (!acc[key]) acc[key] = { nombre: g.casa_nombre ?? 'Sin casa', rows: [] }
     acc[key].rows.push(g)
@@ -540,7 +530,7 @@ export default function GastosTable({ filtros, refreshKey, onEdit, onDeleted }: 
         open={pagoGasto !== null}
         gasto={pagoGasto}
         onClose={() => setPagoGasto(null)}
-        onChanged={() => refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated))}
+        onChanged={() => { refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated)); triggerResumenRefresh() }}
       />
 
       <GastoItemDialog

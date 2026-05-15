@@ -19,9 +19,11 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 interface Props {
   filtros: FiltrosGastos
   setFiltros: (f: Partial<FiltrosGastos>) => void
+  estadoPago: 'todos' | 'pendiente' | 'saldado'
+  setEstadoPago: (v: 'todos' | 'pendiente' | 'saldado') => void
 }
 
-export default function FiltrosGastos({ filtros, setFiltros }: Props) {
+export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago }: Props) {
   const [casas, setCasas] = useState<Casa[]>([])
 
   useEffect(() => {
@@ -73,6 +75,18 @@ export default function FiltrosGastos({ filtros, setFiltros }: Props) {
       >
         <ToggleButton value="C">Crédito</ToggleButton>
         <ToggleButton value="D">Débito</ToggleButton>
+      </ToggleButtonGroup>
+
+      {/* Estado pago */}
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        value={estadoPago}
+        onChange={(_, v) => { if (v) setEstadoPago(v) }}
+      >
+        <ToggleButton value="todos">Todos</ToggleButton>
+        <ToggleButton value="pendiente">Pendientes</ToggleButton>
+        <ToggleButton value="saldado">Saldados</ToggleButton>
       </ToggleButtonGroup>
     </Box>
   )
