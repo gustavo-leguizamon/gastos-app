@@ -44,6 +44,8 @@ Client components
 
 The database is hosted on **Neon** (serverless Postgres, free tier). The connection string lives in `DATABASE_URL` — set in `.env` locally (gitignored) and in Vercel env vars for production. The legacy SQLite file at `data/gastos.db` is no longer used; it's kept in `/data/*.db` (gitignored) only as a historical local snapshot. `package.json` runs `prisma generate` via `postinstall` so Vercel builds get the client without an extra script.
 
+**Migration note:** the initial data migration from SQLite to Postgres was done via `scripts/migrate-sqlite-to-postgres.js` (truncates Postgres tables, copies rows from `data/gastos.db` preserving IDs, resets sequences). Kept in the repo as archival — requires re-installing `sql.js` to run again.
+
 ### PWA (mobile install)
 
 The app is installable as a PWA on Android (and iOS Safari with limitations). Configured via:
