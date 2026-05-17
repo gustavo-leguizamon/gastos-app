@@ -101,14 +101,12 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
         value={busqueda}
         onChange={e => setBusqueda(e.target.value)}
         sx={{ width: 180 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ fontSize: 16 }} />
-              </InputAdornment>
-            ),
-          },
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ fontSize: 16 }} />
+            </InputAdornment>
+          ),
         }}
       />
     </Box>
