@@ -50,7 +50,7 @@ The app is installable as a PWA on Android (and iOS Safari with limitations). Co
 - `public/manifest.json` — name, icons (192/512/maskable-512 PNG), `start_url: /gastos`, `display: standalone`, `theme_color: #1976d2`.
 - `public/sw.js` — minimal service worker. Caches GET requests to static assets (network-first, cache fallback). **Skips `/api/*` and `/_next/data/*`** so data stays fresh and writes always hit the server.
 - `src/components/layout/ServiceWorkerRegister.tsx` — client component that registers `/sw.js` only in production (avoids interfering with `npm run dev`). Mounted from `src/app/layout.tsx`.
-- `src/app/layout.tsx` exports `metadata.manifest`, `metadata.icons`, `metadata.appleWebApp`, and a separate `viewport` export with `themeColor` (Next.js 13 requires `themeColor` in viewport, not metadata).
+- `src/app/layout.tsx` exports `metadata` with `manifest`, `icons`, `appleWebApp`, `themeColor`, and `viewport`. (Next 13 keeps `themeColor`/`viewport` inside `metadata`; the standalone `Viewport` export came in Next 14.)
 - Icons in `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (with safe-area padding for Android adaptive icons). Placeholder design — replace with branded artwork when available.
 
 When changing manifest fields or the SW, **bump `CACHE_NAME` in `sw.js`** so installed clients re-fetch. Service workers cache aggressively; old clients can be stuck on stale versions otherwise.
