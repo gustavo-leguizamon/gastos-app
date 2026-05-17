@@ -44,6 +44,17 @@ Client components
 
 The database is hosted on **Neon** (serverless Postgres, free tier). The connection string lives in `DATABASE_URL` — set in `.env` locally (gitignored) and in Vercel env vars for production. The legacy SQLite file at `data/gastos.db` is no longer used; it's kept in `/data/*.db` (gitignored) only as a historical local snapshot. `package.json` runs `prisma generate` via `postinstall` so Vercel builds get the client without an extra script.
 
+### PWA (mobile install)
+
+The app is installable as a PWA on Android (and iOS Safari with limitations). Configured via:
+- `public/manifest.json` — name, icons (192/512/maskable-512 PNG), `start_url: /gastos`, `display: standalone`, `theme_color: #1976d2`.
+- `public/sw.js` — minimal service worker. Caches GET requests to static assets (network-first, cache fallback). **Skips `/api/*` and `/_next/data/*`** so data stays fresh and writes always hit the server.
+- `src/components/layout/ServiceWorkerRegister.tsx` — client component that registers `/sw.js` only in production (avoids interfering with `npm run dev`). Mounted from `src/app/layout.tsx`.
+- `src/app/layout.tsx` exports `metadata.manifest`, `metadata.icons`, `metadata.appleWebApp`, and a separate `viewport` export with `themeColor` (Next.js 13 requires `themeColor` in viewport, not metadata).
+- Icons in `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (with safe-area padding for Android adaptive icons). Placeholder design — replace with branded artwork when available.
+
+When changing manifest fields or the SW, **bump `CACHE_NAME` in `sw.js`** so installed clients re-fetch. Service workers cache aggressively; old clients can be stuck on stale versions otherwise.
+
 ### Naming convention mismatch (important)
 
 The Prisma schema uses **camelCase** fields (`casaId`, `tipoPago`, `totalMoneda`, etc.), but the API routes and TypeScript interfaces (`src/lib/types.ts`) expose **snake_case** (`casa_id`, `tipo_pago`, `total_moneda`). The `toGastoResponse()` function in each gastos route handles this mapping. All new API routes must follow this same mapping pattern.
@@ -184,3 +195,4 @@ Client components pass `today` as a query param to `/api/resumen` so the server 
 ### Path alias
 
 `@/*` maps to `src/*` (configured in `tsconfig.json`).
+
