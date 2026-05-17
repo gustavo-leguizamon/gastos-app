@@ -13,6 +13,8 @@ import MenuItem from '@mui/material/MenuItem'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import toast from 'react-hot-toast'
 import type { Gasto } from '@/lib/types'
@@ -34,6 +36,8 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
   const [loading, setLoading] = useState(false)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   if (!gasto) return null
 
@@ -102,7 +106,7 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth fullScreen={isMobile}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
         <ContentCopyIcon color="primary" />
         Copiar gasto

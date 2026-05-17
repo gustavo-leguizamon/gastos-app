@@ -57,6 +57,23 @@ The app is installable as a PWA on Android (and iOS Safari with limitations). Co
 
 When changing manifest fields or the SW, **bump `CACHE_NAME` in `sw.js`** so installed clients re-fetch. Service workers cache aggressively; old clients can be stuck on stale versions otherwise.
 
+### Responsive / mobile UI
+
+The app has dedicated mobile layouts at `theme.breakpoints.down('sm')` (≤600px) or `down('md')` (≤900px) where appropriate. Use `useMediaQuery(theme.breakpoints.down(...))` from MUI to bifurcate rendering instead of CSS-only hacks — the data shapes shown on mobile vs desktop differ enough that conditional render is cleaner.
+
+- **`TopBar`**: hamburger + `Drawer` on `<md`; inline `Button` nav on `>=md`. Logo/title flex-grows on mobile to push the menu icon to the edge.
+- **`AppLayout`**: padding `p: { xs: 1.5, sm: 3 }`.
+- **`gastos/page.tsx`**: "Nuevo Gasto" is a `Fab` at bottom-right (`circular` on `<sm`, `extended` on `>=sm`). "Copiar mes" collapses to an `IconButton` on `<sm`. The old `position: fixed; top` button was removed because it overlapped the AppBar.
+- **`FiltrosGastos`**: stacks vertically on `<md`. Búsqueda full-width on top, then casa, then the two toggle groups in a single row sharing 50/50.
+- **`GastosTable`**: renders **cards instead of DataGrid on `<sm`**. Each card shows description, chip, fecha, lugar, cuotas, 3-column totals (Total/Pagado/Restante), optional extras row, expand for sub-items, and a kebab menu (`MoreVertIcon`) with the 5 actions (Sub-items, Pagos, Copiar, Editar, Eliminar). Sub-items expand inline with their own incluye_en_total/vencimiento checkboxes. Desktop keeps the existing DataGrid.
+- **`GastoDialog`, `PagoDialog`, `CopiarMesDialog`, `CopiarGastoDialog`**: `fullScreen={isMobile}` (`<sm`).
+- **`GastoItemDialog`**: `fullScreen` on `<md`. The two-column layout (340px left + flex right) becomes vertical stack on `<md` — resumen + form on top, items list below.
+- **`PagoDialog`**: the "Registrar pago" form (Fecha + Monto + Button) stacks vertically on `<sm`, same with the inline-edit row.
+- **`CopiarMesDialog`**: origen/destino stack vertically on `<sm`; the `ArrowForwardIcon` swaps to `ArrowDownwardIcon`.
+- **`inversiones/page.tsx`**: the movimientos `AppDataGrid` is replaced by a vertical list of cards on `<sm` (sorted by fecha desc to match the default DataGrid sort). The new-movimiento form also stacks vertically on `<sm`.
+
+When adding new pages or tables, prefer the same pattern: build a card-based mobile view rather than letting DataGrid scroll horizontally.
+
 ### Naming convention mismatch (important)
 
 The Prisma schema uses **camelCase** fields (`casaId`, `tipoPago`, `totalMoneda`, etc.), but the API routes and TypeScript interfaces (`src/lib/types.ts`) expose **snake_case** (`casa_id`, `tipo_pago`, `total_moneda`). The `toGastoResponse()` function in each gastos route handles this mapping. All new API routes must follow this same mapping pattern.

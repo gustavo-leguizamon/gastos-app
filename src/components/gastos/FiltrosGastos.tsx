@@ -46,9 +46,18 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
   }
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', md: 'row' },
+        alignItems: { xs: 'stretch', md: 'center' },
+        gap: { xs: 1, md: 2 },
+        flexWrap: { xs: 'nowrap', md: 'wrap' },
+        mb: 2,
+      }}
+    >
       {/* Selector de mes */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: { xs: 'center', md: 'flex-start' } }}>
         <IconButton size="small" onClick={prevMes}><ChevronLeftIcon /></IconButton>
         <Typography variant="body1" fontWeight={600} sx={{ minWidth: 160, textAlign: 'center' }}>
           {MESES[filtros.mes - 1]} {filtros.anio}
@@ -56,8 +65,24 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
         <IconButton size="small" onClick={nextMes}><ChevronRightIcon /></IconButton>
       </Box>
 
+      {/* Búsqueda — full width en mobile, antes que los selects */}
+      <TextField
+        size="small"
+        placeholder="Buscar..."
+        value={busqueda}
+        onChange={e => setBusqueda(e.target.value)}
+        sx={{ width: { xs: '100%', md: 180 }, order: { xs: 1, md: 5 } }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ fontSize: 16 }} />
+            </InputAdornment>
+          ),
+        }}
+      />
+
       {/* Casa */}
-      <FormControl size="small" sx={{ minWidth: 160 }}>
+      <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 }, order: { xs: 2, md: 2 } }}>
         <InputLabel>Casa</InputLabel>
         <Select
           label="Casa"
@@ -71,44 +96,39 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
         </Select>
       </FormControl>
 
-      {/* Tipo pago */}
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={filtros.tipo_pago}
-        onChange={(_, v) => setFiltros({ tipo_pago: v })}
-      >
-        <ToggleButton value="C">Crédito</ToggleButton>
-        <ToggleButton value="D">Débito</ToggleButton>
-      </ToggleButtonGroup>
-
-      {/* Estado pago */}
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={estadoPago}
-        onChange={(_, v) => { if (v) setEstadoPago(v) }}
-      >
-        <ToggleButton value="todos">Todos</ToggleButton>
-        <ToggleButton value="pendiente">Pendientes</ToggleButton>
-        <ToggleButton value="saldado">Saldados</ToggleButton>
-      </ToggleButtonGroup>
-
-      {/* Búsqueda */}
-      <TextField
-        size="small"
-        placeholder="Buscar..."
-        value={busqueda}
-        onChange={e => setBusqueda(e.target.value)}
-        sx={{ width: 180 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 16 }} />
-            </InputAdornment>
-          ),
+      {/* Toggles agrupados: en mobile se muestran lado a lado en una fila */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1,
+          order: { xs: 3, md: 3 },
+          flexWrap: 'wrap',
+          justifyContent: { xs: 'space-between', md: 'flex-start' },
         }}
-      />
+      >
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={filtros.tipo_pago}
+          onChange={(_, v) => setFiltros({ tipo_pago: v })}
+          sx={{ flex: { xs: 1, md: 'initial' } }}
+        >
+          <ToggleButton value="C" sx={{ flex: 1, px: 1 }}>Créd.</ToggleButton>
+          <ToggleButton value="D" sx={{ flex: 1, px: 1 }}>Déb.</ToggleButton>
+        </ToggleButtonGroup>
+
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={estadoPago}
+          onChange={(_, v) => { if (v) setEstadoPago(v) }}
+          sx={{ flex: { xs: 1, md: 'initial' } }}
+        >
+          <ToggleButton value="todos" sx={{ flex: 1, px: 1 }}>Todos</ToggleButton>
+          <ToggleButton value="pendiente" sx={{ flex: 1, px: 1 }}>Pend.</ToggleButton>
+          <ToggleButton value="saldado" sx={{ flex: 1, px: 1 }}>Sald.</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
     </Box>
   )
 }

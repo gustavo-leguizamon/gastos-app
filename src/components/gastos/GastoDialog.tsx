@@ -7,6 +7,8 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import toast from 'react-hot-toast'
 import GastoForm from './GastoForm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -25,6 +27,8 @@ const FORM_ID = 'gasto-form'
 export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   const handleRequestClose = () => {
     if (!loading) setConfirmClose(true)
@@ -53,7 +57,7 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
 
   return (
     <>
-      <Dialog open={open} onClose={handleRequestClose} maxWidth="md" fullWidth disableEscapeKeyDown={loading}>
+      <Dialog open={open} onClose={handleRequestClose} maxWidth="md" fullWidth fullScreen={isMobile} disableEscapeKeyDown={loading}>
         <DialogTitle sx={{ fontWeight: 700 }}>
           {gasto ? 'Editar Gasto' : 'Nuevo Gasto'}
         </DialogTitle>

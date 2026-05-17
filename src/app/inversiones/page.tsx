@@ -17,6 +17,8 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import { GridColDef } from '@mui/x-data-grid'
 import AppDataGrid from '@/components/shared/AppDataGrid'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -50,6 +52,9 @@ export default function InversionesPage() {
   const [invDialogMode, setInvDialogMode] = useState<'create' | 'edit'>('create')
   const [invName, setInvName] = useState('')
   const [invToDelete, setInvToDelete] = useState<Inversion | null>(null)
+
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   const loadInversiones = async () => {
     const data: Inversion[] = await fetch('/api/inversiones').then(r => r.json())
@@ -326,10 +331,20 @@ export default function InversionesPage() {
                   <Button size="small" startIcon={<CloseIcon />} onClick={resetForm}>Cancelar</Button>
                 )}
               </Box>
-              <Box component="form" onSubmit={onSubmit} sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <TextField label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} InputLabelProps={{ shrink: true }} size="small" sx={{ minWidth: 170 }} />
-                <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: 180 }} />
-                <TextField label="Monto extra" type="number" value={montoExtra} onChange={(e) => setMontoExtra(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: 180 }} />
+              <Box
+                component="form"
+                onSubmit={onSubmit}
+                sx={{
+                  display: 'flex',
+                  gap: { xs: 1.5, sm: 2 },
+                  flexWrap: { xs: 'nowrap', sm: 'wrap' },
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: { xs: 'stretch', sm: 'flex-end' },
+                }}
+              >
+                <TextField label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} InputLabelProps={{ shrink: true }} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
+                <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
+                <TextField label="Monto extra" type="number" value={montoExtra} onChange={(e) => setMontoExtra(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={saving}>
                   {editingId ? 'Guardar' : 'Agregar'}
                 </Button>
@@ -337,17 +352,79 @@ export default function InversionesPage() {
             </CardContent>
           </Card>
 
-          <Box sx={{ height: 560, width: '100%', '& .cell-strong': { fontWeight: 600 } }}>
-            <AppDataGrid
-              rows={rows}
-              columns={columns}
-              initialState={{ sorting: { sortModel: [{ field: 'fecha', sort: 'desc' }] } }}
-              onDeleteKeyPress={(id) => {
-                const row = rows.find(r => r.id === id)
-                if (row) setToDelete(row._raw)
-              }}
-            />
-          </Box>
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {rows.length === 0 ? (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="body2" color="text.secondary">
+                      No hay movimientos cargados aún.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ) : (
+                [...rows].reverse().map((row) => {
+                  const cambio = row.cambio
+                  const cambioColor = cambio == null ? 'text.disabled' : cambio > 0 ? 'success.main' : cambio < 0 ? 'error.main' : 'text.secondary'
+                  const sign = cambio == null ? '' : cambio > 0 ? '+' : ''
+                  const [y, m, d] = row.fecha.split('-').map(Number)
+                  const dayName = new Date(y, m - 1, d).toLocaleDateString('es-AR', { weekday: 'long' })
+                  return (
+                    <Card key={row.id} variant="outlined">
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>{row.fecha}</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>{dayName}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex' }}>
+                            <IconButton size="small" onClick={() => onEdit(row._raw)}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={() => setToDelete(row._raw)}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Monto actual</Typography>
+                            <Typography variant="body2" fontWeight={600}>{fmtARS(row.monto_actual)}</Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Monto extra</Typography>
+                            <Typography variant="body2" fontWeight={600}>{fmtARS(row.monto_extra)}</Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Actualizado</Typography>
+                            <Typography variant="body2" fontWeight={700}>{fmtARS(row.monto_actualizado)}</Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Cambio</Typography>
+                            <Typography variant="body2" fontWeight={600} sx={{ color: cambioColor }}>
+                              {cambio == null ? '—' : `${sign}${fmtARS(cambio)}`}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )
+                })
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ height: 560, width: '100%', '& .cell-strong': { fontWeight: 600 } }}>
+              <AppDataGrid
+                rows={rows}
+                columns={columns}
+                initialState={{ sorting: { sortModel: [{ field: 'fecha', sort: 'desc' }] } }}
+                onDeleteKeyPress={(id) => {
+                  const row = rows.find(r => r.id === id)
+                  if (row) setToDelete(row._raw)
+                }}
+              />
+            </Box>
+          )}
         </>
       )}
 

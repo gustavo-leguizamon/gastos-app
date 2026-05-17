@@ -14,7 +14,10 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
 import LinearProgress from '@mui/material/LinearProgress'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import toast from 'react-hot-toast'
 import type { FiltrosGastos, Gasto } from '@/lib/types'
@@ -42,6 +45,8 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
   const [loadingGastos, setLoadingGastos] = useState(false)
   const [copying, setCopying] = useState(false)
   const [progress, setProgress] = useState(0)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i)
 
@@ -137,14 +142,14 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
   const sameMonthYear = srcMes === dstMes && srcAnio === dstAnio
 
   return (
-    <Dialog open={open} onClose={copying ? undefined : onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={copying ? undefined : onClose} maxWidth="sm" fullWidth fullScreen={isMobile}>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
         <ContentCopyIcon color="primary" />
         Copiar mes completo
       </DialogTitle>
 
       <DialogContent dividers>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
           {/* Origen */}
           <Box sx={{ flex: 1 }}>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
@@ -166,7 +171,9 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
             </Box>
           </Box>
 
-          <ArrowForwardIcon sx={{ color: 'text.disabled', mt: 2.5 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: { xs: 0, sm: 2.5 } }}>
+            {isMobile ? <ArrowDownwardIcon sx={{ color: 'text.disabled' }} /> : <ArrowForwardIcon sx={{ color: 'text.disabled' }} />}
+          </Box>
 
           {/* Destino */}
           <Box sx={{ flex: 1 }}>

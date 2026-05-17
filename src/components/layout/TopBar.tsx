@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import AppBar from '@mui/material/AppBar'
@@ -7,6 +8,15 @@ import Toolbar from '@mui/material/Toolbar'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
+import IconButton from '@mui/material/IconButton'
+import Drawer from '@mui/material/Drawer'
+import List from '@mui/material/List'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
+import MenuIcon from '@mui/icons-material/Menu'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -20,38 +30,82 @@ const NAV = [
 
 export default function TopBar() {
   const pathname = usePathname()
+  const theme = useTheme()
+  const isCompact = useMediaQuery(theme.breakpoints.down('md'))
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <AppBar position="fixed" color="default" elevation={0} sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
-      <Toolbar sx={{ gap: 2 }}>
-        <AccountBalanceWalletIcon sx={{ color: 'primary.main', fontSize: 28 }} />
-        <Typography variant="h6" fontWeight={700} color="primary.main" sx={{ mr: 3 }}>
-          GastosApp
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {NAV.map((item) => {
-            const active = pathname.startsWith(item.href)
-            return (
-              <Button
-                key={item.href}
-                component={Link}
-                href={item.href}
-                startIcon={item.icon}
-                variant={active ? 'contained' : 'text'}
-                color="primary"
-                sx={{
-                  borderRadius: 2,
-                  fontWeight: active ? 600 : 400,
-                  textTransform: 'none',
-                  fontSize: 14,
-                }}
-              >
-                {item.label}
-              </Button>
-            )
-          })}
+    <>
+      <AppBar
+        position="fixed"
+        color="default"
+        elevation={0}
+        sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}
+      >
+        <Toolbar sx={{ gap: { xs: 1, md: 2 }, minHeight: { xs: 56, sm: 64 } }}>
+          {isCompact && (
+            <IconButton edge="start" color="primary" onClick={() => setDrawerOpen(true)} aria-label="menu">
+              <MenuIcon />
+            </IconButton>
+          )}
+          <AccountBalanceWalletIcon sx={{ color: 'primary.main', fontSize: 28 }} />
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            color="primary.main"
+            sx={{ mr: { xs: 0, md: 3 }, flexGrow: { xs: 1, md: 0 }, fontSize: { xs: 18, md: 20 } }}
+          >
+            GastosApp
+          </Typography>
+          {!isCompact && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {NAV.map((item) => {
+                const active = pathname.startsWith(item.href)
+                return (
+                  <Button
+                    key={item.href}
+                    component={Link}
+                    href={item.href}
+                    startIcon={item.icon}
+                    variant={active ? 'contained' : 'text'}
+                    color="primary"
+                    sx={{ borderRadius: 2, fontWeight: active ? 600 : 400, textTransform: 'none', fontSize: 14 }}
+                  >
+                    {item.label}
+                  </Button>
+                )
+              })}
+            </Box>
+          )}
+        </Toolbar>
+      </AppBar>
+
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 260, pt: 1 }} role="presentation">
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1.5 }}>
+            <AccountBalanceWalletIcon sx={{ color: 'primary.main', fontSize: 24 }} />
+            <Typography variant="h6" fontWeight={700} color="primary.main">GastosApp</Typography>
+          </Box>
+          <List>
+            {NAV.map((item) => {
+              const active = pathname.startsWith(item.href)
+              return (
+                <ListItemButton
+                  key={item.href}
+                  component={Link}
+                  href={item.href}
+                  selected={active}
+                  onClick={() => setDrawerOpen(false)}
+                  sx={{ borderRadius: 1, mx: 1 }}
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 600 : 400 }} />
+                </ListItemButton>
+              )
+            })}
+          </List>
         </Box>
-      </Toolbar>
-    </AppBar>
+      </Drawer>
+    </>
   )
 }

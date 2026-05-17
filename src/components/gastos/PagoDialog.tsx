@@ -12,6 +12,8 @@ import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -45,6 +47,8 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   if (!gasto) return null
 
@@ -113,7 +117,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={isMobile}>
       <DialogTitle sx={{ fontWeight: 700 }}>Pagos — {gasto.descripcion}</DialogTitle>
 
       <DialogContent dividers>
@@ -147,14 +151,14 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
             {pagos.map(p => (
               <Box key={p.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 {editing?.id === p.id ? (
-                  <Box sx={{ py: 1.5, display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Box sx={{ py: 1.5, display: 'flex', gap: 1, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' } }}>
                     <TextField
                       size="small" label="Fecha" type="date" autoFocus
                       value={editing.fecha}
                       onChange={e => setEditing(s => s ? { ...s, fecha: e.target.value } : s)}
                       onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
                       InputLabelProps={{ shrink: true }}
-                      sx={{ width: 155 }}
+                      sx={{ width: { xs: '100%', sm: 155 } }}
                     />
                     <TextField
                       size="small" label="Monto (ARS)" type="number"
@@ -196,14 +200,14 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
 
         {/* Formulario nuevo pago */}
         <Typography variant="subtitle2" fontWeight={700} mb={1}>Registrar pago</Typography>
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: { xs: 'stretch', sm: 'flex-start' }, flexDirection: { xs: 'column', sm: 'row' } }}>
           <TextField
             size="small" label="Fecha" type="date"
             value={fecha}
             onChange={e => setFecha(e.target.value)}
             onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
             InputLabelProps={{ shrink: true }}
-            sx={{ width: 160 }}
+            sx={{ width: { xs: '100%', sm: 160 } }}
           />
           <TextField
             size="small" label="Monto (ARS)" type="number"
@@ -218,7 +222,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
             onClick={handleAdd}
             disabled={saving}
-            sx={{ height: 40 }}
+            sx={{ height: 40, width: { xs: '100%', sm: 'auto' } }}
           >
             Agregar
           </Button>

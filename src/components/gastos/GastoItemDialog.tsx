@@ -17,6 +17,8 @@ import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -63,6 +65,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   useEffect(() => {
     fetch('/api/lugares').then(r => r.json()).then(setLugares)
@@ -170,15 +174,22 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   })
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { height: '90vh' } }}>
-      <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobile}
+      PaperProps={{ sx: { height: isMobile ? '100%' : '90vh' } }}
+    >
+      <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: 16, sm: 20 } }}>
         <SubdirectoryArrowRightIcon color="primary" />
         Sub-items — {gasto.descripcion}
       </DialogTitle>
 
-      <DialogContent dividers sx={{ p: 0, display: 'flex', overflow: 'hidden' }}>
-        {/* Columna izquierda: resumen + formulario */}
-        <Box sx={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid', borderColor: 'divider', overflowY: 'auto' }}>
+      <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, overflow: 'hidden' }}>
+        {/* Columna izquierda en md+, fila superior en mobile: resumen + formulario */}
+        <Box sx={{ width: { xs: '100%', md: 340 }, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: { xs: 'none', md: '1px solid' }, borderBottom: { xs: '1px solid', md: 'none' }, borderColor: 'divider', overflowY: 'auto' }}>
           {/* Resumen */}
           <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
             <Box>

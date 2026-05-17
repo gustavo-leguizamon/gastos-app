@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { GridColDef } from '@mui/x-data-grid'
 import AppDataGrid from '@/components/shared/AppDataGrid'
 import Box from '@mui/material/Box'
@@ -8,6 +8,15 @@ import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import Checkbox from '@mui/material/Checkbox'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import HomeIcon from '@mui/icons-material/Home'
@@ -18,7 +27,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
-import Checkbox from '@mui/material/Checkbox'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -54,6 +63,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
+  const [menuAnchor, setMenuAnchor] = useState<{ el: HTMLElement; gasto: Gasto } | null>(null)
+
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   const loadGastos = () => {
     setLoading(true)
@@ -416,7 +429,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   const groupEntries = Object.values(groups)
 
-  // Construir filas planas con sub-items inyectados cuando están expandidos
+  // Construir filas planas con sub-items inyectados cuando están expandidos (para DataGrid)
   const buildFlatRows = (gastoRows: Gasto[]) => {
     const result: any[] = []
     for (const g of gastoRows) {
@@ -461,7 +474,210 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     return result
   }
 
+  // Render de una card en mobile para un gasto
+  const renderGastoCard = (g: Gasto) => {
+    const isToday = g.fecha_vencimiento === today
+    const isPast = g.fecha_vencimiento < today && g.total_restante > 0
+    const vencColor = isToday ? '#ef4444' : isPast ? '#f59e0b' : undefined
+    const hasItems = (g.items?.length ?? 0) > 0
+    const expanded = expandedIds.has(g.id)
+    const displayTotalARS = !g.confirmado && hasItems
+      ? g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+      : g.total_ars
+
+    return (
+      <Card
+        key={g.id}
+        variant="outlined"
+        sx={{
+          bgcolor: g.confirmado === false ? 'rgba(245,158,11,0.12)' : undefined,
+          borderColor: g.confirmado === false ? 'rgba(245,158,11,0.3)' : undefined,
+        }}
+      >
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          {/* Header: descripción + menu */}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+                {g.confirmado === false && (
+                  <WarningAmberIcon sx={{ fontSize: 14, color: '#f59e0b', flexShrink: 0 }} />
+                )}
+                <Typography variant="body2" fontWeight={600} sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {g.descripcion}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, fontSize: 12 }}>
+                <Chip
+                  label={g.tipo_pago === 'C' ? 'Crédito' : 'Débito'}
+                  size="small"
+                  color={g.tipo_pago === 'C' ? 'primary' : 'default'}
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: 11 }}
+                />
+                <Typography variant="caption" sx={{ color: vencColor, fontWeight: vencColor ? 600 : undefined }}>
+                  {g.fecha_vencimiento}
+                </Typography>
+                {(g.cuota_actual != null || g.cuotas_totales != null) && (
+                  <Typography variant="caption" color="text.secondary">
+                    Cuota {g.cuota_actual ?? '?'}/{g.cuotas_totales ?? '?'}
+                  </Typography>
+                )}
+                {g.lugar_nombre && (
+                  <Typography variant="caption" color="text.secondary">
+                    📍 {g.lugar_nombre}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={(e) => setMenuAnchor({ el: e.currentTarget, gasto: g })}
+              sx={{ flexShrink: 0 }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          {/* Totales */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Total</Typography>
+              <Typography variant="body2" fontWeight={600} sx={{ color: !g.confirmado && hasItems ? '#f59e0b' : undefined }}>
+                {fmtARS(displayTotalARS)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Pagado</Typography>
+              <Typography variant="body2" fontWeight={600} sx={{ color: '#22c55e' }}>
+                {fmtARS(g.total_pagado)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Restante</Typography>
+              <Typography variant="body2" fontWeight={600} sx={{ color: g.total_restante > 0 ? '#f59e0b' : '#22c55e' }}>
+                {fmtARS(g.total_restante)}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Extras opcionales */}
+          {(g.pasaje_mes_siguiente > 0 || g.prestamo_a_otro > 0 || (g.moneda_codigo !== 'ARS')) && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1 }}>
+              {g.moneda_codigo !== 'ARS' && (
+                <Typography variant="caption" color="text.secondary">
+                  {fmtNum(g.total_moneda, g.moneda_simbolo ?? '$')} (TC ${new Intl.NumberFormat('es-AR').format(g.tipo_cambio)})
+                </Typography>
+              )}
+              {g.pasaje_mes_siguiente > 0 && (
+                <Typography variant="caption" sx={{ color: '#ec4899' }}>
+                  Pasaje: {fmtARS(g.pasaje_mes_siguiente)}
+                </Typography>
+              )}
+              {g.prestamo_a_otro > 0 && (
+                <Typography variant="caption" sx={{ color: '#8b5cf6' }}>
+                  Préstamo: {fmtARS(g.prestamo_a_otro)}
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {/* Botón expandir sub-items */}
+          {hasItems && (
+            <Box sx={{ mt: 1 }}>
+              <Box
+                onClick={() => toggleExpand(g.id)}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  cursor: 'pointer', color: 'primary.main',
+                  fontSize: 12, fontWeight: 500,
+                  userSelect: 'none',
+                }}
+              >
+                {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                {expanded ? 'Ocultar' : 'Ver'} {g.items.length} sub-item{g.items.length !== 1 ? 's' : ''}
+              </Box>
+              {expanded && renderSubItems(g)}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderSubItems = (g: Gasto) => {
+    const sortedItems = [...g.items].sort((a, b) => {
+      if (!a.fecha && !b.fecha) return 0
+      if (!a.fecha) return 1
+      if (!b.fecha) return -1
+      return a.fecha.localeCompare(b.fecha)
+    })
+    const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+    const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
+
+    return (
+      <Box sx={{ mt: 1, pl: 1, borderLeft: '2px solid', borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, mb: 0.5, borderBottom: '1px dashed', borderColor: 'divider' }}>
+          <Typography variant="caption" fontWeight={700} color="text.secondary">TOTAL SUB-ITEMS</Typography>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" sx={{ color: matches ? '#22c55e' : '#ef4444', fontWeight: 700, display: 'block', lineHeight: 1.2 }}>
+              {fmtARS(itemsTotal)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: matches ? '#22c55e' : '#ef4444', fontSize: 10 }}>
+              {matches ? '✓ Coincide' : '✗ No coincide'}
+            </Typography>
+          </Box>
+        </Box>
+        {sortedItems.map(item => (
+          <Box key={item.id} sx={{ py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ color: '#a78bfa', flex: 1, fontSize: 13 }}>
+                {item.descripcion}
+              </Typography>
+              <Typography variant="body2" fontWeight={600} sx={{ fontSize: 13 }}>
+                {fmtARS(item.monto)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+              {item.fecha && <Typography variant="caption" color="text.disabled">{item.fecha}</Typography>}
+              {(item.cuota_actual != null || item.cuotas_totales != null) && (
+                <Typography variant="caption" color="text.secondary">
+                  {item.cuota_actual ?? '?'}/{item.cuotas_totales ?? '?'}
+                </Typography>
+              )}
+              {item.lugar_nombre && <Typography variant="caption" color="text.disabled">📍 {item.lugar_nombre}</Typography>}
+              <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Tooltip title="Incluido en total">
+                  <Checkbox
+                    size="small"
+                    checked={!!item.incluye_en_total}
+                    onChange={(e) => handleToggleItemField(g.id, item.id, 'incluye_en_total', e.target.checked)}
+                    sx={{ p: 0.25 }}
+                  />
+                </Tooltip>
+                <Tooltip title="Incluido en vencimientos">
+                  <Checkbox
+                    size="small"
+                    checked={!!item.incluye_en_vencimiento}
+                    onChange={(e) => handleToggleItemField(g.id, item.id, 'incluye_en_vencimiento', e.target.checked)}
+                    sx={{ p: 0.25 }}
+                  />
+                </Tooltip>
+              </Box>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    )
+  }
+
   if (loading) {
+    if (isMobile) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <Typography variant="body2" color="text.secondary">Cargando...</Typography>
+        </Box>
+      )
+    }
     return <AppDataGrid rows={[]} columns={columns} loading autoHeight sx={gridSx} />
   }
 
@@ -477,20 +693,27 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   return (
     <>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 } }}>
         {groupEntries.map(({ nombre, rows }) => {
           const totalARS = rows.reduce((s, r) => s + r.total_ars, 0)
           const totalRestante = rows.reduce((s, r) => s + r.total_restante, 0)
-          const flatRows = buildFlatRows(rows)
           return (
             <Box key={nombre}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, px: 0.5 }}>
+              {/* Header del grupo */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'stretch', sm: 'center' },
+                justifyContent: 'space-between',
+                gap: 0.5,
+                mb: 1, px: 0.5,
+              }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <HomeIcon sx={{ fontSize: 18, color: 'primary.main' }} />
                   <Typography fontWeight={700} fontSize={15}>{nombre}</Typography>
                   <Chip label={`${rows.length} gasto${rows.length !== 1 ? 's' : ''}`} size="small" variant="outlined" />
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                   <Typography variant="body2" color="text.secondary">
                     Total: <strong style={{ color: '#fff' }}>{fmtARS(totalARS)}</strong>
                   </Typography>
@@ -499,28 +722,67 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   </Typography>
                 </Box>
               </Box>
-              <AppDataGrid
-                rows={flatRows}
-                columns={columns}
-                autoHeight
-                hideFooter
-                getRowId={row => row.id}
-                getRowClassName={({ row }) => {
-                  if (row._type === 'gasto') return row.confirmado === false ? 'row-unconfirmed' : ''
-                  if (row._type === 'item') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-subitem' : 'row-subitem'
-                  if (row._type === 'items_total') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-items-total' : 'row-items-total'
-                  return ''
-                }}
-                isRowSelectable={({ row }) => row._type === 'gasto'}
-                selectedRowId={selectedGastoId}
-                onSelectedRowChange={(id) => setSelectedGastoId(id as number | null)}
-                onDeleteKeyPress={(id) => setDeleteId(id as number)}
-                sx={gridSx}
-              />
+
+              {/* Cards en mobile, DataGrid en desktop */}
+              {isMobile ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {rows.map(g => renderGastoCard(g))}
+                </Box>
+              ) : (
+                <AppDataGrid
+                  rows={buildFlatRows(rows)}
+                  columns={columns}
+                  autoHeight
+                  hideFooter
+                  getRowId={row => row.id}
+                  getRowClassName={({ row }) => {
+                    if (row._type === 'gasto') return row.confirmado === false ? 'row-unconfirmed' : ''
+                    if (row._type === 'item') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-subitem' : 'row-subitem'
+                    if (row._type === 'items_total') return row._parentConfirmado === false ? 'row-unconfirmed-sub row-items-total' : 'row-items-total'
+                    return ''
+                  }}
+                  isRowSelectable={({ row }) => row._type === 'gasto'}
+                  selectedRowId={selectedGastoId}
+                  onSelectedRowChange={(id) => setSelectedGastoId(id as number | null)}
+                  onDeleteKeyPress={(id) => setDeleteId(id as number)}
+                  sx={gridSx}
+                />
+              )}
             </Box>
           )
         })}
       </Box>
+
+      {/* Menú de acciones en mobile */}
+      <Menu
+        anchorEl={menuAnchor?.el ?? null}
+        open={!!menuAnchor}
+        onClose={() => setMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => { if (menuAnchor) setItemGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Sub-items</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) setPagoGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><PaymentsIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Pagos</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) setCopiarGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Copiar a otro mes</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) onEdit(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Editar</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => { if (menuAnchor) setDeleteId(menuAnchor.gasto.id); setMenuAnchor(null) }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+          <ListItemText>Eliminar</ListItemText>
+        </MenuItem>
+      </Menu>
 
       <ConfirmDialog
         open={deleteId !== null}
