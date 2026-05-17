@@ -32,17 +32,17 @@ There are no tests configured in this project.
 
 ## Architecture
 
-**Stack:** Next.js 13 App Router · TypeScript · Material-UI v5 · Prisma + SQLite · Zustand · React Hook Form + Yup
+**Stack:** Next.js 13 App Router · TypeScript · Material-UI v5 · Prisma + PostgreSQL (Neon) · Zustand · React Hook Form + Yup
 
 ### Data flow
 
 ```
 Client components
   → fetch() calls to /api/* routes
-  → Prisma queries SQLite at data/gastos.db
+  → Prisma queries Postgres (Neon) via DATABASE_URL
 ```
 
-The database file lives at `data/gastos.db` (outside `src/`, outside `prisma/`). Prisma schema references it as `file:../data/gastos.db`.
+The database is hosted on **Neon** (serverless Postgres, free tier). The connection string lives in `DATABASE_URL` — set in `.env` locally (gitignored) and in Vercel env vars for production. The legacy SQLite file at `data/gastos.db` is no longer used; it's kept in `/data/*.db` (gitignored) only as a historical local snapshot. `package.json` runs `prisma generate` via `postinstall` so Vercel builds get the client without an extra script.
 
 ### Naming convention mismatch (important)
 
