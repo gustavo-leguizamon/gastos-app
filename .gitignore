@@ -36,3 +36,6 @@ next-env.d.ts
 
 # database
 /data/*.db
+
+# icon source (kept local; only the generated /public icons go to repo)
+/icon-source.png
