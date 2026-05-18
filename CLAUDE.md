@@ -106,9 +106,10 @@ The Prisma schema uses **camelCase** fields (`casaId`, `tipoPago`, `totalMoneda`
 - `total_restante = total_ars - total_pagado`
 
 The `/api/resumen` route computes these aggregates server-side for the summary cards. It also returns:
-- `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas`
+- `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas - total_pasajes`
 - `total_prestamos = SUM(prestamo_a_otro)`
-- `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C'` (credit, regardless of tarjetaId)
+- `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C' AND prestamo_a_otro === 0` — credit gastos that also have a `prestamo_a_otro > 0` are excluded from this bucket to avoid double-subtracting the same amount (the prestamo already covers what gets netted out).
+- `total_pasajes = SUM(pasaje_mes_siguiente)` — amounts carried over to next month are also subtracted from neto.
 
 These are shown as a secondary breakdown inside the "Total Gastos" card (only rendered when at least one of the sub-totals is non-zero).
 
@@ -235,6 +236,8 @@ API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per
 - Additional `sx` is deep-merged with the base styles.
 
 The `document` keydown listener in `AppDataGrid` only fires if the selected row belongs to that grid instance (checked via `rows.some(r => id === r.id)`), preventing double-trigger when multiple grids are on the same page.
+
+**`AppTextField` (`src/components/shared/AppTextField.tsx`):** wrapper genérico de MUI `TextField` que auto-selecciona el contenido del input al recibir foco (`e.target.select()` con `setTimeout(0)` para ganarle al cursor que pone el navegador). Mantiene la API completa de `TextField`. Todos los formularios de la app importan `TextField` desde este path en vez de `@mui/material/TextField`. Si en un caso puntual no se quiere ese comportamiento, pasar `autoSelectOnFocus={false}` o un `onFocus` propio. Si necesitás el TextField "crudo" sin auto-selección (caso muy raro), importá `@mui/material/TextField` directamente.
 
 ### Dates and timezones
 

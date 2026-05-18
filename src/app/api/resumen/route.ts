@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   let pagar_hoy = 0
   let total_prestamos = 0
   let total_tarjetas = 0
+  let total_pasajes = 0
 
   for (const g of gastos) {
     if (!g.confirmado && g.items.length === 0) continue
@@ -31,11 +32,13 @@ export async function GET(req: NextRequest) {
       : g.items.filter((i: any) => i.incluyeEnTotal).reduce((s: number, i: any) => s + i.monto, 0)
     const pagado = g.pagos.reduce((s, p) => s + p.monto, 0)
     const restante = totalArs - pagado
+    const prestamo = g.prestamo_a_otro ?? 0
     total_gastos += totalArs
     total_pagado += pagado
     total_restante += restante
-    total_prestamos += g.prestamo_a_otro ?? 0
-    if (g.tipoPago === 'C') total_tarjetas += totalArs
+    total_prestamos += prestamo
+    total_pasajes += g.pasaje_mes_siguiente ?? 0
+    if (g.tipoPago === 'C' && prestamo === 0) total_tarjetas += totalArs
     if (g.fechaVencimiento === today) {
       pagar_hoy += restante
     } else {
@@ -49,9 +52,10 @@ export async function GET(req: NextRequest) {
   const r = (n: number) => Math.round(n * 100) / 100
   return NextResponse.json({
     total_gastos: r(total_gastos),
-    total_gastos_neto: r(total_gastos - total_prestamos - total_tarjetas),
+    total_gastos_neto: r(total_gastos - total_prestamos - total_tarjetas - total_pasajes),
     total_prestamos: r(total_prestamos),
     total_tarjetas: r(total_tarjetas),
+    total_pasajes: r(total_pasajes),
     total_restante: r(total_restante),
     total_pagado: r(total_pagado),
     pagar_hoy: r(pagar_hoy),

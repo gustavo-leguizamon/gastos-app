@@ -71,6 +71,7 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
           anio,
           notas: gasto.notas ?? '',
           confirmado: false,
+          lugar_id: gasto.lugar_id,
         }),
       })
       if (!res.ok) throw new Error()
@@ -90,6 +91,7 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
               cuotas_totales: item.cuotas_totales,
               incluye_en_total: item.incluye_en_total,
               incluye_en_vencimiento: item.incluye_en_vencimiento,
+              lugar_id: item.lugar_id,
             }),
           })
         ))
