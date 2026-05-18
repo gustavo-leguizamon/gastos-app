@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     total_pagado += pagado
     total_restante += restante
     total_prestamos += prestamo
-    total_pasajes += g.pasaje_mes_siguiente ?? 0
+    total_pasajes += g.pasajeMesSiguiente ?? 0
     if (g.tipoPago === 'C' && prestamo === 0) total_tarjetas += totalArs
     if (g.fechaVencimiento === today) {
       pagar_hoy += restante
