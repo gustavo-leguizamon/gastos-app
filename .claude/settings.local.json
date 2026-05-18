@@ -27,7 +27,21 @@
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-docs.ps1)",
       "Bash(Get-Content *)",
       "PowerShell(Out-Null *)",
-      "PowerShell(Remove-Item *)"
+      "PowerShell(Remove-Item *)",
+      "PowerShell(npm install *)",
+      "PowerShell(node scripts/migrate-sqlite-to-postgres.js 2>&1)",
+      "PowerShell(npm uninstall *)",
+      "PowerShell(node -e \"const{PrismaClient}=require\\('@prisma/client'\\);const p=new PrismaClient\\(\\);p.gasto.count\\(\\).then\\(c=>console.log\\('Gastos en Neon:',c\\)\\).catch\\(e=>console.error\\('ERROR:',e.message\\)\\).finally\\(\\(\\)=>p.$disconnect\\(\\)\\)\")",
+      "PowerShell(\\(Get-Content node_modules/next/package.json | ConvertFrom-Json\\).version)",
+      "PowerShell(npm run *)",
+      "Bash(npm install *)",
+      "PowerShell(npm ls *)",
+      "PowerShell($bytes = New-Object byte[] 32; \\(New-Object Security.Cryptography.RNGCryptoServiceProvider\\).GetBytes\\($bytes\\); [Convert]::ToBase64String\\($bytes\\))",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 30)",
+      "Bash(npm run *)",
+      "PowerShell(Get-Item \"C:\\\\Users\\\\GUSTAV~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-GustavoLeguizamon-Desktop-app-gapp-gastos-app\\\\cfd0e708-5465-4d99-ae1d-3efd2490d6ff\\\\tasks\\\\b4iil243o.output\" | Select-Object Length,LastWriteTime; \"---\"; Invoke-WebRequest -Uri http://localhost:3001/ -MaximumRedirection 0 -ErrorAction SilentlyContinue | Select-Object StatusCode,Headers)",
+      "PowerShell(Move-Item *)",
+      "PowerShell(git status; \"---LOG---\"; git log --oneline -5)"
     ]
   },
   "hooks": {

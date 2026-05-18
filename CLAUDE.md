@@ -148,6 +148,20 @@ Client-side filters in `gastos/page.tsx` (lifted state, passed as props):
 - `estadoPago: 'todos' | 'pendiente' | 'saldado'` — defaults to `'pendiente'` on load. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
 - `busqueda: string` — free-text search filtering by `descripcion` and `lugar_nombre` across all casa groups. Rendered in `FiltrosGastos` alongside the other toggles.
 
+### GastoDialog — cierre
+
+El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (llama `onClose` en vez de `handleRequestClose`). La confirmación de "¿Cerrar sin guardar?" (`ConfirmDialog`) sigue activa para cierres accidentales por click en backdrop o tecla ESC, para evitar pérdida de datos por gestos involuntarios.
+
+### GastoForm — campos condicionales
+
+- **Tipo de cambio**: el campo `tipo_cambio` solo se renderiza cuando la moneda seleccionada no es ARS. Cuando se cambia la moneda a ARS, el form setea `tipo_cambio = 1` automáticamente. El cálculo de "Total en ARS" sigue mostrándose como readonly debajo cuando aplica.
+- **Cuotas**: los campos `cuota_actual` / `cuotas_totales` están ocultos por defecto. Un `Checkbox` "Pago en cuotas" controla su visibilidad (`usaCuotas` state local del form). Al desmarcarlo, ambos valores se setean a `null` vía `setValue()`. Al editar un gasto que ya tenía cuotas (`cuota_actual` o `cuotas_totales` no null) el toggle se inicializa marcado.
+- **Total pagado / Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
+
+### Vencimientos del día alert
+
+`VencimientosHoyAlert` (`src/components/gastos/VencimientosHoyAlert.tsx`) — montado al inicio de `gastos/page.tsx`. En `useEffect` (una sola vez por mount) hace `GET /api/gastos?mes=<hoy>&anio=<hoy>` y filtra client-side por `fecha_vencimiento === today && total_restante > 0 && confirmado`. Si hay matches abre un `Dialog` con la lista (descripción, casa, restante por gasto) y un total a pagar hoy. El componente se monta cada vez que se navega a `/gastos`, así que la alerta aparece en cada entrada mientras existan vencimientos no saldados (no usa localStorage ni dismissal persistente).
+
 ### Copy dialogs
 
 - **`CopiarGastoDialog`** — copies a single gasto (+ its sub-items) to a chosen month/year. Resets all payments to zero, sets `confirmado: false`, adjusts `fechaVencimiento` to the same day in the target month.

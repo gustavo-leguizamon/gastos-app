@@ -17,6 +17,7 @@ import FiltrosGastos from '@/components/gastos/FiltrosGastos'
 import GastosTable from '@/components/gastos/GastosTable'
 import GastoDialog from '@/components/gastos/GastoDialog'
 import CopiarMesDialog from '@/components/gastos/CopiarMesDialog'
+import VencimientosHoyAlert from '@/components/gastos/VencimientosHoyAlert'
 import type { Gasto } from '@/lib/types'
 
 export default function GastosPage() {
@@ -31,6 +32,7 @@ export default function GastosPage() {
 
   return (
     <Box>
+      <VencimientosHoyAlert />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2, sm: 3 } }}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Gastos</Typography>

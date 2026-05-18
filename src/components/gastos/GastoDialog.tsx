@@ -71,7 +71,7 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={handleRequestClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={onClose} disabled={loading}>Cancelar</Button>
           <Button
             type="submit"
             form={FORM_ID}
