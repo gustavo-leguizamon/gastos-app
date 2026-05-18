@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { signOut, useSession } from 'next-auth/react'
+import Tooltip from '@mui/material/Tooltip'
+import LogoutIcon from '@mui/icons-material/Logout'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import Box from '@mui/material/Box'
@@ -33,6 +36,7 @@ export default function TopBar() {
   const theme = useTheme()
   const isCompact = useMediaQuery(theme.breakpoints.down('md'))
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { data: session } = useSession()
 
   return (
     <>
@@ -75,6 +79,20 @@ export default function TopBar() {
                   </Button>
                 )
               })}
+            </Box>
+          )}
+          {session?.user && (
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+              {!isCompact && (
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
+                  {session.user.email}
+                </Typography>
+              )}
+              <Tooltip title="Cerrar sesión">
+                <IconButton color="primary" onClick={() => signOut({ callbackUrl: '/login' })} aria-label="cerrar sesión">
+                  <LogoutIcon />
+                </IconButton>
+              </Tooltip>
             </Box>
           )}
         </Toolbar>

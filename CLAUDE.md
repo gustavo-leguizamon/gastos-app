@@ -32,7 +32,27 @@ There are no tests configured in this project.
 
 ## Architecture
 
-**Stack:** Next.js 13 App Router · TypeScript · Material-UI v5 · Prisma + PostgreSQL (Neon) · Zustand · React Hook Form + Yup
+**Stack:** Next.js 13 App Router · TypeScript · Material-UI v5 · Prisma + PostgreSQL (Neon) · Zustand · React Hook Form + Yup · NextAuth (Google OAuth)
+
+### Authentication
+
+Toda la app está detrás de login con Google vía **NextAuth v4** (estrategia JWT, sin tabla de usuarios en la DB).
+
+- `src/lib/auth.ts` — define `authOptions` con `GoogleProvider` y un callback `signIn` que sólo permite emails listados en `ALLOWED_EMAILS` (env var, coma-separada, normalizada a lowercase). Si la lista está vacía nadie puede entrar.
+- `src/app/api/auth/[...nextauth]/route.ts` — handler standard de NextAuth para App Router.
+- `middleware.ts` (raíz del repo) — usa el middleware default de `next-auth/middleware` para forzar sesión en **todas** las rutas, exceptuando `api/auth/*`, `/login`, el manifest/SW/íconos PWA, favicon y assets de `_next`. Si no hay sesión, redirige a `/login`.
+- `src/app/login/page.tsx` — pantalla de login con botón "Continuar con Google". Muestra `error=AccessDenied` cuando el email no está en la whitelist.
+- `src/components/layout/AppLayout.tsx` — si `pathname === '/login'`, renderiza children sin TopBar (para que la pantalla de login sea limpia).
+- `src/app/providers.tsx` — envuelve todo en `<SessionProvider>` para que `useSession()` funcione client-side.
+- `src/components/layout/TopBar.tsx` — muestra el email del usuario logueado y un `IconButton` con `LogoutIcon` que llama `signOut({ callbackUrl: '/login' })`.
+
+**Env vars requeridas** (ver `.env`):
+- `NEXTAUTH_URL` — URL absoluta del sitio (en dev: `http://localhost:3001`; en Vercel se setea automáticamente, pero conviene definirla explícita).
+- `NEXTAUTH_SECRET` — secreto para firmar JWTs (generar con `openssl rand -base64 32`).
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — credenciales de OAuth 2.0 creadas en Google Cloud Console. Redirect URI autorizado: `<NEXTAUTH_URL>/api/auth/callback/google`.
+- `ALLOWED_EMAILS` — lista coma-separada de emails permitidos (whitelist). Cualquier email fuera de esta lista recibe `AccessDenied` en el callback `signIn`.
+
+Para agregar un nuevo usuario: editar `ALLOWED_EMAILS` (local + Vercel) y hacer redeploy si está en producción. No hay tabla de usuarios — la whitelist es la única autoridad.
 
 ### Data flow
 
