@@ -42,7 +42,8 @@
       "PowerShell(Get-Item \"C:\\\\Users\\\\GUSTAV~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-GustavoLeguizamon-Desktop-app-gapp-gastos-app\\\\cfd0e708-5465-4d99-ae1d-3efd2490d6ff\\\\tasks\\\\b4iil243o.output\" | Select-Object Length,LastWriteTime; \"---\"; Invoke-WebRequest -Uri http://localhost:3001/ -MaximumRedirection 0 -ErrorAction SilentlyContinue | Select-Object StatusCode,Headers)",
       "PowerShell(Move-Item *)",
       "PowerShell(git status; \"---LOG---\"; git log --oneline -5)",
-      "Bash(echo. *)"
+      "Bash(echo. *)",
+      "Bash(powershell *)"
     ]
   },
   "hooks": {

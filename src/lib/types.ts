@@ -108,6 +108,7 @@ export interface Resumen {
   total_restante: number
   total_pagado: number
   pagar_hoy: number
+  total_proximo_mes: number
 }
 
 export interface Inversion {

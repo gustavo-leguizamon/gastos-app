@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { GridColDef } from '@mui/x-data-grid'
+import { GridColDef, GridSortModel } from '@mui/x-data-grid'
 import AppDataGrid from '@/components/shared/AppDataGrid'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -63,6 +63,23 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
+  const [sortModel, setSortModel] = useState<GridSortModel>([])
+
+  const sortGastos = (rows: Gasto[]) => {
+    if (sortModel.length === 0) return rows
+    const { field, sort } = sortModel[0]
+    if (!sort) return rows
+    const sign = sort === 'asc' ? 1 : -1
+    return [...rows].sort((a, b) => {
+      const va = (a as any)[field]
+      const vb = (b as any)[field]
+      if (va == null && vb == null) return 0
+      if (va == null) return 1
+      if (vb == null) return -1
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign
+      return String(va).localeCompare(String(vb)) * sign
+    })
+  }
   const [menuAnchor, setMenuAnchor] = useState<{ el: HTMLElement; gasto: Gasto } | null>(null)
 
   const theme = useTheme()
@@ -730,10 +747,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 </Box>
               ) : (
                 <AppDataGrid
-                  rows={buildFlatRows(rows)}
+                  rows={buildFlatRows(sortGastos(rows))}
                   columns={columns}
                   autoHeight
                   hideFooter
+                  sortingMode="server"
+                  sortModel={sortModel}
+                  onSortModelChange={(m) => setSortModel(m)}
                   getRowId={row => row.id}
                   getRowClassName={({ row }) => {
                     if (row._type === 'gasto') return row.confirmado === false ? 'row-unconfirmed' : ''

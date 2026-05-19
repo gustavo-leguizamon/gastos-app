@@ -11,6 +11,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import TodayIcon from '@mui/icons-material/Today'
+import EventRepeatIcon from '@mui/icons-material/EventRepeat'
 import type { Resumen, FiltrosGastos } from '@/lib/types'
 
 function formatARS(n: number) {
@@ -46,6 +47,13 @@ const CARDS = [
     color: '#ef4444',
     bg: 'rgba(239,68,68,0.12)',
   },
+  {
+    key: 'total_proximo_mes' as const,
+    label: 'Estimado próximo mes',
+    icon: <EventRepeatIcon />,
+    color: '#06b6d4',
+    bg: 'rgba(6,182,212,0.12)',
+  },
 ]
 
 interface Props {
@@ -55,7 +63,7 @@ interface Props {
 
 export default function ResumenCards({ filtros, refreshKey }: Props) {
   const resumenRefreshKey = useGastosStore(s => s.resumenRefreshKey)
-  const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_gastos_neto: 0, total_prestamos: 0, total_tarjetas: 0, total_pasajes: 0, total_restante: 0, total_pagado: 0, pagar_hoy: 0 })
+  const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_gastos_neto: 0, total_prestamos: 0, total_tarjetas: 0, total_pasajes: 0, total_restante: 0, total_pagado: 0, pagar_hoy: 0, total_proximo_mes: 0 })
 
   useEffect(() => {
     const d = new Date()

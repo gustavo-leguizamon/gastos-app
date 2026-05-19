@@ -115,6 +115,22 @@ These are shown as a secondary breakdown inside the "Total Gastos" card (only re
 
 **Unconfirmed gastos in resumen:** gastos where `confirmado = false` are excluded from all resumen totals, **except** when they have sub-items — in that case, the sum of their sub-items with `incluyeEnTotal = true` is used instead of the gasto's own total. This allows partial/estimated amounts to contribute to the summary via their breakdown items.
 
+**Estimado próximo mes (`total_proximo_mes`):** card adicional en el resumen que proyecta el gasto del próximo mes basado en histórico. Algoritmo:
+
+1. **Construcción de "unidades"** del mes actual y de los **2 meses anteriores** (`m-1`, `m-2`). Para cada gasto:
+   - Si tiene sub-items con `incluyeEnTotal = true`: **se agrupan por descripción normalizada (sumando montos)** dentro del gasto. Cada grupo es una unidad (key de match = `parentDesc + desc`). Esto evita inflar el cálculo cuando hay muchos sub-items con la misma descripción (ej. 8 cargas de "DiDi") y permite matchear con el total del mismo concepto en meses anteriores.
+   - Si no tiene sub-items elegibles y el gasto está confirmado: el gasto es una unidad (key = `desc` solo).
+   - Gastos no confirmados sin items se ignoran.
+   - Las descripciones se normalizan a `trim().toLowerCase()` antes del match.
+   - Si en un grupo de sub-items alguno tiene `cuotaActual/cuotasTotales`, esos valores se conservan en la unidad agrupada (se toma la primera info de cuotas vista en el grupo).
+2. **Para cada unidad del mes actual:**
+   - Si está en cuotas (`cuotaActual && cuotasTotales`) y `cuotaActual >= cuotasTotales` (última cuota): se excluye (no se repetirá el próximo mes).
+   - Si está en cuotas pero **no** es la última: se suma el monto directamente (el próximo mes será exactamente el mismo).
+   - Si no tiene cuotas: se busca match en `m-1` y `m-2` por las mismas keys; los meses sin match aportan `0`. El estimado de la unidad es el promedio de los 3 valores (`(current + v1 + v2) / 3`).
+3. La card suma los estimados de todas las unidades y se devuelve como `total_proximo_mes`.
+
+El cálculo se hace en `/api/resumen`, que ahora ejecuta 3 queries en paralelo (mes actual + 2 anteriores). Las consultas previas no necesitan `pagos` (solo se usan items y datos del gasto).
+
 ### Payment system
 
 Payments are tracked via the `Pago` model (separate table), not the legacy `Gasto.totalPagado` field. The `totalPagado` column still exists in the DB for backwards compatibility but is ignored in all display calculations. API routes for payments: `GET|POST /api/gastos/[id]/pagos`, `PUT|DELETE /api/gastos/[id]/pagos/[pagoId]`. The `PUT` endpoint accepts `{ fecha, monto }` to edit an existing payment inline from `PagoDialog`.
@@ -130,6 +146,8 @@ Each `GastoItem` has two boolean flags:
 These flags are rendered as checkboxes inside the actions column of sub-item rows (not as separate columns). They can be toggled inline via `PATCH` (partial update) without reloading the table. Toggling `incluye_en_vencimiento` calls `triggerResumenRefresh()` to refresh only the summary cards, not the full gastos table.
 
 Sub-items are sorted by `fecha` ascending (nulls last) — both in `buildFlatRows` (grid) and in `GastoItemDialog` (right-column list). The sub-items total row appears **before** the individual items when expanded in the grid.
+
+**Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y un `sortModel` controlado por estado local. Cuando el usuario clickea un header, el sort se aplica solo a las filas de gasto (vía `sortGastos()`), y luego `buildFlatRows` construye las filas planas a partir de los gastos ya ordenados. Esto mantiene a los sub-items y a la fila de totales pegados a su gasto padre, sin importar qué columna esté ordenada. El comparador soporta `number` (resta) y strings (`localeCompare`); nulos siempre al final.
 
 Both `Gasto` and `GastoItem` have an optional `lugarId` FK to the `Lugar` model. Lugar can be set in the gasto form and sub-item dialog, and is displayed as a column in the grid.
 

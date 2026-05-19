@@ -31,7 +31,7 @@ export default function GastosPage() {
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
   return (
-    <Box>
+    <Box sx={{ pb: { xs: 10, sm: 12 } }}>
       <VencimientosHoyAlert />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2, sm: 3 } }}>
         <Box>
