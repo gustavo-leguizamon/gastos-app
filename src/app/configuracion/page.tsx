@@ -7,6 +7,10 @@ import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import CardHeader from '@mui/material/CardHeader'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
@@ -20,6 +24,8 @@ import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Switch from '@mui/material/Switch'
+import Tooltip from '@mui/material/Tooltip'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -159,10 +165,12 @@ export default function ConfiguracionPage() {
 
       <Grid container spacing={3}>
         {/* Casas */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardHeader title="Casas" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
-            <CardContent>
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Casas</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <TextField
                   size="small" fullWidth
@@ -174,7 +182,7 @@ export default function ConfiguracionPage() {
                 <IconButton onClick={handleAddCasa} color="primary"><AddIcon /></IconButton>
               </Box>
               <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding>
+              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
                 {casas.map(c => (
                   <ListItem key={c.id} disablePadding sx={{ py: 0.5 }}
                     secondaryAction={
@@ -205,15 +213,17 @@ export default function ConfiguracionPage() {
                   </ListItem>
                 ))}
               </List>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
 
         {/* Monedas */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardHeader title="Monedas" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
-            <CardContent>
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Monedas</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                 <TextField size="small" label="Código (ej: USD)" value={nuevaMoneda.codigo} onChange={e => setNuevaMoneda(p => ({ ...p, codigo: e.target.value.toUpperCase() }))} />
                 <TextField size="small" label="Nombre" value={nuevaMoneda.nombre} onChange={e => setNuevaMoneda(p => ({ ...p, nombre: e.target.value }))} />
@@ -221,7 +231,7 @@ export default function ConfiguracionPage() {
                 <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddMoneda} size="small">Agregar</Button>
               </Box>
               <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding>
+              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
                 {monedas.map(m => (
                   <ListItem key={m.id} disablePadding sx={{ py: 0.5, flexDirection: 'column', alignItems: 'stretch' }}>
                     {editingMoneda?.id === m.id ? (
@@ -246,15 +256,17 @@ export default function ConfiguracionPage() {
                   </ListItem>
                 ))}
               </List>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
 
         {/* Lugares */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardHeader title="Lugares de Carga" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
-            <CardContent>
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Lugares de Carga</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <TextField
                   size="small" fullWidth
@@ -266,7 +278,7 @@ export default function ConfiguracionPage() {
                 <IconButton onClick={handleAddLugar} color="primary"><AddIcon /></IconButton>
               </Box>
               <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding>
+              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
                 {lugares.map(l => (
                   <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
                     secondaryAction={
@@ -297,22 +309,24 @@ export default function ConfiguracionPage() {
                   </ListItem>
                 ))}
               </List>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
 
         {/* Tarjetas */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardHeader title="Tarjetas de Crédito" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
-            <CardContent>
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Tarjetas de Crédito</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                 <TextField size="small" label="Nombre de la tarjeta" value={nuevaTarjeta.nombre} onChange={e => setNuevaTarjeta(p => ({ ...p, nombre: e.target.value }))} />
                 <TextField size="small" label="Banco (opcional)" value={nuevaTarjeta.banco} onChange={e => setNuevaTarjeta(p => ({ ...p, banco: e.target.value }))} />
                 <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTarjeta} size="small">Agregar</Button>
               </Box>
               <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding>
+              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
                 {tarjetas.map(t => (
                   <ListItem key={t.id} disablePadding sx={{ py: 0.5, flexDirection: 'column', alignItems: 'stretch' }}>
                     {editingTarjeta?.id === t.id ? (
@@ -336,14 +350,59 @@ export default function ConfiguracionPage() {
                   </ListItem>
                 ))}
               </List>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
 
         {/* Estimación próximo mes */}
         <Grid item xs={12}>
           <Card>
-            <CardHeader title="Estimación próximo mes" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardHeader
+              titleTypographyProps={{ fontWeight: 700, variant: 'h6' }}
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  Estimación próximo mes
+                  <Tooltip
+                    arrow
+                    componentsProps={{ tooltip: { sx: { maxWidth: 480, p: 1.5, fontSize: 12, lineHeight: 1.5 } } }}
+                    title={
+                      <Box>
+                        <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.5 }}>¿Cómo se calcula?</Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+                          Por cada gasto del mes actual se construyen <strong>unidades</strong>:
+                        </Typography>
+                        <Box component="ul" sx={{ pl: 2.5, mt: 0, mb: 1 }}>
+                          <li>Si tiene sub-items con <em>"Incluir en total"</em>, se agrupan por descripción (sumando) y cada grupo es una unidad.</li>
+                          <li>Si no, el gasto en sí es la unidad.</li>
+                        </Box>
+                        <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>Para cada unidad:</Typography>
+                        <Box component="ol" sx={{ pl: 2.5, mt: 0, mb: 1 }}>
+                          <li>Si <em>"Excluir última cuota"</em> está activo y la unidad está en su última cuota → se omite.</li>
+                          <li>Si <em>"Sumar cuotas vigentes"</em> está activo y la unidad está en cuotas → se suma el monto sin promediar.</li>
+                          <li>
+                            Si no, se busca el mismo gasto/sub-item por descripción (normalizada con <code>trim().toLowerCase()</code>)
+                            en los últimos <strong>N</strong> meses (configurado abajo).
+                          </li>
+                          <li>
+                            Para meses sin match: según el modo, se toma 0 o se omite ese mes del promedio.
+                          </li>
+                          <li>
+                            La unidad aporta <strong>el promedio</strong> del valor actual + los valores encontrados en meses anteriores.
+                          </li>
+                        </Box>
+                        <Typography variant="caption" sx={{ display: 'block' }}>
+                          El total estimado es la suma de los aportes de todas las unidades.
+                        </Typography>
+                      </Box>
+                    }
+                  >
+                    <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                      <HelpOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              }
+            />
             <CardContent>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Estos parámetros controlan cómo se calcula el monto estimado en la tarjeta "Estimado próximo mes" del resumen.
