@@ -70,7 +70,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   useEffect(() => {
-    fetch('/api/categoriaes').then(r => r.json()).then(setCategoriaes)
+    fetch('/api/categorias').then(r => r.json()).then(setCategoriaes)
   }, [])
 
   if (!gasto) return null

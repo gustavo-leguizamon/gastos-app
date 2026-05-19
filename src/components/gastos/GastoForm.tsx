@@ -86,7 +86,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       fetch('/api/casas').then(r => r.json()),
       fetch('/api/monedas').then(r => r.json()),
       fetch('/api/tarjetas').then(r => r.json()),
-      fetch('/api/categoriaes').then(r => r.json()),
+      fetch('/api/categorias').then(r => r.json()),
     ]).then(([c, m, t, l]) => {
       setCasas(c)
       setMonedas(m)
