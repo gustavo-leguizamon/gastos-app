@@ -7,6 +7,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@/components/shared/AppTextField'
+import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -225,11 +226,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
                 inputProps={{ min: 0, step: 0.01 }}
               />
-              <TextField
-                size="small" label="Fecha (opcional)" type="date" sx={{ width: 155 }}
+              <AppDateField
+                size="small" label="Fecha (opcional)" sx={{ width: 155 }}
                 value={fecha} onChange={e => setFecha(e.target.value)}
-                onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
-                InputLabelProps={{ shrink: true }}
               />
             </Box>
             <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -298,12 +297,10 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         onChange={e => setEditing(p => p ? { ...p, monto: e.target.value } : p)}
                         inputProps={{ min: 0, step: 0.01 }}
                       />
-                      <TextField
-                        size="small" label="Fecha (opcional)" type="date" sx={{ width: 150 }}
+                      <AppDateField
+                        size="small" label="Fecha (opcional)" sx={{ width: 150 }}
                         value={editing.fecha}
                         onChange={e => setEditing(p => p ? { ...p, fecha: e.target.value } : p)}
-                        onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
-                        InputLabelProps={{ shrink: true }}
                       />
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1 }}>

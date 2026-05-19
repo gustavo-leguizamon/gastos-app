@@ -6,6 +6,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
+import AppDateField from '@/components/shared/AppDateField'
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
@@ -118,16 +119,13 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="fecha_vencimiento"
             control={control}
             render={({ field }) => (
-              <TextField
+              <AppDateField
                 {...field}
                 fullWidth
                 label="Fecha de Vencimiento"
-                type="date"
                 size="small"
-                InputLabelProps={{ shrink: true }}
                 error={!!errors.fecha_vencimiento}
                 helperText={errors.fecha_vencimiento?.message}
-                onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
               />
             )}
           />

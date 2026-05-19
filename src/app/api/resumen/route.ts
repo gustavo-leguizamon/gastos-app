@@ -15,17 +15,33 @@ export async function GET(req: NextRequest) {
   if (anio) where.anio = Number(anio)
   if (casa_id) where.casaId = Number(casa_id)
 
+  const settings = await prisma.settings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  })
+  const mesesAtras = settings.estimMesesAtras
+  const missingBehavior: 'zero' | 'average_found' = (settings.estimMissingBehavior as any) === 'average_found' ? 'average_found' : 'zero'
+  const incluirCuotasVigentes = settings.estimIncluirCuotasVigentes
+  const excluirUltimaCuota = settings.estimExcluirUltimaCuota
+
   const baseWhere: any = {}
   if (casa_id) baseWhere.casaId = Number(casa_id)
   const mesNum = mes ? Number(mes) : new Date().getMonth() + 1
   const anioNum = anio ? Number(anio) : new Date().getFullYear()
-  const m1 = mesNum === 1 ? { mes: 12, anio: anioNum - 1 } : { mes: mesNum - 1, anio: anioNum }
-  const m2 = m1.mes === 1 ? { mes: 12, anio: m1.anio - 1 } : { mes: m1.mes - 1, anio: m1.anio }
 
-  const [gastos, m1Gastos, m2Gastos] = await Promise.all([
+  // Genera la lista de {mes, anio} para los `mesesAtras` meses previos
+  const prevMonths: { mes: number; anio: number }[] = []
+  let pm = mesNum
+  let pa = anioNum
+  for (let i = 0; i < mesesAtras; i++) {
+    if (pm === 1) { pm = 12; pa -= 1 } else { pm -= 1 }
+    prevMonths.push({ mes: pm, anio: pa })
+  }
+
+  const [gastos, ...prevGastos] = await Promise.all([
     prisma.gasto.findMany({ where, include: { pagos: true, items: true } }),
-    prisma.gasto.findMany({ where: { ...baseWhere, mes: m1.mes, anio: m1.anio }, include: { items: true } }),
-    prisma.gasto.findMany({ where: { ...baseWhere, mes: m2.mes, anio: m2.anio }, include: { items: true } }),
+    ...prevMonths.map(p => prisma.gasto.findMany({ where: { ...baseWhere, mes: p.mes, anio: p.anio }, include: { items: true } })),
   ])
 
   let total_gastos = 0
@@ -113,7 +129,7 @@ export async function GET(req: NextRequest) {
     }
     return out
   }
-  const findMatch = (units: Unit[], target: Unit): number => {
+  const findMatch = (units: Unit[], target: Unit): number | null => {
     for (const u of units) {
       if (target.isSubitem) {
         if (u.isSubitem && u.parentDesc === target.parentDesc && u.desc === target.desc) return u.monto
@@ -121,22 +137,28 @@ export async function GET(req: NextRequest) {
         if (!u.isSubitem && u.desc === target.desc) return u.monto
       }
     }
-    return 0
+    return null
   }
   const currentUnits = buildUnits(gastos)
-  const m1Units = buildUnits(m1Gastos)
-  const m2Units = buildUnits(m2Gastos)
+  const prevUnits = prevGastos.map(buildUnits)
   let total_proximo_mes = 0
   for (const u of currentUnits) {
     const tieneCuotas = u.cuotaActual != null && u.cuotasTotales != null
-    if (tieneCuotas && (u.cuotaActual as number) >= (u.cuotasTotales as number)) continue
-    if (tieneCuotas) {
+    if (tieneCuotas && excluirUltimaCuota && (u.cuotaActual as number) >= (u.cuotasTotales as number)) continue
+    if (tieneCuotas && incluirCuotasVigentes) {
       total_proximo_mes += u.monto
       continue
     }
-    const v1 = findMatch(m1Units, u)
-    const v2 = findMatch(m2Units, u)
-    total_proximo_mes += (u.monto + v1 + v2) / 3
+    // Promedio con meses previos
+    const valores: number[] = [u.monto]
+    for (const pu of prevUnits) {
+      const found = findMatch(pu, u)
+      if (found !== null) valores.push(found)
+      else if (missingBehavior === 'zero') valores.push(0)
+      // si missingBehavior === 'average_found' → no agregamos nada
+    }
+    if (valores.length === 0) continue
+    total_proximo_mes += valores.reduce((s, v) => s + v, 0) / valores.length
   }
 
   const r = (n: number) => Math.round(n * 100) / 100

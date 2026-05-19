@@ -17,6 +17,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import { GridColDef } from '@mui/x-data-grid'
 import AppDataGrid from '@/components/shared/AppDataGrid'
+import AppDateField from '@/components/shared/AppDateField'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
@@ -342,7 +343,7 @@ export default function InversionesPage() {
                   alignItems: { xs: 'stretch', sm: 'flex-end' },
                 }}
               >
-                <TextField label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} InputLabelProps={{ shrink: true }} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
+                <AppDateField label="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
                 <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <TextField label="Monto extra" type="number" value={montoExtra} onChange={(e) => setMontoExtra(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={saving}>

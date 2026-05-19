@@ -7,6 +7,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@/components/shared/AppTextField'
+import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -152,12 +153,10 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
               <Box key={p.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 {editing?.id === p.id ? (
                   <Box sx={{ py: 1.5, display: 'flex', gap: 1, alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' } }}>
-                    <TextField
-                      size="small" label="Fecha" type="date" autoFocus
+                    <AppDateField
+                      size="small" label="Fecha" autoFocus
                       value={editing.fecha}
                       onChange={e => setEditing(s => s ? { ...s, fecha: e.target.value } : s)}
-                      onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
-                      InputLabelProps={{ shrink: true }}
                       sx={{ width: { xs: '100%', sm: 155 } }}
                     />
                     <TextField
@@ -201,12 +200,10 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
         {/* Formulario nuevo pago */}
         <Typography variant="subtitle2" fontWeight={700} mb={1}>Registrar pago</Typography>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: { xs: 'stretch', sm: 'flex-start' }, flexDirection: { xs: 'column', sm: 'row' } }}>
-          <TextField
-            size="small" label="Fecha" type="date"
+          <AppDateField
+            size="small" label="Fecha"
             value={fecha}
             onChange={e => setFecha(e.target.value)}
-            onClick={e => (e.currentTarget.querySelector('input') as any)?.showPicker?.()}
-            InputLabelProps={{ shrink: true }}
             sx={{ width: { xs: '100%', sm: 160 } }}
           />
           <TextField

@@ -115,21 +115,31 @@ These are shown as a secondary breakdown inside the "Total Gastos" card (only re
 
 **Unconfirmed gastos in resumen:** gastos where `confirmado = false` are excluded from all resumen totals, **except** when they have sub-items — in that case, the sum of their sub-items with `incluyeEnTotal = true` is used instead of the gasto's own total. This allows partial/estimated amounts to contribute to the summary via their breakdown items.
 
-**Estimado próximo mes (`total_proximo_mes`):** card adicional en el resumen que proyecta el gasto del próximo mes basado en histórico. Algoritmo:
+**Estimado próximo mes (`total_proximo_mes`):** card adicional en el resumen que proyecta el gasto del próximo mes basado en histórico.
 
-1. **Construcción de "unidades"** del mes actual y de los **2 meses anteriores** (`m-1`, `m-2`). Para cada gasto:
+**Configuración** (parametrizable desde `/configuracion` → sección "Estimación próximo mes", persistida en la tabla `Settings`, singleton fila `id = 1`):
+- `estim_meses_atras` (default `2`, rango 0–12): cantidad de meses previos al actual a usar en el promedio.
+- `estim_missing_behavior` (default `"zero"`): qué hacer cuando una unidad no tiene match en un mes anterior. `"zero"` aporta 0 al promedio; `"average_found"` promedia solo con los meses que sí tienen match (denominador variable).
+- `estim_incluir_cuotas_vigentes` (default `true`): si una unidad está en cuotas y no es la última, suma su monto directamente (saltea el promedio).
+- `estim_excluir_ultima_cuota` (default `true`): excluye del estimado las unidades cuya `cuotaActual >= cuotasTotales` (no se repetirán el próximo mes).
+
+El endpoint `GET /api/settings` upsertea la fila al primer pedido (devuelve defaults). `PUT /api/settings` actualiza los valores (validación: enteros en rango para `estim_meses_atras`, enum para `estim_missing_behavior`, coerción booleana para los switches). Las respuestas usan snake_case.
+
+**Algoritmo:**
+
+1. **Construcción de "unidades"** del mes actual y de los `estim_meses_atras` meses anteriores. Para cada gasto:
    - Si tiene sub-items con `incluyeEnTotal = true`: **se agrupan por descripción normalizada (sumando montos)** dentro del gasto. Cada grupo es una unidad (key de match = `parentDesc + desc`). Esto evita inflar el cálculo cuando hay muchos sub-items con la misma descripción (ej. 8 cargas de "DiDi") y permite matchear con el total del mismo concepto en meses anteriores.
    - Si no tiene sub-items elegibles y el gasto está confirmado: el gasto es una unidad (key = `desc` solo).
    - Gastos no confirmados sin items se ignoran.
    - Las descripciones se normalizan a `trim().toLowerCase()` antes del match.
    - Si en un grupo de sub-items alguno tiene `cuotaActual/cuotasTotales`, esos valores se conservan en la unidad agrupada (se toma la primera info de cuotas vista en el grupo).
 2. **Para cada unidad del mes actual:**
-   - Si está en cuotas (`cuotaActual && cuotasTotales`) y `cuotaActual >= cuotasTotales` (última cuota): se excluye (no se repetirá el próximo mes).
-   - Si está en cuotas pero **no** es la última: se suma el monto directamente (el próximo mes será exactamente el mismo).
-   - Si no tiene cuotas: se busca match en `m-1` y `m-2` por las mismas keys; los meses sin match aportan `0`. El estimado de la unidad es el promedio de los 3 valores (`(current + v1 + v2) / 3`).
+   - Si está en cuotas y `estim_excluir_ultima_cuota = true` y es la última cuota: se excluye.
+   - Si está en cuotas y `estim_incluir_cuotas_vigentes = true`: se suma el monto directamente, sin promediar.
+   - En caso contrario: se promedia. Para cada mes previo, se busca match por keys. Si no hay match, según `estim_missing_behavior`: `"zero"` aporta 0 al array de valores, `"average_found"` omite el mes. El monto del mes actual siempre entra al array. Estimado de la unidad = promedio del array.
 3. La card suma los estimados de todas las unidades y se devuelve como `total_proximo_mes`.
 
-El cálculo se hace en `/api/resumen`, que ahora ejecuta 3 queries en paralelo (mes actual + 2 anteriores). Las consultas previas no necesitan `pagos` (solo se usan items y datos del gasto).
+El cálculo se hace en `/api/resumen`, que ejecuta `1 + estim_meses_atras` queries en paralelo (mes actual + N anteriores). Las consultas previas no necesitan `pagos` (solo se usan items y datos del gasto).
 
 ### Payment system
 
@@ -220,6 +230,7 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 | `GET/POST /api/lugares` | Locations CRUD |
+| `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
 | `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes its movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos for an inversion |
@@ -261,6 +272,8 @@ API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per
 The `document` keydown listener in `AppDataGrid` only fires if the selected row belongs to that grid instance (checked via `rows.some(r => id === r.id)`), preventing double-trigger when multiple grids are on the same page.
 
 **`AppTextField` (`src/components/shared/AppTextField.tsx`):** wrapper genérico de MUI `TextField` que auto-selecciona el contenido del input al recibir foco (`e.target.select()` con `setTimeout(0)` para ganarle al cursor que pone el navegador). Mantiene la API completa de `TextField`. Todos los formularios de la app importan `TextField` desde este path en vez de `@mui/material/TextField`. Si en un caso puntual no se quiere ese comportamiento, pasar `autoSelectOnFocus={false}` o un `onFocus` propio. Si necesitás el TextField "crudo" sin auto-selección (caso muy raro), importá `@mui/material/TextField` directamente.
+
+**`AppDateField` (`src/components/shared/AppDateField.tsx`):** wrapper genérico de MUI `TextField` para inputs de fecha. Setea `type="date"` e `InputLabelProps.shrink=true` por defecto, y abre el calendario nativo al recibir foco vía `HTMLInputElement.showPicker()` (envuelto en try/catch porque no está soportado en todos los browsers). El usuario igualmente puede tipear la fecha manualmente. Todos los inputs de fecha de la app (gastos: `GastoForm`, `GastoItemDialog`, `PagoDialog`; inversiones: `inversiones/page.tsx`) deben usar este componente en vez de `<TextField type="date" ... />`.
 
 ### Dates and timezones
 

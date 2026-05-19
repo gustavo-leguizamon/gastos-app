@@ -43,7 +43,8 @@
       "PowerShell(Move-Item *)",
       "PowerShell(git status; \"---LOG---\"; git log --oneline -5)",
       "Bash(echo. *)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "PowerShell(\\(Get-Content 'C:\\\\Users\\\\GustavoLeguizamon\\\\Desktop\\\\app\\\\gapp\\\\gastos-app\\\\src\\\\app\\\\configuracion\\\\page.tsx' | Measure-Object -Line\\).Lines)"
     ]
   },
   "hooks": {

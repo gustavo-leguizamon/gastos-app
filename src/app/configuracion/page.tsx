@@ -14,6 +14,12 @@ import IconButton from '@mui/material/IconButton'
 import TextField from '@/components/shared/AppTextField'
 import Button from '@mui/material/Button'
 import Divider from '@mui/material/Divider'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Switch from '@mui/material/Switch'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
@@ -115,6 +121,36 @@ export default function ConfiguracionPage() {
     if (!editingTarjeta || !editingTarjeta.nombre.trim()) return
     try { await updateTarjeta(editingTarjeta.id, editingTarjeta); setEditingTarjeta(null); toast.success('Tarjeta actualizada') }
     catch { toast.error('Error al actualizar tarjeta') }
+  }
+
+  // Settings (estimado próximo mes)
+  const [settings, setSettings] = useState({
+    estim_meses_atras: 2,
+    estim_missing_behavior: 'zero' as 'zero' | 'average_found',
+    estim_incluir_cuotas_vigentes: true,
+    estim_excluir_ultima_cuota: true,
+  })
+  const [savingSettings, setSavingSettings] = useState(false)
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setSettings).catch(() => {})
+  }, [])
+  const handleSaveSettings = async () => {
+    setSavingSettings(true)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      if (!res.ok) throw new Error()
+      const updated = await res.json()
+      setSettings(updated)
+      toast.success('Configuración guardada')
+    } catch {
+      toast.error('Error al guardar configuración')
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   return (
@@ -300,6 +336,64 @@ export default function ConfiguracionPage() {
                   </ListItem>
                 ))}
               </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Estimación próximo mes */}
+        <Grid item xs={12}>
+          <Card>
+            <CardHeader title="Estimación próximo mes" titleTypographyProps={{ fontWeight: 700, variant: 'h6' }} />
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Estos parámetros controlan cómo se calcula el monto estimado en la tarjeta "Estimado próximo mes" del resumen.
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Meses hacia atrás para el promedio"
+                  value={settings.estim_meses_atras}
+                  onChange={e => setSettings(p => ({ ...p, estim_meses_atras: Math.max(0, Math.min(12, Number(e.target.value) || 0)) }))}
+                  inputProps={{ min: 0, max: 12, step: 1 }}
+                  sx={{ minWidth: 240 }}
+                  helperText="Mes actual + N meses previos"
+                />
+                <FormControl size="small" sx={{ minWidth: 280 }}>
+                  <InputLabel>Comportamiento sin match</InputLabel>
+                  <Select
+                    label="Comportamiento sin match"
+                    value={settings.estim_missing_behavior}
+                    onChange={e => setSettings(p => ({ ...p, estim_missing_behavior: e.target.value as 'zero' | 'average_found' }))}
+                  >
+                    <MenuItem value="zero">Tomar 0 cuando no hay match (default)</MenuItem>
+                    <MenuItem value="average_found">Promediar solo con los meses con match</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={settings.estim_incluir_cuotas_vigentes}
+                      onChange={e => setSettings(p => ({ ...p, estim_incluir_cuotas_vigentes: e.target.checked }))}
+                    />
+                  }
+                  label={<Typography variant="body2">Sumar directamente cuotas vigentes (sin promediar)</Typography>}
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={settings.estim_excluir_ultima_cuota}
+                      onChange={e => setSettings(p => ({ ...p, estim_excluir_ultima_cuota: e.target.checked }))}
+                    />
+                  }
+                  label={<Typography variant="body2">Excluir gastos cuya cuota actual sea la última</Typography>}
+                />
+              </Box>
+              <Button variant="contained" onClick={handleSaveSettings} disabled={savingSettings}>
+                {savingSettings ? 'Guardando…' : 'Guardar'}
+              </Button>
             </CardContent>
           </Card>
         </Grid>

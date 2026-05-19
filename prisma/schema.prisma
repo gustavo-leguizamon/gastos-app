@@ -101,6 +101,15 @@ model Movimiento {
   inversion Inversion @relation(fields: [inversionId], references: [id], onDelete: Cascade)
 }
 
+model Settings {
+  id                          Int      @id @default(1)
+  estimMesesAtras             Int      @default(2)
+  estimMissingBehavior        String   @default("zero")
+  estimIncluirCuotasVigentes  Boolean  @default(true)
+  estimExcluirUltimaCuota     Boolean  @default(true)
+  updatedAt                   DateTime @updatedAt
+}
+
 model Pago {
   id        Int      @id @default(autoincrement())
   gastoId   Int
