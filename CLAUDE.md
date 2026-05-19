@@ -271,3 +271,4 @@ Client components pass `today` as a query param to `/api/resumen` so the server 
 `@/*` maps to `src/*` (configured in `tsconfig.json`).
 
 
+

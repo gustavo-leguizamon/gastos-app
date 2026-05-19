@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
             })
           }
         }
-        for (const u of grouped.values()) out.push(u)
+        grouped.forEach((u) => out.push(u))
       } else if (g.confirmado) {
         out.push({
           parentDesc: norm(g.descripcion),
