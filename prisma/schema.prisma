@@ -28,7 +28,7 @@ model Tarjeta {
   gastos Gasto[]
 }
 
-model Lugar {
+model Categoria {
   id     Int         @id @default(autoincrement())
   nombre String
   gastos Gasto[]
@@ -48,7 +48,7 @@ model Gasto {
   pasajeMesSiguiente   Float    @default(0)
   prestamo_a_otro      Float    @default(0)
   tarjetaId            Int?
-  lugarId              Int?
+  categoriaId          Int?
   cuotaActual          Int?
   cuotasTotales        Int?
   mes                  Int
@@ -60,10 +60,10 @@ model Gasto {
 
   casa    Casa     @relation(fields: [casaId], references: [id])
   moneda  Moneda   @relation(fields: [monedaId], references: [id])
-  tarjeta Tarjeta? @relation(fields: [tarjetaId], references: [id])
-  lugar   Lugar?   @relation(fields: [lugarId], references: [id])
-  pagos   Pago[]
-  items   GastoItem[]
+  tarjeta   Tarjeta?   @relation(fields: [tarjetaId], references: [id])
+  categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  pagos     Pago[]
+  items     GastoItem[]
 }
 
 model GastoItem {
@@ -76,11 +76,11 @@ model GastoItem {
   cuotasTotales        Int?
   incluyeEnTotal       Boolean  @default(true)
   incluyeEnVencimiento Boolean  @default(false)
-  lugarId              Int?
+  categoriaId          Int?
   createdAt            DateTime @default(now())
 
-  gasto Gasto  @relation(fields: [gastoId], references: [id], onDelete: Cascade)
-  lugar Lugar? @relation(fields: [lugarId], references: [id])
+  gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  categoria Categoria? @relation(fields: [categoriaId], references: [id])
 }
 
 model Inversion {

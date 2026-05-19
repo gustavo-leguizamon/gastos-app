@@ -332,13 +332,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       },
     },
     {
-      field: 'lugar_nombre',
-      headerName: 'Lugar',
+      field: 'categoria_nombre',
+      headerName: 'Categoría',
       width: 130,
       renderCell: ({ value, row }) => {
         if (row._type === 'items_total') return null
-        if (row._type === 'item') return row._lugar_nombre
-          ? <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>{row._lugar_nombre}</Typography>
+        if (row._type === 'item') return row._categoria_nombre
+          ? <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>{row._categoria_nombre}</Typography>
           : null
         return value || '-'
       },
@@ -433,7 +433,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }).filter(g => {
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
-    return g.descripcion.toLowerCase().includes(q) || g.lugar_nombre?.toLowerCase().includes(q)
+    return g.descripcion.toLowerCase().includes(q) || g.categoria_nombre?.toLowerCase().includes(q)
   })
 
   // Agrupar por casa
@@ -483,7 +483,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             _cuotas_totales: item.cuotas_totales,
             _incluye_en_total: item.incluye_en_total,
             _incluye_en_vencimiento: item.incluye_en_vencimiento,
-            _lugar_nombre: item.lugar_nombre ?? null,
+            _categoria_nombre: item.categoria_nombre ?? null,
           })
         }
       }
@@ -539,9 +539,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                     Cuota {g.cuota_actual ?? '?'}/{g.cuotas_totales ?? '?'}
                   </Typography>
                 )}
-                {g.lugar_nombre && (
+                {g.categoria_nombre && (
                   <Typography variant="caption" color="text.secondary">
-                    📍 {g.lugar_nombre}
+                    📍 {g.categoria_nombre}
                   </Typography>
                 )}
               </Box>
@@ -661,7 +661,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   {item.cuota_actual ?? '?'}/{item.cuotas_totales ?? '?'}
                 </Typography>
               )}
-              {item.lugar_nombre && <Typography variant="caption" color="text.disabled">📍 {item.lugar_nombre}</Typography>}
+              {item.categoria_nombre && <Typography variant="caption" color="text.disabled">📍 {item.categoria_nombre}</Typography>}
               <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Tooltip title="Incluido en total">
                   <Checkbox

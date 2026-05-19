@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-const ITEM_INCLUDE = { lugar: true }
+const ITEM_INCLUDE = { categoria: true }
 
 function toItemResponse(item: any) {
   return {
@@ -14,8 +14,8 @@ function toItemResponse(item: any) {
     cuotas_totales: item.cuotasTotales ?? null,
     incluye_en_total: item.incluyeEnTotal,
     incluye_en_vencimiento: item.incluyeEnVencimiento,
-    lugar_id: item.lugarId ?? null,
-    lugar_nombre: item.lugar?.nombre ?? null,
+    categoria_id: item.categoriaId ?? null,
+    categoria_nombre: item.categoria?.nombre ?? null,
     created_at: item.createdAt.toISOString(),
   }
 }
@@ -32,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
       cuotasTotales: body.cuotas_totales ?? null,
       incluyeEnTotal: body.incluye_en_total ?? true,
       incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
-      lugarId: body.lugar_id ?? null,
+      categoriaId: body.categoria_id ?? null,
     },
     include: ITEM_INCLUDE,
   })

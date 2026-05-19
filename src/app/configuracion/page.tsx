@@ -32,7 +32,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
-import type { Casa, Lugar, Moneda, Tarjeta } from '@/lib/types'
+import type { Casa, Categoria, Moneda, Tarjeta } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -76,10 +76,10 @@ export default function ConfiguracionPage() {
   const [nuevaTarjeta, setNuevaTarjeta] = useState({ nombre: '', banco: '' })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
-  // Lugares
-  const { items: lugares, add: addLugar, update: updateLugar, remove: removeLugar } = useSimpleCrud<Lugar>('/api/lugares')
-  const [nuevoLugar, setNuevoLugar] = useState('')
-  const [editingLugar, setEditingLugar] = useState<{ id: number; nombre: string } | null>(null)
+  // Categorias
+  const { items: categorias, add: addCategoria, update: updateCategoria, remove: removeCategoria } = useSimpleCrud<Categoria>('/api/categorias')
+  const [nuevoCategoria, setNuevoCategoria] = useState('')
+  const [editingCategoria, setEditingCategoria] = useState<{ id: number; nombre: string } | null>(null)
 
   const handleAddCasa = async () => {
     if (!nuevaCasa.trim()) return
@@ -105,16 +105,16 @@ export default function ConfiguracionPage() {
     catch { toast.error('Error al actualizar moneda') }
   }
 
-  const handleAddLugar = async () => {
-    if (!nuevoLugar.trim()) return
-    try { await addLugar({ nombre: nuevoLugar.trim() }); setNuevoLugar(''); toast.success('Lugar agregado') }
-    catch { toast.error('Error al agregar lugar') }
+  const handleAddCategoria = async () => {
+    if (!nuevoCategoria.trim()) return
+    try { await addCategoria({ nombre: nuevoCategoria.trim() }); setNuevoCategoria(''); toast.success('Categoría agregada') }
+    catch { toast.error('Error al agregar categoría') }
   }
 
-  const handleSaveLugar = async () => {
-    if (!editingLugar || !editingLugar.nombre.trim()) return
-    try { await updateLugar(editingLugar.id, { nombre: editingLugar.nombre.trim() }); setEditingLugar(null); toast.success('Lugar actualizado') }
-    catch { toast.error('Error al actualizar lugar') }
+  const handleSaveCategoria = async () => {
+    if (!editingCategoria || !editingCategoria.nombre.trim()) return
+    try { await updateCategoria(editingCategoria.id, { nombre: editingCategoria.nombre.trim() }); setEditingCategoria(null); toast.success('Categoría actualizada') }
+    catch { toast.error('Error al actualizar categoría') }
   }
 
   const handleAddTarjeta = async () => {
@@ -260,47 +260,47 @@ export default function ConfiguracionPage() {
           </Accordion>
         </Grid>
 
-        {/* Lugares */}
+        {/* Categorias */}
         <Grid item xs={12}>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight={700} variant="h6">Lugares de Carga</Typography>
+              <Typography fontWeight={700} variant="h6">Categorías</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <TextField
                   size="small" fullWidth
-                  label="Ej: Amazon, MercadoLibre"
-                  value={nuevoLugar}
-                  onChange={e => setNuevoLugar(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddLugar()}
+                  label="Ej: Amazon, Supermercado, Combustible"
+                  value={nuevoCategoria}
+                  onChange={e => setNuevoCategoria(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddCategoria()}
                 />
-                <IconButton onClick={handleAddLugar} color="primary"><AddIcon /></IconButton>
+                <IconButton onClick={handleAddCategoria} color="primary"><AddIcon /></IconButton>
               </Box>
               <Divider sx={{ mb: 1 }} />
               <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
-                {lugares.map(l => (
+                {categorias.map(l => (
                   <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
                     secondaryAction={
-                      editingLugar?.id === l.id ? (
+                      editingCategoria?.id === l.id ? (
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton size="small" color="primary" onClick={handleSaveLugar}><CheckIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => setEditingLugar(null)}><CloseIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" color="primary" onClick={handleSaveCategoria}><CheckIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setEditingCategoria(null)}><CloseIcon fontSize="small" /></IconButton>
                         </Box>
                       ) : (
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton size="small" onClick={() => setEditingLugar({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeLugar(l.id); toast.success('Lugar eliminado') }}><DeleteIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setEditingCategoria({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeCategoria(l.id); toast.success('Categoría eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
                         </Box>
                       )
                     }
                   >
-                    {editingLugar?.id === l.id ? (
+                    {editingCategoria?.id === l.id ? (
                       <TextField
                         size="small" fullWidth autoFocus
-                        value={editingLugar.nombre}
-                        onChange={e => setEditingLugar(p => p ? { ...p, nombre: e.target.value } : p)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSaveLugar(); if (e.key === 'Escape') setEditingLugar(null) }}
+                        value={editingCategoria.nombre}
+                        onChange={e => setEditingCategoria(p => p ? { ...p, nombre: e.target.value } : p)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveCategoria(); if (e.key === 'Escape') setEditingCategoria(null) }}
                         sx={{ mr: 9 }}
                       />
                     ) : (

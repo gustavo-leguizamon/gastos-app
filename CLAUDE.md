@@ -85,7 +85,7 @@ The app has dedicated mobile layouts at `theme.breakpoints.down('sm')` (≤600px
 - **`AppLayout`**: padding `p: { xs: 1.5, sm: 3 }`.
 - **`gastos/page.tsx`**: "Nuevo Gasto" is a `Fab` at bottom-right (`circular` on `<sm`, `extended` on `>=sm`). "Copiar mes" collapses to an `IconButton` on `<sm`. The old `position: fixed; top` button was removed because it overlapped the AppBar.
 - **`FiltrosGastos`**: stacks vertically on `<md`. Búsqueda full-width on top, then casa, then the two toggle groups in a single row sharing 50/50.
-- **`GastosTable`**: renders **cards instead of DataGrid on `<sm`**. Each card shows description, chip, fecha, lugar, cuotas, 3-column totals (Total/Pagado/Restante), optional extras row, expand for sub-items, and a kebab menu (`MoreVertIcon`) with the 5 actions (Sub-items, Pagos, Copiar, Editar, Eliminar). Sub-items expand inline with their own incluye_en_total/vencimiento checkboxes. Desktop keeps the existing DataGrid.
+- **`GastosTable`**: renders **cards instead of DataGrid on `<sm`**. Each card shows description, chip, fecha, categoría, cuotas, 3-column totals (Total/Pagado/Restante), optional extras row, expand for sub-items, and a kebab menu (`MoreVertIcon`) with the 5 actions (Sub-items, Pagos, Copiar, Editar, Eliminar). Sub-items expand inline with their own incluye_en_total/vencimiento checkboxes. Desktop keeps the existing DataGrid.
 - **`GastoDialog`, `PagoDialog`, `CopiarMesDialog`, `CopiarGastoDialog`**: `fullScreen={isMobile}` (`<sm`).
 - **`GastoItemDialog`**: `fullScreen` on `<md`. The two-column layout (340px left + flex right) becomes vertical stack on `<md` — resumen + form on top, items list below.
 - **`PagoDialog`**: the "Registrar pago" form (Fecha + Monto + Button) stacks vertically on `<sm`, same with the inline-edit row.
@@ -159,7 +159,7 @@ Sub-items are sorted by `fecha` ascending (nulls last) — both in `buildFlatRow
 
 **Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y un `sortModel` controlado por estado local. Cuando el usuario clickea un header, el sort se aplica solo a las filas de gasto (vía `sortGastos()`), y luego `buildFlatRows` construye las filas planas a partir de los gastos ya ordenados. Esto mantiene a los sub-items y a la fila de totales pegados a su gasto padre, sin importar qué columna esté ordenada. El comparador soporta `number` (resta) y strings (`localeCompare`); nulos siempre al final.
 
-Both `Gasto` and `GastoItem` have an optional `lugarId` FK to the `Lugar` model. Lugar can be set in the gasto form and sub-item dialog, and is displayed as a column in the grid.
+Both `Gasto` and `GastoItem` have an optional `categoriaId` FK to the `Categoria` model. Categoría can be set in the gasto form and sub-item dialog, and is displayed as a column in the grid. (Previously called `Lugar` — renombrado a `Categoria` con la migración `20260516000000_rename_lugar_to_categoria` que hace `ALTER TABLE`/`RENAME COLUMN` preservando los datos.)
 
 `GastoItemDialog` uses a two-column layout (`maxWidth="md"`, height 90vh): left column (340px) shows the resumen (Total gasto / Suma sub-items / Sin asignar) and the add form; right column shows the scrollable items list. Both columns handle overflow independently.
 
@@ -175,7 +175,7 @@ When sub-items are added/edited/deleted, `triggerResumenRefresh()` is called alo
 
 Client-side filters in `gastos/page.tsx` (lifted state, passed as props):
 - `estadoPago: 'todos' | 'pendiente' | 'saldado'` — defaults to `'pendiente'` on load. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
-- `busqueda: string` — free-text search filtering by `descripcion` and `lugar_nombre` across all casa groups. Rendered in `FiltrosGastos` alongside the other toggles.
+- `busqueda: string` — free-text search filtering by `descripcion` and `categoria_nombre` across all casa groups. Rendered in `FiltrosGastos` alongside the other toggles.
 
 ### GastoDialog — cierre
 
@@ -213,7 +213,7 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `tipo_cambio` | Exchange rate to ARS; always 1 when `moneda.codigo === 'ARS'` |
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
 | `confirmado` | Whether the gasto amount is confirmed. Defaults to `true` on new gastos; always set to `false` when copying. Unconfirmed rows render with an orange background and a warning icon in the expand column. The "Total ARS" cell shows the sub-items sum (in orange) instead of `totalMoneda × tipoCambio` when unconfirmed and items exist. |
-| `lugar_id` | Optional FK to `Lugar` — the physical location of the expense. Available on both `Gasto` and `GastoItem`. |
+| `categoria_id` | Optional FK to `Categoria` — categoría del gasto (ej: Auto, Supermercado, Mascotas). Available on both `Gasto` and `GastoItem`. |
 
 ### API surface
 
@@ -229,7 +229,7 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
-| `GET/POST /api/lugares` | Locations CRUD |
+| `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) |
 | `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
 | `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes its movimientos) |

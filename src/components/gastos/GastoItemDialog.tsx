@@ -27,7 +27,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
-import type { Gasto, GastoItem, Lugar } from '@/lib/types'
+import type { Gasto, GastoItem, Categoria } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -42,7 +42,7 @@ type EditState = {
   cuotas_totales: string
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
-  lugar_id: number | null
+  categoria_id: number | null
 }
 
 interface Props {
@@ -60,8 +60,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [cuotasTotales, setCuotasTotales] = useState('')
   const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
-  const [lugarId, setLugarId] = useState<number | null>(null)
-  const [lugares, setLugares] = useState<Lugar[]>([])
+  const [categoriaId, setCategoriaId] = useState<number | null>(null)
+  const [categoriaes, setCategoriaes] = useState<Categoria[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -70,7 +70,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   useEffect(() => {
-    fetch('/api/lugares').then(r => r.json()).then(setLugares)
+    fetch('/api/categoriaes').then(r => r.json()).then(setCategoriaes)
   }, [])
 
   if (!gasto) return null
@@ -87,7 +87,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     cuotas_totales: item.cuotas_totales != null ? String(item.cuotas_totales) : '',
     incluye_en_total: item.incluye_en_total,
     incluye_en_vencimiento: item.incluye_en_vencimiento,
-    lugar_id: item.lugar_id ?? null,
+    categoria_id: item.categoria_id ?? null,
   })
 
   const handleSaveEdit = async () => {
@@ -107,7 +107,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: editing.cuotas_totales ? Number(editing.cuotas_totales) : null,
           incluye_en_total: editing.incluye_en_total,
           incluye_en_vencimiento: editing.incluye_en_vencimiento,
-          lugar_id: editing.lugar_id,
+          categoria_id: editing.categoria_id,
         }),
       })
       if (!res.ok) throw new Error()
@@ -138,13 +138,13 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
           incluye_en_total: incluyeEnTotal,
           incluye_en_vencimiento: incluyeEnVencimiento,
-          lugar_id: lugarId,
+          categoria_id: categoriaId,
         }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
       setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
-      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setLugarId(null)
+      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setCategoriaId(null)
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -244,14 +244,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
               />
             </Box>
             <FormControl size="small" fullWidth>
-              <InputLabel>Lugar (opcional)</InputLabel>
+              <InputLabel>Categoría (opcional)</InputLabel>
               <Select
-                label="Lugar (opcional)"
-                value={lugarId ?? ''}
-                onChange={e => setLugarId(e.target.value === '' ? null : Number(e.target.value))}
+                label="Categoría (opcional)"
+                value={categoriaId ?? ''}
+                onChange={e => setCategoriaId(e.target.value === '' ? null : Number(e.target.value))}
               >
                 <MenuItem value="">Sin especificar</MenuItem>
-                {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                {categoriaes.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -318,14 +318,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                       />
                     </Box>
                     <FormControl size="small" fullWidth>
-                      <InputLabel>Lugar (opcional)</InputLabel>
+                      <InputLabel>Categoría (opcional)</InputLabel>
                       <Select
-                        label="Lugar (opcional)"
-                        value={editing.lugar_id ?? ''}
-                        onChange={e => setEditing(p => p ? { ...p, lugar_id: e.target.value === '' ? null : Number(e.target.value) } : p)}
+                        label="Categoría (opcional)"
+                        value={editing.categoria_id ?? ''}
+                        onChange={e => setEditing(p => p ? { ...p, categoria_id: e.target.value === '' ? null : Number(e.target.value) } : p)}
                       >
                         <MenuItem value="">Sin especificar</MenuItem>
-                        {lugares.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                        {categoriaes.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
                       </Select>
                     </FormControl>
                     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -363,9 +363,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                             Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
                           </Typography>
                         )}
-                        {item.lugar_nombre && (
+                        {item.categoria_nombre && (
                           <Typography variant="caption" color="text.secondary">
-                            📍 {item.lugar_nombre}
+                            📍 {item.categoria_nombre}
                           </Typography>
                         )}
                       </Box>

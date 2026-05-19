@@ -100,7 +100,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
             anio: dstAnio,
             notas: g.notas ?? '',
             confirmado: false,
-            lugar_id: g.lugar_id,
+            categoria_id: g.categoria_id,
           }),
         })
         if (!res.ok) throw new Error()
@@ -119,7 +119,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
                 cuotas_totales: item.cuotas_totales,
                 incluye_en_total: item.incluye_en_total,
                 incluye_en_vencimiento: item.incluye_en_vencimiento,
-                lugar_id: item.lugar_id,
+                categoria_id: item.categoria_id,
               }),
             })
           ))
