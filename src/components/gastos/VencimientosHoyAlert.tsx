@@ -9,14 +9,24 @@ import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import type { Gasto } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
 }
 
+type Entrada = {
+  key: string
+  tipo: 'gasto' | 'subitem'
+  descripcion: string
+  parent?: string
+  casa_nombre?: string
+  monto: number
+}
+
 export default function VencimientosHoyAlert() {
-  const [pendientes, setPendientes] = useState<Gasto[]>([])
+  const [pendientes, setPendientes] = useState<Entrada[]>([])
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -26,9 +36,37 @@ export default function VencimientosHoyAlert() {
     fetch(`/api/gastos?${params}`)
       .then(r => r.json())
       .then((gastos: Gasto[]) => {
-        const hoy = gastos.filter(g => g.fecha_vencimiento === today && g.total_restante > 0 && g.confirmado)
-        if (hoy.length > 0) {
-          setPendientes(hoy)
+        const out: Entrada[] = []
+        for (const g of gastos) {
+          if (!g.confirmado) continue
+          if (g.fecha_vencimiento === today) {
+            if (g.total_restante > 0) {
+              out.push({
+                key: `g-${g.id}`,
+                tipo: 'gasto',
+                descripcion: g.descripcion,
+                casa_nombre: g.casa_nombre,
+                monto: g.total_restante,
+              })
+            }
+          } else {
+            // Sub-items con incluye_en_vencimiento y fecha === hoy (para no duplicar cuando el gasto padre vence hoy)
+            for (const it of g.items ?? []) {
+              if (it.incluye_en_vencimiento && it.fecha === today) {
+                out.push({
+                  key: `i-${it.id}`,
+                  tipo: 'subitem',
+                  descripcion: it.descripcion,
+                  parent: g.descripcion,
+                  casa_nombre: g.casa_nombre,
+                  monto: it.monto,
+                })
+              }
+            }
+          }
+        }
+        if (out.length > 0) {
+          setPendientes(out)
           setOpen(true)
         }
       })
@@ -37,7 +75,7 @@ export default function VencimientosHoyAlert() {
 
   if (pendientes.length === 0) return null
 
-  const total = pendientes.reduce((s, g) => s + g.total_restante, 0)
+  const total = pendientes.reduce((s, e) => s + e.monto, 0)
 
   return (
     <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
@@ -46,17 +84,27 @@ export default function VencimientosHoyAlert() {
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Tenés {pendientes.length} gasto{pendientes.length !== 1 ? 's' : ''} con vencimiento hoy que aún {pendientes.length !== 1 ? 'no fueron saldados' : 'no fue saldado'}:
+          Tenés {pendientes.length} {pendientes.length !== 1 ? 'vencimientos' : 'vencimiento'} hoy que aún {pendientes.length !== 1 ? 'no fueron saldados' : 'no fue saldado'}:
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {pendientes.map(g => (
-            <Box key={g.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="body2" fontWeight={600} noWrap>{g.descripcion}</Typography>
-                <Typography variant="caption" color="text.secondary">{g.casa_nombre}</Typography>
+          {pendientes.map(e => (
+            <Box key={e.key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <Box sx={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                {e.tipo === 'subitem' && <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />}
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap>
+                    {e.descripcion}
+                    {e.tipo === 'subitem' && e.parent && (
+                      <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 0.5 }}>
+                        · {e.parent}
+                      </Typography>
+                    )}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{e.casa_nombre}</Typography>
+                </Box>
               </Box>
               <Typography variant="body2" fontWeight={700} sx={{ color: '#f59e0b', flexShrink: 0, ml: 2 }}>
-                {fmtARS(g.total_restante)}
+                {fmtARS(e.monto)}
               </Typography>
             </Box>
           ))}

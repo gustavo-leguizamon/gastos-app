@@ -179,7 +179,12 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 
 ### Vencimientos del día alert
 
-`VencimientosHoyAlert` (`src/components/gastos/VencimientosHoyAlert.tsx`) — montado al inicio de `gastos/page.tsx`. En `useEffect` (una sola vez por mount) hace `GET /api/gastos?mes=<hoy>&anio=<hoy>` y filtra client-side por `fecha_vencimiento === today && total_restante > 0 && confirmado`. Si hay matches abre un `Dialog` con la lista (descripción, casa, restante por gasto) y un total a pagar hoy. El componente se monta cada vez que se navega a `/gastos`, así que la alerta aparece en cada entrada mientras existan vencimientos no saldados (no usa localStorage ni dismissal persistente).
+`VencimientosHoyAlert` (`src/components/gastos/VencimientosHoyAlert.tsx`) — montado al inicio de `gastos/page.tsx`. En `useEffect` (una sola vez por mount) hace `GET /api/gastos?mes=<hoy>&anio=<hoy>` y arma client-side la lista de vencimientos del día siguiendo la **misma lógica que `pagar_hoy` en `/api/resumen`**:
+
+- Si `g.fecha_vencimiento === today` y `total_restante > 0` y `confirmado`: el gasto entra como entrada principal.
+- Si **no** vence hoy: se recorren sus `items` y entran como sub-item los que tengan `incluye_en_vencimiento = true && fecha === today` (con su propia descripción y monto). La condición de "padre no vence hoy" evita duplicar montos cuando ya está cubierto por la fila principal.
+
+Si hay matches abre un `Dialog` con la lista (gastos y sub-items, sub-items marcados con icon `SubdirectoryArrowRightIcon` y caption mostrando el gasto padre) y un total a pagar hoy. El componente se monta cada vez que se navega a `/gastos`, así que la alerta aparece en cada entrada mientras existan vencimientos no saldados (no usa localStorage ni dismissal persistente).
 
 ### Copy dialogs
 
