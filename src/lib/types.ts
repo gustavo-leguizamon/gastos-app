@@ -72,6 +72,9 @@ export interface Gasto {
   anio: number
   notas: string | null
   confirmado: boolean
+  es_tarjeta: boolean
+  fecha_cierre: string | null
+  fecha_proximo_cierre: string | null
   created_at: string
   updated_at: string
   pagos: Pago[]
@@ -97,6 +100,9 @@ export interface GastoFormData {
   notas: string
   confirmado: boolean
   categoria_id: number | null
+  es_tarjeta: boolean
+  fecha_cierre: string | null
+  fecha_proximo_cierre: string | null
 }
 
 export interface Resumen {

@@ -185,7 +185,29 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 
 - **Tipo de cambio**: el campo `tipo_cambio` solo se renderiza cuando la moneda seleccionada no es ARS. Cuando se cambia la moneda a ARS, el form setea `tipo_cambio = 1` automáticamente. El cálculo de "Total en ARS" sigue mostrándose como readonly debajo cuando aplica.
 - **Cuotas**: los campos `cuota_actual` / `cuotas_totales` están ocultos por defecto. Un `Checkbox` "Pago en cuotas" controla su visibilidad (`usaCuotas` state local del form). Al desmarcarlo, ambos valores se setean a `null` vía `setValue()`. Al editar un gasto que ya tenía cuotas (`cuota_actual` o `cuotas_totales` no null) el toggle se inicializa marcado.
-- **Total pagado / Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
+- **Total pagado**: se muestra siempre (creación y edición). Cuando se crea un nuevo gasto y el valor es > 0, `GastoDialog.handleSubmit` ejecuta un `POST /api/gastos/[id]/pagos` adicional con `{ fecha: gasto.fecha_vencimiento, monto: total_pagado }` para registrar ese pago inicial automáticamente. Si la segunda llamada falla, se muestra un toast pero el gasto ya queda creado. Este paso no aplica en modo edición (allí los pagos se manejan vía `PagoDialog`).
+- **Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
+
+### Tarjeta de crédito (resumen de tarjeta) y propagación de pagos
+
+Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` (campo Prisma `esTarjeta`, default `false`). Cuando está activo:
+
+- El select de **Tarjeta** se muestra siempre (independiente del `tipo_pago`).
+- La **descripción** se bloquea y se sincroniza automáticamente con el formato `Nombre (Banco)` de la tarjeta seleccionada (si la tarjeta no tiene banco, solo se usa el `nombre`). Implementado en un `useEffect` que llama `setValue('descripcion', ...)` al cambiar `esTarjeta` o `tarjetaId`.
+- Aparecen 2 campos de fecha opcionales: `fecha_cierre` (`fechaCierre`) y `fecha_proximo_cierre` (`fechaProximoCierre`). El de vencimiento ya existe en todo gasto.
+
+**Propagación de pagos a la tarjeta** (en `POST /api/gastos/[id]/pagos`, función `propagatePagoToTarjeta`):
+
+1. Solo aplica cuando el **gasto fuente** tiene `tipoPago = 'C'` y `tarjetaId` asignada.
+2. Se busca el "resumen de tarjeta" del **mismo mes/año** que el gasto fuente, filtrando por `esTarjeta = true` y mismo `tarjetaId`. Si no existe, no hay `fechaProximoCierre` y se asume el comportamiento "≤" (target = mes siguiente).
+3. Se determina el **mes destino** comparando `pago.fecha` con `currentCC.fechaProximoCierre`:
+   - `pago.fecha <= fechaProximoCierre` → target = mes del gasto fuente **+1**.
+   - `pago.fecha > fechaProximoCierre` → target = mes del gasto fuente **+2**.
+   - El helper `shiftMonth(mes, anio, n)` maneja el rollover de mes/año.
+4. Se busca el resumen de tarjeta del mes destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `descripcion = "Nombre (Banco)"` (o solo `nombre` si la tarjeta no tiene banco), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento = "{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
+5. Se crea un `GastoItem` (sub-item) en ese resumen con `descripcion = gasto fuente.descripcion`, `fecha = pago.fecha`, `monto = pago.monto`, `incluyeEnTotal = true`.
+
+La propagación está envuelta en try/catch — si falla, el pago original se mantiene y el error queda en console. Esta lógica también se dispara desde el flujo de "Total Pagado en gasto nuevo" (`GastoDialog` → `POST /api/gastos/[id]/pagos`).
 
 ### Autocompletado de descripciones
 
@@ -211,6 +233,8 @@ Si hay matches abre un `Dialog` con la lista (gastos y sub-items, sub-items marc
 - **`CopiarMesDialog`** — copies all gastos of a source month/year to a target month/year. Source defaults to the active filter; target defaults to next month. Shows a count preview before copying and a `LinearProgress` during the sequential copy loop.
 
 Both dialogs call `triggerRefresh()` on completion to reload the full table.
+
+Ambos dialogs propagan al body los campos de tarjeta del resumen (`es_tarjeta`, `fecha_cierre`, `fecha_proximo_cierre`) tal cual los tiene la fila origen — útil para que los gastos que actúan como "resumen de tarjeta" conserven ese estado y sus fechas de cierre al duplicarse. Las fechas se copian tal cual; si querés que reflejen el ciclo del nuevo mes, hay que editarlas a mano en la fila copiada.
 
 ### Key domain concepts
 

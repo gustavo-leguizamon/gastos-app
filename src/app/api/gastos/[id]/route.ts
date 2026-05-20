@@ -39,6 +39,9 @@ function toGastoResponse(g: any) {
     anio: g.anio,
     notas: g.notas,
     confirmado: g.confirmado,
+    es_tarjeta: g.esTarjeta ?? false,
+    fecha_cierre: g.fechaCierre ?? null,
+    fecha_proximo_cierre: g.fechaProximoCierre ?? null,
     pagos,
     items: (g.items ?? []).map((i: any) => ({
       id: i.id,
@@ -96,6 +99,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       notas: body.notas || null,
       confirmado: body.confirmado ?? true,
       categoriaId: body.categoria_id ?? null,
+      esTarjeta: body.es_tarjeta ?? false,
+      fechaCierre: body.fecha_cierre || null,
+      fechaProximoCierre: body.fecha_proximo_cierre || null,
     },
     include: INCLUDE,
   })

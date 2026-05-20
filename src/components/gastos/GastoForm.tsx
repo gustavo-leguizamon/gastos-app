@@ -40,6 +40,9 @@ const schema = yup.object({
   notas: yup.string().optional().default(''),
   confirmado: yup.boolean().required().default(true),
   categoria_id: yup.number().nullable().optional(),
+  es_tarjeta: yup.boolean().required().default(false),
+  fecha_cierre: yup.string().nullable().optional(),
+  fecha_proximo_cierre: yup.string().nullable().optional(),
 })
 
 interface Props {
@@ -80,6 +83,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       notas: gasto?.notas ?? '',
       confirmado: gasto?.confirmado ?? true,
       categoria_id: gasto?.categoria_id ?? null,
+      es_tarjeta: gasto?.es_tarjeta ?? false,
+      fecha_cierre: gasto?.fecha_cierre ?? null,
+      fecha_proximo_cierre: gasto?.fecha_proximo_cierre ?? null,
     },
   })
 
@@ -108,11 +114,21 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const monedaId = watch('moneda_id')
   const tipoCambio = watch('tipo_cambio')
   const totalMoneda = watch('total_moneda')
+  const esTarjeta = watch('es_tarjeta')
+  const tarjetaId = watch('tarjeta_id')
 
   const isEditing = !!gasto
   const monedaSeleccionada = useMemo(() => monedas.find(m => m.id === monedaId), [monedas, monedaId])
   const esARS = monedaSeleccionada?.codigo === 'ARS'
   const totalARS = (totalMoneda || 0) * (esARS ? 1 : (tipoCambio || 1))
+
+  // Cuando es tarjeta y se selecciona una tarjeta, la descripción se sincroniza con "Nombre (Banco)"
+  useEffect(() => {
+    if (esTarjeta && tarjetaId) {
+      const t = tarjetas.find(x => x.id === tarjetaId)
+      if (t) setValue('descripcion', t.banco ? `${t.nombre} (${t.banco})` : t.nombre)
+    }
+  }, [esTarjeta, tarjetaId, tarjetas, setValue])
 
   return (
     <Box component="form" id={formId} onSubmit={handleSubmit(onSubmit)}>
@@ -152,29 +168,65 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           />
         </Grid>
 
+        {/* Es tarjeta de crédito */}
+        <Grid item xs={12}>
+          <Controller
+            name="es_tarjeta"
+            control={control}
+            render={({ field }) => (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!field.value}
+                    onChange={e => {
+                      field.onChange(e.target.checked)
+                      if (!e.target.checked) {
+                        setValue('fecha_cierre', null)
+                        setValue('fecha_proximo_cierre', null)
+                      }
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">Este gasto es una tarjeta de crédito (resumen del mes)</Typography>}
+              />
+            )}
+          />
+        </Grid>
+
         {/* Descripcion */}
         <Grid item xs={12}>
           <Controller
             name="descripcion"
             control={control}
             render={({ field }) => (
-              <Autocomplete
-                freeSolo
-                options={descripciones}
-                value={field.value || ''}
-                onInputChange={(_, val) => field.onChange(val)}
-                onChange={(_, val) => field.onChange(val ?? '')}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                    label="Descripción"
-                    size="small"
-                    error={!!errors.descripcion}
-                    helperText={errors.descripcion?.message ?? 'Sugerencias de descripciones ya usadas'}
-                  />
-                )}
-              />
+              esTarjeta ? (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Descripción"
+                  size="small"
+                  disabled
+                  helperText="Se sincroniza con la tarjeta seleccionada"
+                />
+              ) : (
+                <Autocomplete
+                  freeSolo
+                  options={descripciones}
+                  value={field.value || ''}
+                  onInputChange={(_, val) => field.onChange(val)}
+                  onChange={(_, val) => field.onChange(val ?? '')}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      label="Descripción"
+                      size="small"
+                      error={!!errors.descripcion}
+                      helperText={errors.descripcion?.message ?? 'Sugerencias de descripciones ya usadas'}
+                    />
+                  )}
+                />
+              )
             )}
           />
         </Grid>
@@ -201,8 +253,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           />
         </Grid>
 
-        {/* Tarjeta (solo credito) */}
-        {tipoPago === 'C' && (
+        {/* Tarjeta (crédito o resumen de tarjeta) */}
+        {(tipoPago === 'C' || esTarjeta) && (
           <Grid item xs={12} sm={6}>
             <Controller
               name="tarjeta_id"
@@ -218,6 +270,45 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
               )}
             />
           </Grid>
+        )}
+
+        {/* Fecha cierre y próximo cierre — solo si es resumen de tarjeta */}
+        {esTarjeta && (
+          <>
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="fecha_cierre"
+                control={control}
+                render={({ field }) => (
+                  <AppDateField
+                    {...field}
+                    value={field.value ?? ''}
+                    fullWidth
+                    label="Fecha de cierre (opcional)"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                )}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="fecha_proximo_cierre"
+                control={control}
+                render={({ field }) => (
+                  <AppDateField
+                    {...field}
+                    value={field.value ?? ''}
+                    fullWidth
+                    label="Fecha de próximo cierre (opcional)"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Si un pago crédito tiene fecha ≤ esta, se propaga al mes siguiente; si es mayor, al subsiguiente"
+                  />
+                )}
+              />
+            </Grid>
+          </>
         )}
 
         {/* Moneda */}
@@ -293,28 +384,29 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           </Grid>
         )}
 
-        {/* Total pagado / Pasaje / Préstamo — solo en edición */}
+        {/* Total pagado — disponible siempre */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="total_pagado"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                fullWidth
+                label="Total Pagado (ARS)"
+                type="number"
+                size="small"
+                inputProps={{ step: 0.01, min: 0 }}
+                error={!!errors.total_pagado}
+                helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si > 0, se crea un pago con la fecha del gasto')}
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Pasaje / Préstamo — solo en edición */}
         {isEditing && (
           <>
-            <Grid item xs={12} sm={6}>
-              <Controller
-                name="total_pagado"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Total Pagado (ARS)"
-                    type="number"
-                    size="small"
-                    inputProps={{ step: 0.01, min: 0 }}
-                    error={!!errors.total_pagado}
-                    helperText={errors.total_pagado?.message}
-                  />
-                )}
-              />
-            </Grid>
-
             <Grid item xs={12} sm={6}>
               <Controller
                 name="pasaje_mes_siguiente"

@@ -45,6 +45,19 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error('Error al guardar')
+      // Al crear, si total_pagado > 0, generar el pago automáticamente con la fecha del gasto
+      if (!gasto && Number(data.total_pagado) > 0) {
+        const nuevo = await res.json()
+        try {
+          await fetch(`/api/gastos/${nuevo.id}/pagos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fecha: data.fecha_vencimiento, monto: Number(data.total_pagado) }),
+          })
+        } catch {
+          toast.error('Gasto creado, pero falló la creación del pago inicial')
+        }
+      }
       toast.success(gasto ? 'Gasto actualizado' : 'Gasto creado')
       onSaved()
       onClose()

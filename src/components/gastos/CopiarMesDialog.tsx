@@ -101,6 +101,9 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
             notas: g.notas ?? '',
             confirmado: false,
             categoria_id: g.categoria_id,
+            es_tarjeta: g.es_tarjeta,
+            fecha_cierre: g.fecha_cierre,
+            fecha_proximo_cierre: g.fecha_proximo_cierre,
           }),
         })
         if (!res.ok) throw new Error()
