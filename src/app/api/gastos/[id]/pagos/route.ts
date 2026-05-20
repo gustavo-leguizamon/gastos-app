@@ -25,6 +25,7 @@ async function propagatePagoToTarjeta(opts: {
   sourceGastoId: number
   fecha: string
   monto: number
+  pagoId: number
 }) {
   const source = await prisma.gasto.findUnique({ where: { id: opts.sourceGastoId } })
   if (!source) return
@@ -96,6 +97,8 @@ async function propagatePagoToTarjeta(opts: {
       fecha: opts.fecha,
       incluyeEnTotal: true,
       incluyeEnVencimiento: false,
+      pagoId: opts.pagoId,
+      categoriaId: source.categoriaId ?? null,
     },
   })
 }
@@ -116,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       sourceGastoId: Number(params.id),
       fecha: pago.fecha,
       monto: pago.monto,
+      pagoId: pago.id,
     })
   } catch (err) {
     // No interrumpir el flujo del pago aunque falle la propagación

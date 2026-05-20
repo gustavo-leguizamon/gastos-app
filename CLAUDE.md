@@ -205,9 +205,11 @@ Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` 
    - `pago.fecha > fechaProximoCierre` → target = mes del gasto fuente **+2**.
    - El helper `shiftMonth(mes, anio, n)` maneja el rollover de mes/año.
 4. Se busca el resumen de tarjeta del mes destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `descripcion = "Nombre (Banco)"` (o solo `nombre` si la tarjeta no tiene banco), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento = "{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
-5. Se crea un `GastoItem` (sub-item) en ese resumen con `descripcion = gasto fuente.descripcion`, `fecha = pago.fecha`, `monto = pago.monto`, `incluyeEnTotal = true`.
+5. Se crea un `GastoItem` (sub-item) en ese resumen con `descripcion = gasto fuente.descripcion`, `fecha = pago.fecha`, `monto = pago.monto`, `incluyeEnTotal = true`, `pagoId = pago.id` (FK al pago que originó la propagación), y `categoriaId = gasto fuente.categoriaId` (hereda la categoría del gasto que recibió el pago).
 
 La propagación está envuelta en try/catch — si falla, el pago original se mantiene y el error queda en console. Esta lógica también se dispara desde el flujo de "Total Pagado en gasto nuevo" (`GastoDialog` → `POST /api/gastos/[id]/pagos`).
+
+**Cascade al eliminar el pago:** `GastoItem.pagoId` referencia a `Pago` con `onDelete: Cascade`. Cuando un pago se elimina (vía `DELETE /api/gastos/[id]/pagos/[pagoId]` o por cascada al borrar su gasto), Postgres borra automáticamente cualquier sub-item propagado que esté linkeado, manteniendo la consistencia entre el resumen de tarjeta y los pagos efectivamente realizados.
 
 ### Autocompletado de descripciones
 

@@ -80,10 +80,12 @@ model GastoItem {
   incluyeEnTotal       Boolean  @default(true)
   incluyeEnVencimiento Boolean  @default(false)
   categoriaId          Int?
+  pagoId               Int?
   createdAt            DateTime @default(now())
 
   gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
   categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
 }
 
 model Inversion {
@@ -120,5 +122,6 @@ model Pago {
   monto     Float
   createdAt DateTime @default(now())
 
-  gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  gasto Gasto       @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  items GastoItem[]
 }
