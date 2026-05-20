@@ -187,6 +187,15 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 - **Cuotas**: los campos `cuota_actual` / `cuotas_totales` están ocultos por defecto. Un `Checkbox` "Pago en cuotas" controla su visibilidad (`usaCuotas` state local del form). Al desmarcarlo, ambos valores se setean a `null` vía `setValue()`. Al editar un gasto que ya tenía cuotas (`cuota_actual` o `cuotas_totales` no null) el toggle se inicializa marcado.
 - **Total pagado / Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
 
+### Autocompletado de descripciones
+
+Para evitar que el mismo gasto/sub-item se cargue con descripciones distintas en diferentes períodos (y que el matching del estimado próximo mes pierda matches), los campos "Descripción" de `GastoForm` y `GastoItemDialog` (alta + edición inline) usan `Autocomplete` de MUI con `freeSolo`:
+
+- `GastoForm`: opciones desde `GET /api/gastos/descripciones` (todas las descripciones distintas de gastos).
+- `GastoItemDialog`: opciones desde `GET /api/items/descripciones?parent=<gasto.descripcion>` (descripciones de sub-items cuyo gasto padre tenga esa misma descripción, case-insensitive). Se refetchea cuando cambia `gasto.descripcion`.
+
+`freeSolo` permite que el usuario tipee algo nuevo si no existe en las sugerencias, pero el listado dropdown filtra por substring mientras se escribe, así puede elegir una descripción existente con un click.
+
 ### Vencimientos del día alert
 
 `VencimientosHoyAlert` (`src/components/gastos/VencimientosHoyAlert.tsx`) — montado al inicio de `gastos/page.tsx`. En `useEffect` (una sola vez por mount) hace `GET /api/gastos?mes=<hoy>&anio=<hoy>` y arma client-side la lista de vencimientos del día siguiendo la **misma lógica que `pagar_hoy` en `/api/resumen`**:
@@ -231,6 +240,8 @@ Both dialogs call `triggerRefresh()` on completion to reload the full table.
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) |
 | `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
+| `GET /api/gastos/descripciones` | Lista de descripciones distintas de gastos (para autocompletar) |
+| `GET /api/items/descripciones` | Lista de descripciones distintas de sub-items. Acepta `?parent=<descripcion>` para filtrar por descripción del gasto padre (case-insensitive) |
 | `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes its movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos for an inversion |

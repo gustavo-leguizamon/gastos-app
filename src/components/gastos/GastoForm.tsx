@@ -6,6 +6,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
+import Autocomplete from '@mui/material/Autocomplete'
 import AppDateField from '@/components/shared/AppDateField'
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
@@ -54,6 +55,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [monedas, setMonedas] = useState<Moneda[]>([])
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [categoriaes, setCategoriaes] = useState<Categoria[]>([])
+  const [descripciones, setDescripciones] = useState<string[]>([])
   const [usaCuotas, setUsaCuotas] = useState<boolean>(!!(gasto?.cuota_actual ?? gasto?.cuotas_totales))
   const now = new Date()
 
@@ -87,11 +89,13 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       fetch('/api/monedas').then(r => r.json()),
       fetch('/api/tarjetas').then(r => r.json()),
       fetch('/api/categorias').then(r => r.json()),
-    ]).then(([c, m, t, l]) => {
+      fetch('/api/gastos/descripciones').then(r => r.json()).catch(() => []),
+    ]).then(([c, m, t, l, d]) => {
       setCasas(c)
       setMonedas(m)
       setTarjetas(t)
       setCategoriaes(l)
+      setDescripciones(Array.isArray(d) ? d : [])
       if (!gasto) {
         if (c.length === 1) setValue('casa_id', c[0].id)
         const ars = m.find((x: Moneda) => x.codigo === 'ARS')
@@ -154,13 +158,22 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="descripcion"
             control={control}
             render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Descripción"
-                size="small"
-                error={!!errors.descripcion}
-                helperText={errors.descripcion?.message}
+              <Autocomplete
+                freeSolo
+                options={descripciones}
+                value={field.value || ''}
+                onInputChange={(_, val) => field.onChange(val)}
+                onChange={(_, val) => field.onChange(val ?? '')}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    label="Descripción"
+                    size="small"
+                    error={!!errors.descripcion}
+                    helperText={errors.descripcion?.message ?? 'Sugerencias de descripciones ya usadas'}
+                  />
+                )}
               />
             )}
           />

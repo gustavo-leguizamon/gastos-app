@@ -7,6 +7,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@/components/shared/AppTextField'
+import Autocomplete from '@mui/material/Autocomplete'
 import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -62,6 +63,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
   const [categoriaId, setCategoriaId] = useState<number | null>(null)
   const [categoriaes, setCategoriaes] = useState<Categoria[]>([])
+  const [descripciones, setDescripciones] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
@@ -72,6 +74,15 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   useEffect(() => {
     fetch('/api/categorias').then(r => r.json()).then(setCategoriaes)
   }, [])
+
+  useEffect(() => {
+    if (!gasto) return
+    const params = new URLSearchParams({ parent: gasto.descripcion })
+    fetch(`/api/items/descripciones?${params}`)
+      .then(r => r.json())
+      .then(d => setDescripciones(Array.isArray(d) ? d : []))
+      .catch(() => setDescripciones([]))
+  }, [gasto?.descripcion])
 
   if (!gasto) return null
 
@@ -214,10 +225,19 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           {/* Formulario nuevo item */}
           <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Typography variant="subtitle2" fontWeight={700}>Agregar sub-item</Typography>
-            <TextField
-              size="small" label="Descripción" fullWidth
-              value={descripcion} onChange={e => setDescripcion(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            <Autocomplete
+              freeSolo
+              options={descripciones}
+              value={descripcion}
+              onInputChange={(_, val) => setDescripcion(val)}
+              onChange={(_, val) => setDescripcion(val ?? '')}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small" label="Descripción" fullWidth
+                  onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                />
+              )}
             />
             <Box sx={{ display: 'flex', gap: 1.5 }}>
               <TextField
@@ -285,10 +305,15 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
               <Box key={item.id} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 {editing?.id === item.id ? (
                   <Box sx={{ py: 1.5, px: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <TextField
-                      size="small" fullWidth autoFocus label="Descripción"
+                    <Autocomplete
+                      freeSolo
+                      options={descripciones}
                       value={editing.descripcion}
-                      onChange={e => setEditing(p => p ? { ...p, descripcion: e.target.value } : p)}
+                      onInputChange={(_, val) => setEditing(p => p ? { ...p, descripcion: val } : p)}
+                      onChange={(_, val) => setEditing(p => p ? { ...p, descripcion: val ?? '' } : p)}
+                      renderInput={(params) => (
+                        <TextField {...params} size="small" fullWidth autoFocus label="Descripción" />
+                      )}
                     />
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <TextField
