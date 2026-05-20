@@ -53,6 +53,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string; itemId: string } }) {
-  await prisma.gastoItem.delete({ where: { id: Number(params.itemId) } })
+  // Si el item está linkeado a un pago (propagación de tarjeta), borramos el pago — el cascade en GastoItem.pagoId arrastra el item.
+  const item = await prisma.gastoItem.findUnique({ where: { id: Number(params.itemId) }, select: { pagoId: true } })
+  if (item?.pagoId) {
+    await prisma.pago.delete({ where: { id: item.pagoId } })
+  } else {
+    await prisma.gastoItem.delete({ where: { id: Number(params.itemId) } })
+  }
   return NextResponse.json({ ok: true })
 }

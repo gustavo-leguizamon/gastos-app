@@ -187,6 +187,7 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 - **Cuotas**: los campos `cuota_actual` / `cuotas_totales` están ocultos por defecto. Un `Checkbox` "Pago en cuotas" controla su visibilidad (`usaCuotas` state local del form). Al desmarcarlo, ambos valores se setean a `null` vía `setValue()`. Al editar un gasto que ya tenía cuotas (`cuota_actual` o `cuotas_totales` no null) el toggle se inicializa marcado.
 - **Total pagado**: se muestra siempre (creación y edición). Cuando se crea un nuevo gasto y el valor es > 0, `GastoDialog.handleSubmit` ejecuta un `POST /api/gastos/[id]/pagos` adicional con `{ fecha: gasto.fecha_vencimiento, monto: total_pagado }` para registrar ese pago inicial automáticamente. Si la segunda llamada falla, se muestra un toast pero el gasto ya queda creado. Este paso no aplica en modo edición (allí los pagos se manejan vía `PagoDialog`).
 - **Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
+- **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (validado por Yup vía `when('tipo_pago', { is: 'C', ... })`). En la UI el select de tarjeta oculta la opción "Sin especificar" y el label pierde el "(opcional)". Si se intenta guardar sin seleccionar tarjeta, aparece un `FormHelperText` con el mensaje "Seleccioná una tarjeta". Cuando `tipo_pago === 'D'`, la tarjeta sigue siendo opcional.
 
 ### Tarjeta de crédito (resumen de tarjeta) y propagación de pagos
 
@@ -210,6 +211,8 @@ Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` 
 La propagación está envuelta en try/catch — si falla, el pago original se mantiene y el error queda en console. Esta lógica también se dispara desde el flujo de "Total Pagado en gasto nuevo" (`GastoDialog` → `POST /api/gastos/[id]/pagos`).
 
 **Cascade al eliminar el pago:** `GastoItem.pagoId` referencia a `Pago` con `onDelete: Cascade`. Cuando un pago se elimina (vía `DELETE /api/gastos/[id]/pagos/[pagoId]` o por cascada al borrar su gasto), Postgres borra automáticamente cualquier sub-item propagado que esté linkeado, manteniendo la consistencia entre el resumen de tarjeta y los pagos efectivamente realizados.
+
+**Cascade inverso (al borrar el sub-item):** el handler `DELETE /api/gastos/[id]/items/[itemId]` verifica si el item tiene `pagoId`. Si lo tiene, en vez de borrar el item directamente, borra el **Pago** referenciado — y el cascade del FK arrastra el item automáticamente. Así, eliminar el sub-item propagado desde el resumen de tarjeta también deshace el pago original en el gasto crédito que lo originó. Si el item no tiene `pagoId` (item común sin propagación), se borra directamente como siempre.
 
 ### Autocompletado de descripciones
 

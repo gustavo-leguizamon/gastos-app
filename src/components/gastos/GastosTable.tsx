@@ -27,6 +27,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import CreditCardIcon from '@mui/icons-material/CreditCard'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -155,7 +156,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     {
       field: '_expand',
       headerName: '',
-      width: 60,
+      width: 90,
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
@@ -174,6 +175,26 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 <IconButton size="small" onClick={() => toggleExpand(row.id)}>
                   {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
                 </IconButton>
+              </Tooltip>
+            )}
+            {row.es_tarjeta && (
+              <Tooltip
+                arrow
+                title={
+                  <Box>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      <strong>Cierre:</strong> {row.fecha_cierre || '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      <strong>Vencimiento:</strong> {row.fecha_vencimiento || '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      <strong>Próximo cierre:</strong> {row.fecha_proximo_cierre || '—'}
+                    </Typography>
+                  </Box>
+                }
+              >
+                <CreditCardIcon sx={{ fontSize: 16, color: 'primary.main', ml: 0.5 }} />
               </Tooltip>
             )}
           </Box>

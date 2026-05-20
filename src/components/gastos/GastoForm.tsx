@@ -32,7 +32,14 @@ const schema = yup.object({
   total_pagado: yup.number().min(0, 'Debe ser >= 0').required('Requerido'),
   pasaje_mes_siguiente: yup.number().min(0).required('Requerido'),
   prestamo_a_otro: yup.number().min(0).required('Requerido'),
-  tarjeta_id: yup.number().nullable().optional(),
+  tarjeta_id: yup
+    .number()
+    .nullable()
+    .when('tipo_pago', {
+      is: 'C',
+      then: (s) => s.typeError('Seleccioná una tarjeta').required('Seleccioná una tarjeta').min(1, 'Seleccioná una tarjeta'),
+      otherwise: (s) => s.optional(),
+    }),
   cuota_actual: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
   cuotas_totales: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
   mes: yup.number().required(),
@@ -260,12 +267,13 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
               name="tarjeta_id"
               control={control}
               render={({ field }) => (
-                <FormControl fullWidth size="small">
-                  <InputLabel>Tarjeta</InputLabel>
-                  <Select {...field} label="Tarjeta" value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
-                    <MenuItem value="">Sin especificar</MenuItem>
+                <FormControl fullWidth size="small" error={!!errors.tarjeta_id}>
+                  <InputLabel>Tarjeta{tipoPago === 'C' ? '' : ' (opcional)'}</InputLabel>
+                  <Select {...field} label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
+                    {tipoPago !== 'C' && <MenuItem value="">Sin especificar</MenuItem>}
                     {tarjetas.map(t => <MenuItem key={t.id} value={t.id}>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</MenuItem>)}
                   </Select>
+                  {errors.tarjeta_id && <FormHelperText>{errors.tarjeta_id.message}</FormHelperText>}
                 </FormControl>
               )}
             />
