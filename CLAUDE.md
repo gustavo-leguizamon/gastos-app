@@ -185,7 +185,12 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 
 - **Tipo de cambio**: el campo `tipo_cambio` solo se renderiza cuando la moneda seleccionada no es ARS. Cuando se cambia la moneda a ARS, el form setea `tipo_cambio = 1` automáticamente. El cálculo de "Total en ARS" sigue mostrándose como readonly debajo cuando aplica.
 - **Cuotas**: los campos `cuota_actual` / `cuotas_totales` están ocultos por defecto. Un `Checkbox` "Pago en cuotas" controla su visibilidad (`usaCuotas` state local del form). Al desmarcarlo, ambos valores se setean a `null` vía `setValue()`. Al editar un gasto que ya tenía cuotas (`cuota_actual` o `cuotas_totales` no null) el toggle se inicializa marcado.
-- **Total pagado**: se muestra siempre (creación y edición). Cuando se crea un nuevo gasto y el valor es > 0, `GastoDialog.handleSubmit` ejecuta un `POST /api/gastos/[id]/pagos` adicional con `{ fecha: gasto.fecha_vencimiento, monto: total_pagado }` para registrar ese pago inicial automáticamente. Si la segunda llamada falla, se muestra un toast pero el gasto ya queda creado. Este paso no aplica en modo edición (allí los pagos se manejan vía `PagoDialog`).
+- **Total pagado / Pagado completo**: en alta hay un checkbox `pagado_completo` (no se persiste, es solo del form), **marcado por defecto**. Si está marcado, el campo "Total Pagado (ARS)" se oculta. En `GastoDialog.handleSubmit`, al crear:
+  - Si `pagado_completo = true` → se registra un `POST /api/gastos/[id]/pagos` con `{ fecha: gasto.fecha_vencimiento, monto: total_moneda × tipo_cambio }` (el total en ARS del gasto).
+  - Si `pagado_completo = false` y `total_pagado > 0` → se registra el pago con ese monto parcial.
+  - Si la creación del pago falla, se muestra un toast pero el gasto ya queda creado.
+  - Como el pago se crea vía el endpoint normal, la **propagación a tarjeta de crédito** (sub-item en el resumen del próximo mes) se dispara automáticamente cuando el gasto es `tipo_pago = 'C'` con `tarjeta_id`.
+  - En edición el checkbox no se renderiza; los pagos se manejan vía `PagoDialog`.
 - **Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (validado por Yup vía `when('tipo_pago', { is: 'C', ... })`). En la UI el select de tarjeta oculta la opción "Sin especificar" y el label pierde el "(opcional)". Si se intenta guardar sin seleccionar tarjeta, aparece un `FormHelperText` con el mensaje "Seleccioná una tarjeta". Cuando `tipo_pago === 'D'`, la tarjeta sigue siendo opcional.
 
@@ -296,7 +301,7 @@ API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per
 **UI** (`src/app/inversiones/page.tsx`):
 - Tabs at the top, one per inversion. To the right: edit/delete icons act on the active tab; **+** button opens the create dialog. Tab selection drives which movimientos are loaded.
 - Form below tabs (Fecha / Monto actual / Monto extra) doubles as create/edit (Editar on a row loads its values; "Cancelar" exits edit mode). Submitting creates/updates a movimiento under the active inversion.
-- DataGrid below the form. **Default sort: `fecha` descending.** The `cambio` computation always runs in ascending order internally (in the `rows` memo), independent of the visual sort, so values stay correct regardless of how the user sorts.
+- DataGrid below the form. **Default sort: `fecha` descending, then `id` descending as tiebreaker.** Since the free DataGrid only supports single-column sort, the `id` tiebreaker is implemented by pre-reversing the rows array (after computing `cambio` in ascending order) so stable sort by `fecha desc` keeps the same-fecha rows in `id desc` order. The `cambio` computation always runs in ascending order internally (in the `rows` memo), independent of the visual sort, so values stay correct regardless of how the user sorts.
 - When no inversiones exist, the page shows an empty-state card prompting the user to create one with the **+** button.
 
 **Migration note:** the original `Inversion` table (single-level, with `fecha`/`montoActual`/`montoExtra` directly) was migrated via `prisma/migrate-inversiones.sql`. That script renames the old table to `Movimiento`, creates a new `Inversion` parent with a default row named "General", and back-fills `inversionId = 1` for all existing snapshots. Kept in the repo as a one-shot historical migration — do not re-run.

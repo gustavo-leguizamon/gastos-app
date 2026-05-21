@@ -103,6 +103,7 @@ export interface GastoFormData {
   es_tarjeta: boolean
   fecha_cierre: string | null
   fecha_proximo_cierre: string | null
+  pagado_completo?: boolean
 }
 
 export interface Resumen {

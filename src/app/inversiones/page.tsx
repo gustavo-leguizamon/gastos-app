@@ -204,7 +204,7 @@ export default function InversionesPage() {
       return a.id - b.id
     })
     let prevActualizado: number | null = null
-    return sorted.map((mov) => {
+    const ascRows = sorted.map((mov) => {
       const actualizado = mov.monto_actual + mov.monto_extra
       const cambio = prevActualizado === null ? null : actualizado - prevActualizado
       prevActualizado = actualizado
@@ -218,6 +218,7 @@ export default function InversionesPage() {
         _raw: mov,
       }
     })
+    return ascRows.reverse()
   }, [movimientos])
 
   const columns: GridColDef[] = [

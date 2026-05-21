@@ -50,6 +50,7 @@ const schema = yup.object({
   es_tarjeta: yup.boolean().required().default(false),
   fecha_cierre: yup.string().nullable().optional(),
   fecha_proximo_cierre: yup.string().nullable().optional(),
+  pagado_completo: yup.boolean().required().default(false),
 })
 
 interface Props {
@@ -93,6 +94,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       es_tarjeta: gasto?.es_tarjeta ?? false,
       fecha_cierre: gasto?.fecha_cierre ?? null,
       fecha_proximo_cierre: gasto?.fecha_proximo_cierre ?? null,
+      pagado_completo: true,
     },
   })
 
@@ -123,6 +125,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const totalMoneda = watch('total_moneda')
   const esTarjeta = watch('es_tarjeta')
   const tarjetaId = watch('tarjeta_id')
+  const pagadoCompleto = watch('pagado_completo')
 
   const isEditing = !!gasto
   const monedaSeleccionada = useMemo(() => monedas.find(m => m.id === monedaId), [monedas, monedaId])
@@ -392,25 +395,51 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           </Grid>
         )}
 
-        {/* Total pagado — disponible siempre */}
-        <Grid item xs={12} sm={6}>
-          <Controller
-            name="total_pagado"
-            control={control}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Total Pagado (ARS)"
-                type="number"
-                size="small"
-                inputProps={{ step: 0.01, min: 0 }}
-                error={!!errors.total_pagado}
-                helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si > 0, se crea un pago con la fecha del gasto')}
-              />
-            )}
-          />
-        </Grid>
+        {/* Pagado completo — solo en alta */}
+        {!isEditing && (
+          <Grid item xs={12}>
+            <Controller
+              name="pagado_completo"
+              control={control}
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={!!field.value}
+                      onChange={e => {
+                        field.onChange(e.target.checked)
+                        if (e.target.checked) setValue('total_pagado', 0)
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">Ya fue pagado en su totalidad (se registra un pago automático por el total al guardar)</Typography>}
+                />
+              )}
+            />
+          </Grid>
+        )}
+
+        {/* Total pagado — oculto si está marcado "pagado completo" */}
+        {!(pagadoCompleto && !isEditing) && (
+          <Grid item xs={12} sm={6}>
+            <Controller
+              name="total_pagado"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  label="Total Pagado (ARS)"
+                  type="number"
+                  size="small"
+                  inputProps={{ step: 0.01, min: 0 }}
+                  error={!!errors.total_pagado}
+                  helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si > 0, se crea un pago con la fecha del gasto')}
+                />
+              )}
+            />
+          </Grid>
+        )}
 
         {/* Pasaje / Préstamo — solo en edición */}
         {isEditing && (
