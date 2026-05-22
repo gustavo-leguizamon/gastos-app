@@ -223,8 +223,10 @@ La propagación está envuelta en try/catch — si falla, el pago original se ma
 
 Para evitar que el mismo gasto/sub-item se cargue con descripciones distintas en diferentes períodos (y que el matching del estimado próximo mes pierda matches), los campos "Descripción" de `GastoForm` y `GastoItemDialog` (alta + edición inline) usan `Autocomplete` de MUI con `freeSolo`:
 
-- `GastoForm`: opciones desde `GET /api/gastos/descripciones` (todas las descripciones distintas de gastos).
-- `GastoItemDialog`: opciones desde `GET /api/items/descripciones?parent=<gasto.descripcion>` (descripciones de sub-items cuyo gasto padre tenga esa misma descripción, case-insensitive). Se refetchea cuando cambia `gasto.descripcion`.
+- `GastoForm`: opciones desde `GET /api/gastos/descripciones`.
+- `GastoItemDialog`: opciones desde `GET /api/items/descripciones` (el parámetro `?parent=...` se sigue enviando pero el endpoint lo ignora).
+
+Ambos endpoints devuelven la **misma unión**: `gastos.descripcion ∪ gastoItem.descripcion`, distintos, ordenados con `localeCompare('es', { sensitivity: 'base' })`. La idea es que al cargar un gasto te sugiera también descripciones existentes de sub-items (y viceversa), para mantener consistencia de naming. La implementación hace 2 queries paralelas a Prisma con `distinct: ['descripcion']` y deduplica con `Set` en memoria — barato para datasets personales y mucho más útil que separar gastos vs items.
 
 `freeSolo` permite que el usuario tipee algo nuevo si no existe en las sugerencias, pero el listado dropdown filtra por substring mientras se escribe, así puede elegir una descripción existente con un click.
 
@@ -274,8 +276,8 @@ Ambos dialogs propagan al body los campos de tarjeta del resumen (`es_tarjeta`, 
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) |
 | `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
-| `GET /api/gastos/descripciones` | Lista de descripciones distintas de gastos (para autocompletar) |
-| `GET /api/items/descripciones` | Lista de descripciones distintas de sub-items. Acepta `?parent=<descripcion>` para filtrar por descripción del gasto padre (case-insensitive) |
+| `GET /api/gastos/descripciones` | Unión de descripciones distintas de gastos y sub-items (para autocompletar). |
+| `GET /api/items/descripciones` | Alias — devuelve exactamente lo mismo que `/api/gastos/descripciones`. El parámetro `?parent=...` se acepta pero se ignora (kept for backward-compat). |
 | `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes its movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos for an inversion |
