@@ -200,17 +200,18 @@ Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` 
 
 - El select de **Tarjeta** se muestra siempre (independiente del `tipo_pago`).
 - La **descripción** se bloquea y se sincroniza automáticamente con el formato `Nombre (Banco)` de la tarjeta seleccionada (si la tarjeta no tiene banco, solo se usa el `nombre`). Implementado en un `useEffect` que llama `setValue('descripcion', ...)` al cambiar `esTarjeta` o `tarjetaId`.
-- Aparecen 2 campos de fecha opcionales: `fecha_cierre` (`fechaCierre`) y `fecha_proximo_cierre` (`fechaProximoCierre`). El de vencimiento ya existe en todo gasto.
+
+**Cierres de tarjeta** (`TarjetaCierre`): las fechas `fechaCierre`, `fechaVencimiento` y `fechaProximoCierre` que antes vivían en cada gasto "resumen de tarjeta" ahora viven en una tabla aparte `TarjetaCierre` con un registro por `(tarjetaId, mes, anio)` (constraint único). Se cargan/editan en `/configuracion` → Tarjetas → expand de cada tarjeta → sub-accordion "Cierres por mes/año". CRUD vía `/api/tarjetas/[id]/cierres` (GET/POST) y `/api/tarjetas/[id]/cierres/[cierreId]` (PUT/DELETE). Cascade `onDelete: Cascade` al borrar la tarjeta. El gasto "resumen de tarjeta" sigue existiendo como contenedor (con `esTarjeta = true`) pero ya no guarda esas fechas — toda la lógica de propagación las lee desde `TarjetaCierre`. Migración `20260516010000_add_tarjeta_cierre` crea la tabla, backfillea desde los gastos `esTarjeta = true` existentes (un cierre por `(tarjetaId, mes, anio)`, tomando el de menor `id` si hay duplicados), y dropea las columnas `fechaCierre`/`fechaProximoCierre` de `Gasto`.
 
 **Propagación de pagos a la tarjeta** (en `POST /api/gastos/[id]/pagos`, función `propagatePagoToTarjeta`):
 
 1. Solo aplica cuando el **gasto fuente** tiene `tipoPago = 'C'` y `tarjetaId` asignada.
-2. Se busca el "resumen de tarjeta" del **mismo mes/año** que el gasto fuente, filtrando por `esTarjeta = true` y mismo `tarjetaId`. Si no existe, no hay `fechaProximoCierre` y se asume el comportamiento "≤" (target = mes siguiente).
-3. Se determina el **mes destino** comparando `pago.fecha` con `currentCC.fechaProximoCierre`:
+2. Se busca el `TarjetaCierre` del **mismo mes/año** que el gasto fuente (vía constraint único `tarjetaId_mes_anio`). Si no existe o no tiene `fechaProximoCierre`, se asume el comportamiento "≤" (target = mes siguiente).
+3. Se determina el **mes destino** comparando `pago.fecha` con `currentCierre.fechaProximoCierre`:
    - `pago.fecha <= fechaProximoCierre` → target = mes del gasto fuente **+1**.
    - `pago.fecha > fechaProximoCierre` → target = mes del gasto fuente **+2**.
    - El helper `shiftMonth(mes, anio, n)` maneja el rollover de mes/año.
-4. Se busca el resumen de tarjeta del mes destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `descripcion = "Nombre (Banco)"` (o solo `nombre` si la tarjeta no tiene banco), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento = "{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
+4. Se busca el resumen de tarjeta del mes destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `descripcion = "Nombre (Banco)"` (o solo `nombre` si la tarjeta no tiene banco), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento` = `TarjetaCierre.fechaVencimiento` del target si existe, sino `"{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
 5. Se crea un `GastoItem` (sub-item) en ese resumen con `descripcion = gasto fuente.descripcion`, `fecha = pago.fecha`, `monto = pago.monto`, `incluyeEnTotal = true`, `pagoId = pago.id` (FK al pago que originó la propagación), y `categoriaId = gasto fuente.categoriaId` (hereda la categoría del gasto que recibió el pago).
 
 La propagación está envuelta en try/catch — si falla, el pago original se mantiene y el error queda en console. Esta lógica también se dispara desde el flujo de "Total Pagado en gasto nuevo" (`GastoDialog` → `POST /api/gastos/[id]/pagos`).
@@ -246,7 +247,7 @@ Si hay matches abre un `Dialog` con la lista (gastos y sub-items, sub-items marc
 
 Both dialogs call `triggerRefresh()` on completion to reload the full table.
 
-Ambos dialogs propagan al body los campos de tarjeta del resumen (`es_tarjeta`, `fecha_cierre`, `fecha_proximo_cierre`) tal cual los tiene la fila origen — útil para que los gastos que actúan como "resumen de tarjeta" conserven ese estado y sus fechas de cierre al duplicarse. Las fechas se copian tal cual; si querés que reflejen el ciclo del nuevo mes, hay que editarlas a mano en la fila copiada.
+Ambos dialogs propagan al body el flag `es_tarjeta` del origen para que los gastos que actúan como "resumen de tarjeta" conserven ese rol al duplicarse. Las fechas de cierre **ya no se copian** (viven en la tabla `TarjetaCierre` por mes/año, independientes del gasto) — si querés cargar fechas para el nuevo mes, agregalas en `/configuracion` → tarjeta → "Cierres por mes/año".
 
 ### Key domain concepts
 
@@ -274,6 +275,8 @@ Ambos dialogs propagan al body los campos de tarjeta del resumen (`es_tarjeta`, 
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD |
+| `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres de tarjeta (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
+| `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) |
 | `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
 | `GET /api/gastos/descripciones` | Unión de descripciones distintas de gastos y sub-items (para autocompletar). |
@@ -336,6 +339,8 @@ Client components pass `today` as a query param to `/api/resumen` so the server 
 ### Path alias
 
 `@/*` maps to `src/*` (configured in `tsconfig.json`).
+
+
 
 
 

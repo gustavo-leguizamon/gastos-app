@@ -73,8 +73,6 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
           confirmado: false,
           categoria_id: gasto.categoria_id,
           es_tarjeta: gasto.es_tarjeta,
-          fecha_cierre: gasto.fecha_cierre,
-          fecha_proximo_cierre: gasto.fecha_proximo_cierre,
         }),
       })
       if (!res.ok) throw new Error()

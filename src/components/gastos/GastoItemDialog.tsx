@@ -61,7 +61,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
   const [categoriaId, setCategoriaId] = useState<number | null>(null)
-  const [categoriaes, setCategoriaes] = useState<Categoria[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -71,7 +71,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   useEffect(() => {
-    fetch('/api/categorias').then(r => r.json()).then(setCategoriaes)
+    fetch('/api/categorias').then(r => r.json()).then(setCategorias)
   }, [])
 
   useEffect(() => {
@@ -270,7 +270,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                 onChange={e => setCategoriaId(e.target.value === '' ? null : Number(e.target.value))}
               >
                 <MenuItem value="">Sin especificar</MenuItem>
-                {categoriaes.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -349,7 +349,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         onChange={e => setEditing(p => p ? { ...p, categoria_id: e.target.value === '' ? null : Number(e.target.value) } : p)}
                       >
                         <MenuItem value="">Sin especificar</MenuItem>
-                        {categoriaes.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                        {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
                       </Select>
                     </FormControl>
                     <Box sx={{ display: 'flex', gap: 2 }}>

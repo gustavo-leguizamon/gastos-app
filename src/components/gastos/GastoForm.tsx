@@ -47,8 +47,6 @@ const schema = yup.object({
   confirmado: yup.boolean().required().default(true),
   categoria_id: yup.number().nullable().optional(),
   es_tarjeta: yup.boolean().required().default(false),
-  fecha_cierre: yup.string().nullable().optional(),
-  fecha_proximo_cierre: yup.string().nullable().optional(),
   pagado_completo: yup.boolean().required().default(false),
 })
 
@@ -64,7 +62,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [casas, setCasas] = useState<Casa[]>([])
   const [monedas, setMonedas] = useState<Moneda[]>([])
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
-  const [categoriaes, setCategoriaes] = useState<Categoria[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [usaCuotas, setUsaCuotas] = useState<boolean>(!!(gasto?.cuota_actual ?? gasto?.cuotas_totales))
   const now = new Date()
@@ -91,8 +89,6 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       confirmado: gasto?.confirmado ?? true,
       categoria_id: gasto?.categoria_id ?? null,
       es_tarjeta: gasto?.es_tarjeta ?? false,
-      fecha_cierre: gasto?.fecha_cierre ?? null,
-      fecha_proximo_cierre: gasto?.fecha_proximo_cierre ?? null,
       pagado_completo: true,
     },
   })
@@ -108,7 +104,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       setCasas(c)
       setMonedas(m)
       setTarjetas(t)
-      setCategoriaes(l)
+      setCategorias(l)
       setDescripciones(Array.isArray(d) ? d : [])
       if (!gasto) {
         if (c.length === 1) setValue('casa_id', c[0].id)
@@ -185,13 +181,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             render={({ field }) => (
               <AppToggle
                 checked={!!field.value}
-                onChange={e => {
-                  field.onChange(e.target.checked)
-                  if (!e.target.checked) {
-                    setValue('fecha_cierre', null)
-                    setValue('fecha_proximo_cierre', null)
-                  }
-                }}
+                onChange={e => field.onChange(e.target.checked)}
                 label={<Typography variant="body2">Este gasto es una tarjeta de crédito (resumen del mes)</Typography>}
               />
             )}
@@ -276,45 +266,6 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
               )}
             />
           </Grid>
-        )}
-
-        {/* Fecha cierre y próximo cierre — solo si es resumen de tarjeta */}
-        {esTarjeta && (
-          <>
-            <Grid item xs={12} sm={6}>
-              <Controller
-                name="fecha_cierre"
-                control={control}
-                render={({ field }) => (
-                  <AppDateField
-                    {...field}
-                    value={field.value ?? ''}
-                    fullWidth
-                    label="Fecha de cierre (opcional)"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Controller
-                name="fecha_proximo_cierre"
-                control={control}
-                render={({ field }) => (
-                  <AppDateField
-                    {...field}
-                    value={field.value ?? ''}
-                    fullWidth
-                    label="Fecha de próximo cierre (opcional)"
-                    size="small"
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Si un pago crédito tiene fecha ≤ esta, se propaga al mes siguiente; si es mayor, al subsiguiente"
-                  />
-                )}
-              />
-            </Grid>
-          </>
         )}
 
         {/* Moneda */}
@@ -569,7 +520,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                   onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
                 >
                   <MenuItem value="">Sin especificar</MenuItem>
-                  {categoriaes.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
+                  {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
                 </Select>
               </FormControl>
             )}

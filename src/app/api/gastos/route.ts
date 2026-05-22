@@ -40,8 +40,6 @@ function toGastoResponse(g: any) {
     notas: g.notas,
     confirmado: g.confirmado,
     es_tarjeta: g.esTarjeta ?? false,
-    fecha_cierre: g.fechaCierre ?? null,
-    fecha_proximo_cierre: g.fechaProximoCierre ?? null,
     created_at: g.createdAt?.toISOString(),
     updated_at: g.updatedAt?.toISOString(),
     pagos,
@@ -112,8 +110,6 @@ export async function POST(req: NextRequest) {
       confirmado: body.confirmado ?? true,
       categoriaId: body.categoria_id ?? null,
       esTarjeta: body.es_tarjeta ?? false,
-      fechaCierre: body.fecha_cierre || null,
-      fechaProximoCierre: body.fecha_proximo_cierre || null,
     },
     include: INCLUDE,
   })

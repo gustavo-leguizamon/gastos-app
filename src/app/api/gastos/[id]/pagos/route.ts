@@ -32,19 +32,17 @@ async function propagatePagoToTarjeta(opts: {
   if (source.tipoPago !== 'C') return
   if (!source.tarjetaId) return
 
-  // CC gasto del mes/año del source para esa tarjeta
-  const currentCC = await prisma.gasto.findFirst({
+  // Cierre del mes/año del source — define la "fecha próximo cierre" usada para decidir
+  // si el pago se propaga a +1 o +2 meses.
+  const currentCierre = await prisma.tarjetaCierre.findUnique({
     where: {
-      esTarjeta: true,
-      tarjetaId: source.tarjetaId,
-      mes: source.mes,
-      anio: source.anio,
+      tarjetaId_mes_anio: { tarjetaId: source.tarjetaId, mes: source.mes, anio: source.anio },
     },
   })
 
   // Si payment.fecha <= fechaProximoCierre → target = source +1 ; else → +2
-  // Si no hay fechaProximoCierre, default = +1.
-  const proximo = currentCC?.fechaProximoCierre ?? null
+  // Si no hay TarjetaCierre o no tiene fechaProximoCierre, default = +1.
+  const proximo = currentCierre?.fechaProximoCierre ?? null
   const shift = proximo && opts.fecha > proximo ? 2 : 1
   const target = shiftMonth(source.mes, source.anio, shift)
 
@@ -67,7 +65,13 @@ async function propagatePagoToTarjeta(opts: {
     const ars = await prisma.moneda.findFirst({ where: { codigo: 'ARS' } })
     if (!ars) return
 
-    const defaultVenc = `${target.anio}-${String(target.mes).padStart(2, '0')}-01`
+    // Si existe un TarjetaCierre del target con fechaVencimiento, usamos ese; sino default al día 1.
+    const targetCierre = await prisma.tarjetaCierre.findUnique({
+      where: {
+        tarjetaId_mes_anio: { tarjetaId: source.tarjetaId, mes: target.mes, anio: target.anio },
+      },
+    })
+    const defaultVenc = targetCierre?.fechaVencimiento || `${target.anio}-${String(target.mes).padStart(2, '0')}-01`
     targetCC = await prisma.gasto.create({
       data: {
         casaId: source.casaId,

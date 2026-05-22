@@ -31,6 +31,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
+import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import type { Casa, Categoria, Moneda, Tarjeta } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
@@ -338,13 +339,16 @@ export default function ConfiguracionPage() {
                         </Box>
                       </Box>
                     ) : (
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
-                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                          <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                      <>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                          <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                            <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                          </Box>
                         </Box>
-                      </Box>
+                        <TarjetaCierres tarjetaId={t.id} />
+                      </>
                     )}
                   </ListItem>
                 ))}

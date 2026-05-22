@@ -16,6 +16,18 @@ export interface Tarjeta {
   banco: string | null
 }
 
+export interface TarjetaCierre {
+  id: number
+  tarjeta_id: number
+  mes: number
+  anio: number
+  fecha_cierre: string | null
+  fecha_vencimiento: string | null
+  fecha_proximo_cierre: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Categoria {
   id: number
   nombre: string
@@ -73,8 +85,6 @@ export interface Gasto {
   notas: string | null
   confirmado: boolean
   es_tarjeta: boolean
-  fecha_cierre: string | null
-  fecha_proximo_cierre: string | null
   created_at: string
   updated_at: string
   pagos: Pago[]
@@ -101,8 +111,6 @@ export interface GastoFormData {
   confirmado: boolean
   categoria_id: number | null
   es_tarjeta: boolean
-  fecha_cierre: string | null
-  fecha_proximo_cierre: string | null
   pagado_completo?: boolean
 }
 
