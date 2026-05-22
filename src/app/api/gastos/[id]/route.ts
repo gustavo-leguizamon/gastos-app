@@ -11,6 +11,12 @@ function toGastoResponse(g: any) {
     created_at: p.createdAt?.toISOString(),
   }))
   const totalPagado = Math.round(pagos.reduce((s: number, p: any) => s + p.monto, 0) * 100) / 100
+  const cierreRow = g.tarjeta?.cierres?.find((c: any) => c.mes === g.mes && c.anio === g.anio) ?? null
+  const cierre = cierreRow ? {
+    fecha_cierre: cierreRow.fechaCierre ?? null,
+    fecha_vencimiento: cierreRow.fechaVencimiento ?? null,
+    fecha_proximo_cierre: cierreRow.fechaProximoCierre ?? null,
+  } : null
   return {
     id: g.id,
     casa_id: g.casaId,
@@ -40,6 +46,7 @@ function toGastoResponse(g: any) {
     notas: g.notas,
     confirmado: g.confirmado,
     es_tarjeta: g.esTarjeta ?? false,
+    cierre,
     pagos,
     items: (g.items ?? []).map((i: any) => ({
       id: i.id,
@@ -61,7 +68,7 @@ function toGastoResponse(g: any) {
 const INCLUDE = {
   casa: true,
   moneda: true,
-  tarjeta: true,
+  tarjeta: { include: { cierres: true } },
   categoria: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
   items: { orderBy: { createdAt: 'asc' as const }, include: { categoria: true } },

@@ -85,6 +85,11 @@ export interface Gasto {
   notas: string | null
   confirmado: boolean
   es_tarjeta: boolean
+  cierre?: {
+    fecha_cierre: string | null
+    fecha_vencimiento: string | null
+    fecha_proximo_cierre: string | null
+  } | null
   created_at: string
   updated_at: string
   pagos: Pago[]

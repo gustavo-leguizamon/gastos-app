@@ -178,7 +178,24 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
               </Tooltip>
             )}
             {row.es_tarjeta && (
-              <Tooltip arrow title="Resumen de tarjeta — las fechas de cierre se configuran en /configuracion">
+              <Tooltip
+                arrow
+                title={
+                  row.cierre ? (
+                    <Box>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Cierre:</strong> {row.cierre.fecha_cierre || '—'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Vencimiento:</strong> {row.cierre.fecha_vencimiento || '—'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Próximo cierre:</strong> {row.cierre.fecha_proximo_cierre || '—'}
+                      </Typography>
+                    </Box>
+                  ) : 'Sin cierre cargado para este mes/año — configurarlo en /configuracion'
+                }
+              >
                 <CreditCardIcon sx={{ fontSize: 16, color: 'primary.main', ml: 0.5 }} />
               </Tooltip>
             )}
