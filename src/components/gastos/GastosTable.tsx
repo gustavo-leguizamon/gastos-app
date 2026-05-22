@@ -14,7 +14,7 @@ import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
-import Checkbox from '@mui/material/Checkbox'
+import Switch from '@mui/material/Switch'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import EditIcon from '@mui/icons-material/Edit'
@@ -375,21 +375,19 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         if (row._type === 'item') return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Tooltip title={row._incluye_en_total ? 'Incluido en total' : 'Excluido del total'}>
-              <Checkbox
+              <Switch
                 size="small"
                 checked={!!row._incluye_en_total}
                 onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_total', e.target.checked)}
                 onClick={(e) => e.stopPropagation()}
-                sx={{ p: 0.5 }}
               />
             </Tooltip>
             <Tooltip title={row._incluye_en_vencimiento ? 'Incluido en vencimientos' : 'Excluido de vencimientos'}>
-              <Checkbox
+              <Switch
                 size="small"
                 checked={!!row._incluye_en_vencimiento}
                 onChange={(e) => handleToggleItemField(row._parentId, row._itemId, 'incluye_en_vencimiento', e.target.checked)}
                 onClick={(e) => e.stopPropagation()}
-                sx={{ p: 0.5 }}
               />
             </Tooltip>
           </Box>
@@ -685,19 +683,17 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
               {item.categoria_nombre && <Typography variant="caption" color="text.disabled">📍 {item.categoria_nombre}</Typography>}
               <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Tooltip title="Incluido en total">
-                  <Checkbox
+                  <Switch
                     size="small"
                     checked={!!item.incluye_en_total}
                     onChange={(e) => handleToggleItemField(g.id, item.id, 'incluye_en_total', e.target.checked)}
-                    sx={{ p: 0.25 }}
                   />
                 </Tooltip>
                 <Tooltip title="Incluido en vencimientos">
-                  <Checkbox
+                  <Switch
                     size="small"
                     checked={!!item.incluye_en_vencimiento}
                     onChange={(e) => handleToggleItemField(g.id, item.id, 'incluye_en_vencimiento', e.target.checked)}
-                    sx={{ p: 0.25 }}
                   />
                 </Tooltip>
               </Box>

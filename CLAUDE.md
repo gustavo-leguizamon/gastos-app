@@ -90,7 +90,7 @@ The app has dedicated mobile layouts at `theme.breakpoints.down('sm')` (≤600px
 - **`GastoItemDialog`**: `fullScreen` on `<md`. The two-column layout (340px left + flex right) becomes vertical stack on `<md` — resumen + form on top, items list below.
 - **`PagoDialog`**: the "Registrar pago" form (Fecha + Monto + Button) stacks vertically on `<sm`, same with the inline-edit row.
 - **`CopiarMesDialog`**: origen/destino stack vertically on `<sm`; the `ArrowForwardIcon` swaps to `ArrowDownwardIcon`.
-- **`inversiones/page.tsx`**: the movimientos `AppDataGrid` is replaced by a vertical list of cards on `<sm` (sorted by fecha desc to match the default DataGrid sort). The new-movimiento form also stacks vertically on `<sm`.
+- **`inversiones/page.tsx`**: the movimientos `AppDataGrid` is replaced by a vertical list of cards on `<sm`. The mobile cards iterate `rows` directly (which is already in fecha desc + id desc order, matching the default DataGrid sort) — do **not** re-reverse on mobile. The new-movimiento form also stacks vertically on `<sm`.
 
 When adding new pages or tables, prefer the same pattern: build a card-based mobile view rather than letting DataGrid scroll horizontally.
 
@@ -319,6 +319,8 @@ The `document` keydown listener in `AppDataGrid` only fires if the selected row 
 **`AppTextField` (`src/components/shared/AppTextField.tsx`):** wrapper genérico de MUI `TextField` que auto-selecciona el contenido del input al recibir foco (`e.target.select()` con `setTimeout(0)` para ganarle al cursor que pone el navegador). Mantiene la API completa de `TextField`. Todos los formularios de la app importan `TextField` desde este path en vez de `@mui/material/TextField`. Si en un caso puntual no se quiere ese comportamiento, pasar `autoSelectOnFocus={false}` o un `onFocus` propio. Si necesitás el TextField "crudo" sin auto-selección (caso muy raro), importá `@mui/material/TextField` directamente.
 
 **`AppDateField` (`src/components/shared/AppDateField.tsx`):** wrapper genérico de MUI `TextField` para inputs de fecha. Setea `type="date"` e `InputLabelProps.shrink=true` por defecto, y abre el calendario nativo al recibir foco vía `HTMLInputElement.showPicker()` (envuelto en try/catch porque no está soportado en todos los browsers). El usuario igualmente puede tipear la fecha manualmente. Todos los inputs de fecha de la app (gastos: `GastoForm`, `GastoItemDialog`, `PagoDialog`; inversiones: `inversiones/page.tsx`) deben usar este componente en vez de `<TextField type="date" ... />`.
+
+**`AppToggle` (`src/components/shared/AppToggle.tsx`):** toggle estándar de la app — wrapper de `<FormControlLabel control={<Switch />} label />`. Reemplaza a `Checkbox` en toda la app: todas las opciones booleanas con label se renderizan como Switch (visualmente: deslizador en vez de cuadradito). Acepta todas las props de `Switch` (incluido `size`, `color`) más `label` y `labelPlacement`. Usado en: `GastoForm` (es_tarjeta, pagado_completo, usa_cuotas, confirmado), `GastoItemDialog` (incluir_en_total, incluir_en_vencimiento — alta y edición), `configuracion/page.tsx` (settings de estimación). Para toggles **sin label** (ej. inline en celdas de `GastosTable` o cards mobile), usar `<Switch size="small" />` de MUI directamente — el wrapper solo aplica cuando hay label.
 
 ### Dates and timezones
 

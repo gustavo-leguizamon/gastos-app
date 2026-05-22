@@ -365,7 +365,7 @@ export default function InversionesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                [...rows].reverse().map((row) => {
+                rows.map((row) => {
                   const cambio = row.cambio
                   const cambioColor = cambio == null ? 'text.disabled' : cambio > 0 ? 'success.main' : cambio < 0 ? 'error.main' : 'text.secondary'
                   const sign = cambio == null ? '' : cambio > 0 ? '+' : ''

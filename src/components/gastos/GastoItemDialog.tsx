@@ -13,8 +13,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import CircularProgress from '@mui/material/CircularProgress'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Checkbox from '@mui/material/Checkbox'
+import AppToggle from '@/components/shared/AppToggle'
 import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
@@ -275,12 +274,12 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <FormControlLabel
-                control={<Checkbox size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)} />}
+              <AppToggle
+                size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)}
                 label={<Typography variant="caption">Incluir en total</Typography>}
               />
-              <FormControlLabel
-                control={<Checkbox size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)} />}
+              <AppToggle
+                size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)}
                 label={<Typography variant="caption">Incluir en vencimiento</Typography>}
               />
             </Box>
@@ -354,12 +353,12 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                       </Select>
                     </FormControl>
                     <Box sx={{ display: 'flex', gap: 2 }}>
-                      <FormControlLabel
-                        control={<Checkbox size="small" checked={editing.incluye_en_total} onChange={e => setEditing(p => p ? { ...p, incluye_en_total: e.target.checked } : p)} />}
+                      <AppToggle
+                        size="small" checked={editing.incluye_en_total} onChange={e => setEditing(p => p ? { ...p, incluye_en_total: e.target.checked } : p)}
                         label={<Typography variant="caption">Incluir en total</Typography>}
                       />
-                      <FormControlLabel
-                        control={<Checkbox size="small" checked={editing.incluye_en_vencimiento} onChange={e => setEditing(p => p ? { ...p, incluye_en_vencimiento: e.target.checked } : p)} />}
+                      <AppToggle
+                        size="small" checked={editing.incluye_en_vencimiento} onChange={e => setEditing(p => p ? { ...p, incluye_en_vencimiento: e.target.checked } : p)}
                         label={<Typography variant="caption">Incluir en vencimiento</Typography>}
                       />
                     </Box>

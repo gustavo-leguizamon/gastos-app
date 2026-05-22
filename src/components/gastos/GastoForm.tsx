@@ -17,8 +17,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import FormHelperText from '@mui/material/FormHelperText'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Checkbox from '@mui/material/Checkbox'
+import AppToggle from '@/components/shared/AppToggle'
 import type { Casa, Moneda, Tarjeta, Categoria, Gasto, GastoFormData } from '@/lib/types'
 
 const schema = yup.object({
@@ -184,19 +183,15 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="es_tarjeta"
             control={control}
             render={({ field }) => (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={!!field.value}
-                    onChange={e => {
-                      field.onChange(e.target.checked)
-                      if (!e.target.checked) {
-                        setValue('fecha_cierre', null)
-                        setValue('fecha_proximo_cierre', null)
-                      }
-                    }}
-                  />
-                }
+              <AppToggle
+                checked={!!field.value}
+                onChange={e => {
+                  field.onChange(e.target.checked)
+                  if (!e.target.checked) {
+                    setValue('fecha_cierre', null)
+                    setValue('fecha_proximo_cierre', null)
+                  }
+                }}
                 label={<Typography variant="body2">Este gasto es una tarjeta de crédito (resumen del mes)</Typography>}
               />
             )}
@@ -402,16 +397,12 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
               name="pagado_completo"
               control={control}
               render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={!!field.value}
-                      onChange={e => {
-                        field.onChange(e.target.checked)
-                        if (e.target.checked) setValue('total_pagado', 0)
-                      }}
-                    />
-                  }
+                <AppToggle
+                  checked={!!field.value}
+                  onChange={e => {
+                    field.onChange(e.target.checked)
+                    if (e.target.checked) setValue('total_pagado', 0)
+                  }}
                   label={<Typography variant="body2">Ya fue pagado en su totalidad (se registra un pago automático por el total al guardar)</Typography>}
                 />
               )}
@@ -486,19 +477,15 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
 
         {/* Toggle: usa cuotas */}
         <Grid item xs={12}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={usaCuotas}
-                onChange={e => {
-                  setUsaCuotas(e.target.checked)
-                  if (!e.target.checked) {
-                    setValue('cuota_actual', null)
-                    setValue('cuotas_totales', null)
-                  }
-                }}
-              />
-            }
+          <AppToggle
+            checked={usaCuotas}
+            onChange={e => {
+              setUsaCuotas(e.target.checked)
+              if (!e.target.checked) {
+                setValue('cuota_actual', null)
+                setValue('cuotas_totales', null)
+              }
+            }}
             label={<Typography variant="body2">Pago en cuotas</Typography>}
           />
         </Grid>
@@ -595,14 +582,10 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="confirmado"
             control={control}
             render={({ field }) => (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={!!field.value}
-                    onChange={e => field.onChange(e.target.checked)}
-                    color="warning"
-                  />
-                }
+              <AppToggle
+                checked={!!field.value}
+                onChange={e => field.onChange(e.target.checked)}
+                color="warning"
                 label={
                   <Box>
                     <Typography variant="body2">Gasto confirmado</Typography>

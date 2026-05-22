@@ -22,8 +22,7 @@ import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Switch from '@mui/material/Switch'
+import AppToggle from '@/components/shared/AppToggle'
 import Tooltip from '@mui/material/Tooltip'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -431,22 +430,14 @@ export default function ConfiguracionPage() {
                 </FormControl>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.estim_incluir_cuotas_vigentes}
-                      onChange={e => setSettings(p => ({ ...p, estim_incluir_cuotas_vigentes: e.target.checked }))}
-                    />
-                  }
+                <AppToggle
+                  checked={settings.estim_incluir_cuotas_vigentes}
+                  onChange={e => setSettings(p => ({ ...p, estim_incluir_cuotas_vigentes: e.target.checked }))}
                   label={<Typography variant="body2">Sumar directamente cuotas vigentes (sin promediar)</Typography>}
                 />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.estim_excluir_ultima_cuota}
-                      onChange={e => setSettings(p => ({ ...p, estim_excluir_ultima_cuota: e.target.checked }))}
-                    />
-                  }
+                <AppToggle
+                  checked={settings.estim_excluir_ultima_cuota}
+                  onChange={e => setSettings(p => ({ ...p, estim_excluir_ultima_cuota: e.target.checked }))}
                   label={<Typography variant="body2">Excluir gastos cuya cuota actual sea la última</Typography>}
                 />
               </Box>
