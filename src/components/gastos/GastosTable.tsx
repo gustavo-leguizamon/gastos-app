@@ -539,9 +539,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           {/* Header: descripción + menu */}
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
                 {g.confirmado === false && (
                   <WarningAmberIcon sx={{ fontSize: 14, color: '#f59e0b', flexShrink: 0 }} />
+                )}
+                {(g.tarjeta_id || g.es_tarjeta) && (
+                  <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>
+                    <BrandLogo marca={g.tarjeta_marca} width={28} height={20} />
+                  </Box>
                 )}
                 <Typography variant="body2" fontWeight={600} sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {g.descripcion}
