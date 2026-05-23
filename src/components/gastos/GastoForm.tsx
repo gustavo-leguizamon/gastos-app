@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import TarjetaLogo from '@/components/shared/TarjetaLogo'
+import BrandLogo from '@/components/shared/BrandLogo'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -263,7 +263,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                     {tarjetas.map(t => (
                       <MenuItem key={t.id} value={t.id}>
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                          <TarjetaLogo marca={t.marca} size={20} />
+                          <BrandLogo marca={t.marca} width={30} height={22} />
                           <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
                         </Box>
                       </MenuItem>

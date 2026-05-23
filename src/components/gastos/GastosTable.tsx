@@ -28,7 +28,7 @@ import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRig
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
-import TarjetaLogo from '@/components/shared/TarjetaLogo'
+import BrandLogo from '@/components/shared/BrandLogo'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -198,7 +198,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 }
               >
                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}>
-                  <TarjetaLogo marca={row.tarjeta_marca} size={18} />
+                  <BrandLogo marca={row.tarjeta_marca} width={30} height={22} />
                 </Box>
               </Tooltip>
             )}

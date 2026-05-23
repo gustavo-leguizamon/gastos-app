@@ -45,7 +45,8 @@
       "Bash(echo. *)",
       "Bash(powershell *)",
       "PowerShell(\\(Get-Content 'C:\\\\Users\\\\GustavoLeguizamon\\\\Desktop\\\\app\\\\gapp\\\\gastos-app\\\\src\\\\app\\\\configuracion\\\\page.tsx' | Measure-Object -Line\\).Lines)",
-      "Bash(dir *)"
+      "Bash(dir *)",
+      "PowerShell(Add-Content *)"
     ]
   },
   "hooks": {
