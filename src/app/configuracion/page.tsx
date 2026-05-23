@@ -361,39 +361,49 @@ export default function ConfiguracionPage() {
                           <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingTarjeta(null)}>Cancelar</Button>
                         </Box>
                       </Box>
-                    ) : (
-                      <>
-                        {(() => {
-                          const accent = marcaColor(t.marca) ?? '#6366f1'
-                          return (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 1,
-                                px: 1.5,
-                                py: 1,
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: `${accent}55`,
-                                bgcolor: `${accent}10`,
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                                <BrandLogo marca={t.marca} width={44} height={32} />
-                                <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
-                              </Box>
-                              <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                                <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
-                                <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
-                              </Box>
+                    ) : (() => {
+                      const accent = marcaColor(t.marca) ?? '#6366f1'
+                      return (
+                        <Accordion
+                          disableGutters
+                          TransitionProps={{ unmountOnExit: true }}
+                          sx={{
+                            width: '100%',
+                            boxShadow: 'none',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: `${accent}55`,
+                            bgcolor: `${accent}10`,
+                            '&:before': { display: 'none' },
+                            '&.Mui-expanded': { margin: 0 },
+                          }}
+                        >
+                          <AccordionSummary
+                            sx={{
+                              px: 1.5,
+                              minHeight: 0,
+                              '& .MuiAccordionSummary-content': { my: 1, alignItems: 'center', justifyContent: 'space-between', gap: 1 },
+                              '& .MuiAccordionSummary-content.Mui-expanded': { my: 1 },
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                              <BrandLogo marca={t.marca} width={44} height={32} />
+                              <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
                             </Box>
-                          )
-                        })()}
-                        <TarjetaCierres tarjetaId={t.id} />
-                      </>
-                    )}
+                            <Box
+                              sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
+                              <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                            </Box>
+                          </AccordionSummary>
+                          <AccordionDetails sx={{ px: 1.5, pt: 0 }}>
+                            <TarjetaCierres tarjetaId={t.id} />
+                          </AccordionDetails>
+                        </Accordion>
+                      )
+                    })()}
                   </ListItem>
                 ))}
               </List>

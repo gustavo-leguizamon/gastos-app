@@ -1,10 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Accordion from '@mui/material/Accordion'
-import AccordionSummary from '@mui/material/AccordionSummary'
-import AccordionDetails from '@mui/material/AccordionDetails'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -41,16 +37,15 @@ const emptyForm = (): FormState => ({
 
 export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
   const [cierres, setCierres] = useState<TarjetaCierre[]>([])
-  const [loaded, setLoaded] = useState(false)
   const [form, setForm] = useState<FormState>(emptyForm())
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const load = () =>
     fetch(`/api/tarjetas/${tarjetaId}/cierres`)
       .then(r => r.json())
-      .then(data => { setCierres(data); setLoaded(true) })
+      .then(setCierres)
 
-  const handleExpand = (_: any, expanded: boolean) => { if (expanded && !loaded) load() }
+  useEffect(() => { load() }, [tarjetaId])
 
   const resetForm = () => { setForm(emptyForm()); setEditingId(null) }
 
@@ -114,73 +109,58 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
   }
 
   return (
-    <Accordion
-      onChange={handleExpand}
-      sx={{
-        boxShadow: 'none',
-        bgcolor: 'transparent',
-        '&:before': { display: 'none' },
-        '& .MuiAccordionSummary-root': { minHeight: 36, px: 0 },
-        '& .MuiAccordionSummary-content': { my: 0.5 },
-        '& .MuiAccordionDetails-root': { px: 0, pt: 0 },
-      }}
-    >
-      <AccordionSummary expandIcon={<ExpandMoreIcon fontSize="small" />}>
-        <Typography variant="caption" color="text.secondary">Cierres por mes/año</Typography>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
-              select size="small" label="Mes" sx={{ flex: 1 }}
-              SelectProps={{ native: true }}
-              value={form.mes}
-              onChange={e => setForm(p => ({ ...p, mes: Number(e.target.value) }))}
-            >
-              {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-            </TextField>
-            <TextField
-              size="small" type="number" label="Año" sx={{ flex: 1 }}
-              value={form.anio}
-              onChange={e => setForm(p => ({ ...p, anio: Number(e.target.value) || p.anio }))}
-            />
-          </Box>
-          <AppDateField size="small" label="Fecha de cierre" value={form.fecha_cierre} onChange={e => setForm(p => ({ ...p, fecha_cierre: e.target.value }))} />
-          <AppDateField size="small" label="Fecha de vencimiento" value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
-          <AppDateField size="small" label="Fecha de próximo cierre" value={form.fecha_proximo_cierre} onChange={e => setForm(p => ({ ...p, fecha_proximo_cierre: e.target.value }))} />
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button size="small" variant="contained" startIcon={editingId ? <CheckIcon /> : <AddIcon />} onClick={handleSubmit}>
-              {editingId ? 'Guardar' : 'Agregar'}
-            </Button>
-            {editingId && (
-              <Button size="small" startIcon={<CloseIcon />} onClick={resetForm}>Cancelar</Button>
-            )}
-          </Box>
+    <Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            select size="small" label="Mes" sx={{ flex: 1 }}
+            SelectProps={{ native: true }}
+            value={form.mes}
+            onChange={e => setForm(p => ({ ...p, mes: Number(e.target.value) }))}
+          >
+            {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </TextField>
+          <TextField
+            size="small" type="number" label="Año" sx={{ flex: 1 }}
+            value={form.anio}
+            onChange={e => setForm(p => ({ ...p, anio: Number(e.target.value) || p.anio }))}
+          />
         </Box>
+        <AppDateField size="small" label="Fecha de cierre" value={form.fecha_cierre} onChange={e => setForm(p => ({ ...p, fecha_cierre: e.target.value }))} />
+        <AppDateField size="small" label="Fecha de vencimiento" value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
+        <AppDateField size="small" label="Fecha de próximo cierre" value={form.fecha_proximo_cierre} onChange={e => setForm(p => ({ ...p, fecha_proximo_cierre: e.target.value }))} />
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button size="small" variant="contained" startIcon={editingId ? <CheckIcon /> : <AddIcon />} onClick={handleSubmit}>
+            {editingId ? 'Guardar' : 'Agregar'}
+          </Button>
+          {editingId && (
+            <Button size="small" startIcon={<CloseIcon />} onClick={resetForm}>Cancelar</Button>
+          )}
+        </Box>
+      </Box>
 
-        <Divider sx={{ mb: 1 }} />
+      <Divider sx={{ mb: 1 }} />
 
-        {cierres.length === 0 ? (
-          <Typography variant="caption" color="text.disabled">Aún no hay cierres cargados.</Typography>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            {cierres.map(c => (
-              <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Box sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="body2" fontWeight={600}>{MESES[c.mes - 1]} {c.anio}</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    Cierre: {c.fecha_cierre || '—'} · Venc: {c.fecha_vencimiento || '—'} · Próx: {c.fecha_proximo_cierre || '—'}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                  <IconButton size="small" onClick={() => handleEdit(c)}><EditIcon fontSize="small" /></IconButton>
-                  <IconButton size="small" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton>
-                </Box>
+      {cierres.length === 0 ? (
+        <Typography variant="caption" color="text.disabled">Aún no hay cierres cargados.</Typography>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {cierres.map(c => (
+            <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="body2" fontWeight={600}>{MESES[c.mes - 1]} {c.anio}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Cierre: {c.fecha_cierre || '—'} · Venc: {c.fecha_vencimiento || '—'} · Próx: {c.fecha_proximo_cierre || '—'}
+                </Typography>
               </Box>
-            ))}
-          </Box>
-        )}
-      </AccordionDetails>
-    </Accordion>
+              <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                <IconButton size="small" onClick={() => handleEdit(c)}><EditIcon fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
   )
 }
