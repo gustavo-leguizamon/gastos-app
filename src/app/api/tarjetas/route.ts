@@ -7,7 +7,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { nombre, banco } = await req.json()
-  const tarjeta = await prisma.tarjeta.create({ data: { nombre, banco: banco || null } })
+  const { nombre, banco, marca } = await req.json()
+  const tarjeta = await prisma.tarjeta.create({ data: { nombre, banco: banco || null, marca: marca || null } })
   return NextResponse.json(tarjeta, { status: 201 })
 }

@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { nombre, banco } = await req.json()
-  const tarjeta = await prisma.tarjeta.update({ where: { id: Number(params.id) }, data: { nombre, banco: banco || null } })
+  const { nombre, banco, marca } = await req.json()
+  const tarjeta = await prisma.tarjeta.update({
+    where: { id: Number(params.id) },
+    data: { nombre, banco: banco || null, marca: marca || null },
+  })
   return NextResponse.json(tarjeta)
 }
 

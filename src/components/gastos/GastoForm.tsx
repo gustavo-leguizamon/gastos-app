@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import TarjetaLogo from '@/components/shared/TarjetaLogo'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -259,7 +260,14 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                   <InputLabel>Tarjeta{tipoPago === 'C' ? '' : ' (opcional)'}</InputLabel>
                   <Select {...field} label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
                     {tipoPago !== 'C' && <MenuItem value="">Sin especificar</MenuItem>}
-                    {tarjetas.map(t => <MenuItem key={t.id} value={t.id}>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</MenuItem>)}
+                    {tarjetas.map(t => (
+                      <MenuItem key={t.id} value={t.id}>
+                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                          <TarjetaLogo marca={t.marca} size={20} />
+                          <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
+                        </Box>
+                      </MenuItem>
+                    ))}
                   </Select>
                   {errors.tarjeta_id && <FormHelperText>{errors.tarjeta_id.message}</FormHelperText>}
                 </FormControl>

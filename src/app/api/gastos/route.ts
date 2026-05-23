@@ -37,6 +37,7 @@ function toGastoResponse(g: any) {
     tarjeta_id: g.tarjetaId,
     tarjeta_nombre: g.tarjeta?.nombre ?? null,
     tarjeta_banco: g.tarjeta?.banco ?? null,
+    tarjeta_marca: g.tarjeta?.marca ?? null,
     categoria_id: g.categoriaId ?? null,
     categoria_nombre: g.categoria?.nombre ?? null,
     cuota_actual: g.cuotaActual ?? null,

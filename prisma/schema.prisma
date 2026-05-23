@@ -25,6 +25,7 @@ model Tarjeta {
   id      Int             @id @default(autoincrement())
   nombre  String
   banco   String?
+  marca   String?
   gastos  Gasto[]
   cierres TarjetaCierre[]
 }

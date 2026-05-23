@@ -1,0 +1,1 @@
+ALTER TABLE "Tarjeta" ADD COLUMN "marca" TEXT;

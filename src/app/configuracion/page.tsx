@@ -32,7 +32,9 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
-import type { Casa, Categoria, Moneda, Tarjeta } from '@/lib/types'
+import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
+import BrandLogo from '@/components/shared/BrandLogo'
+import type { Casa, Categoria, Moneda, Tarjeta, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -73,7 +75,7 @@ export default function ConfiguracionPage() {
 
   // Tarjetas
   const { items: tarjetas, add: addTarjeta, update: updateTarjeta, remove: removeTarjeta } = useSimpleCrud<Tarjeta>('/api/tarjetas')
-  const [nuevaTarjeta, setNuevaTarjeta] = useState({ nombre: '', banco: '' })
+  const [nuevaTarjeta, setNuevaTarjeta] = useState<{ nombre: string; banco: string; marca: TarjetaMarca | '' }>({ nombre: '', banco: '', marca: '' })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
   // Categorias
@@ -119,8 +121,11 @@ export default function ConfiguracionPage() {
 
   const handleAddTarjeta = async () => {
     if (!nuevaTarjeta.nombre.trim()) return
-    try { await addTarjeta(nuevaTarjeta); setNuevaTarjeta({ nombre: '', banco: '' }); toast.success('Tarjeta agregada') }
-    catch { toast.error('Error al agregar tarjeta') }
+    try {
+      await addTarjeta({ ...nuevaTarjeta, marca: nuevaTarjeta.marca || null })
+      setNuevaTarjeta({ nombre: '', banco: '', marca: '' })
+      toast.success('Tarjeta agregada')
+    } catch { toast.error('Error al agregar tarjeta') }
   }
 
   const handleSaveTarjeta = async () => {
@@ -323,6 +328,15 @@ export default function ConfiguracionPage() {
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
                 <TextField size="small" label="Nombre de la tarjeta" value={nuevaTarjeta.nombre} onChange={e => setNuevaTarjeta(p => ({ ...p, nombre: e.target.value }))} />
                 <TextField size="small" label="Banco (opcional)" value={nuevaTarjeta.banco} onChange={e => setNuevaTarjeta(p => ({ ...p, banco: e.target.value }))} />
+                <TextField
+                  select size="small" label="Marca (opcional)"
+                  SelectProps={{ native: true }}
+                  value={nuevaTarjeta.marca}
+                  onChange={e => setNuevaTarjeta(p => ({ ...p, marca: e.target.value as TarjetaMarca | '' }))}
+                >
+                  <option value="">—</option>
+                  {MARCAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </TextField>
                 <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTarjeta} size="small">Agregar</Button>
               </Box>
               <Divider sx={{ mb: 1 }} />
@@ -333,6 +347,15 @@ export default function ConfiguracionPage() {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
                         <TextField size="small" label="Nombre" autoFocus value={editingTarjeta.nombre} onChange={e => setEditingTarjeta(p => p ? { ...p, nombre: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveTarjeta(); if (e.key === 'Escape') setEditingTarjeta(null) }} />
                         <TextField size="small" label="Banco (opcional)" value={editingTarjeta.banco ?? ''} onChange={e => setEditingTarjeta(p => p ? { ...p, banco: e.target.value } : p)} onKeyDown={e => { if (e.key === 'Enter') handleSaveTarjeta(); if (e.key === 'Escape') setEditingTarjeta(null) }} />
+                        <TextField
+                          select size="small" label="Marca (opcional)"
+                          SelectProps={{ native: true }}
+                          value={editingTarjeta.marca ?? ''}
+                          onChange={e => setEditingTarjeta(p => p ? { ...p, marca: (e.target.value || null) as TarjetaMarca | null } : p)}
+                        >
+                          <option value="">—</option>
+                          {MARCAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        </TextField>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={handleSaveTarjeta}>Guardar</Button>
                           <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingTarjeta(null)}>Cancelar</Button>
@@ -340,13 +363,34 @@ export default function ConfiguracionPage() {
                       </Box>
                     ) : (
                       <>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
-                          <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                            <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
-                          </Box>
-                        </Box>
+                        {(() => {
+                          const accent = marcaColor(t.marca) ?? '#6366f1'
+                          return (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 1,
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: `${accent}55`,
+                                bgcolor: `${accent}10`,
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                                <BrandLogo marca={t.marca} width={44} height={32} />
+                                <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                              </Box>
+                              <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                                <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
+                                <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                              </Box>
+                            </Box>
+                          )
+                        })()}
                         <TarjetaCierres tarjetaId={t.id} />
                       </>
                     )}

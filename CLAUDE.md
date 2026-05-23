@@ -194,6 +194,14 @@ El botón **Cancelar** cierra el dialog directamente sin pedir confirmación (ll
 - **Pasaje / Préstamo**: solo se renderizan en modo edición (`isEditing = !!gasto`), no aparecen al crear un gasto nuevo.
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (validado por Yup vía `when('tipo_pago', { is: 'C', ... })`). En la UI el select de tarjeta oculta la opción "Sin especificar" y el label pierde el "(opcional)". Si se intenta guardar sin seleccionar tarjeta, aparece un `FormHelperText` con el mensaje "Seleccioná una tarjeta". Cuando `tipo_pago === 'D'`, la tarjeta sigue siendo opcional.
 
+### Logos de marca (Visa, Mastercard, etc.)
+
+Cada `Tarjeta` tiene un campo opcional `marca` (string nullable: `visa | mastercard | amex | diners | discover | jcb | otra`). Se setea en `/configuracion` → Tarjetas → form de alta/edición (select de marca). El render del logo se hace con el componente `TarjetaLogo` (`src/components/shared/TarjetaLogo.tsx`) que usa íconos de `react-icons/fa` (`FaCcVisa`, `FaCcMastercard`, `FaCcAmex`, `FaCcDinersClub`, `FaCcDiscover`, `FaCcJcb`) coloreados con el color institucional de cada marca. Si la marca es `otra` o no está seteada, cae al `CreditCardIcon` genérico de MUI. La constante exportada `MARCAS` lista las opciones para selects (value + label).
+
+`TarjetaLogo` se usa en: configuración de tarjetas (al lado del nombre), `GastoForm` (dentro de cada `MenuItem` del select de Tarjeta), y `GastosTable` (reemplaza al `CreditCardIcon` viejo en gastos `es_tarjeta=true`, dentro del Tooltip de fechas de cierre). Los gastos response exponen `tarjeta_marca?: TarjetaMarca | null` para que la tabla pueda renderizar sin querys extra.
+
+Migración `20260516020000_add_tarjeta_marca` agrega la columna `marca TEXT NULL` a `Tarjeta`.
+
 ### Tarjeta de crédito (resumen de tarjeta) y propagación de pagos
 
 Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` (campo Prisma `esTarjeta`, default `false`). Cuando está activo:
@@ -232,6 +240,20 @@ Para evitar que el mismo gasto/sub-item se cargue con descripciones distintas en
 Ambos endpoints devuelven la **misma unión**: `gastos.descripcion ∪ gastoItem.descripcion`, distintos, ordenados con `localeCompare('es', { sensitivity: 'base' })`. La idea es que al cargar un gasto te sugiera también descripciones existentes de sub-items (y viceversa), para mantener consistencia de naming. La implementación hace 2 queries paralelas a Prisma con `distinct: ['descripcion']` y deduplica con `Set` en memoria — barato para datasets personales y mucho más útil que separar gastos vs items.
 
 `freeSolo` permite que el usuario tipee algo nuevo si no existe en las sugerencias, pero el listado dropdown filtra por substring mientras se escribe, así puede elegir una descripción existente con un click.
+
+### Tarjetas cerradas (dashboard de gastos)
+
+`TarjetasCerradas` (`src/components/gastos/TarjetasCerradas.tsx`) — montado en `/gastos` debajo de `ResumenCards`. Hace `GET /api/tarjetas/cerradas?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como chips/cards las tarjetas cuyo `TarjetaCierre` del mes filtrado tiene `fechaProximoCierre` **menor a hoy**. Cada chip muestra:
+- `<BrandLogo marca={t.marca} width={44} height={32} />` — SVG inline estilizado por marca (rectángulo coloreado + texto blanco para Visa/Amex/etc; círculos rojo+amarillo para Mastercard). Aspect ratio compacto ~1.4:1.
+- Banco (o nombre si no hay banco) como texto principal.
+- `marca` como caption.
+- Tooltip con `fechaCierre`, `fechaVencimiento` y `fechaProximoCierre`.
+
+**Estética unificada con `/configuracion`:** ambos lugares usan el mismo `BrandLogo` con dimensiones idénticas (44x32) y el mismo wrapper outer (borde + `bgcolor` tintados con `marcaColor(t.marca)`). El helper `marcaColor` se exporta desde `TarjetaLogo.tsx`.
+
+Si no hay tarjetas que cumplan la condición, el componente `TarjetasCerradas` no renderiza nada. Refresca con `refreshKey` del store de gastos.
+
+**`BrandLogo` (`src/components/shared/BrandLogo.tsx`):** componente reutilizable que recibe `marca` y devuelve un SVG inline estilizado (viewBox 44x32, relación ~1.4:1). Soporta Visa, Mastercard, Amex, Cabal, Naranja, Diners, Discover, JCB. Fallback a `CreditCardIcon` para marcas no reconocidas. Provee el contraste visual deseado sin depender de assets externos.
 
 ### Vencimientos del día alert
 
@@ -276,9 +298,10 @@ Ambos dialogs propagan al body el flag `es_tarjeta` del origen para que los gast
 | `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
-| `GET/POST /api/tarjetas` | Credit cards CRUD |
+| `GET/POST /api/tarjetas` | Credit cards CRUD (incluye campo opcional `marca`: `visa`/`mastercard`/`amex`/`diners`/`discover`/`jcb`/`otra`) |
 | `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres de tarjeta (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
 | `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
+| `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` seteada y **< today**. Acepta `mes`, `anio`, `today` (YYYY-MM-DD). Devuelve `{ id, nombre, banco, marca, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) |
 | `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
 | `GET /api/gastos/descripciones` | Unión de descripciones distintas de gastos y sub-items (para autocompletar). |

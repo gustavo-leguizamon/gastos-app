@@ -10,10 +10,13 @@ export interface Casa {
   nombre: string
 }
 
+export type TarjetaMarca = 'visa' | 'mastercard' | 'amex' | 'diners' | 'discover' | 'jcb' | 'otra'
+
 export interface Tarjeta {
   id: number
   nombre: string
   banco: string | null
+  marca: TarjetaMarca | null
 }
 
 export interface TarjetaCierre {
@@ -76,6 +79,7 @@ export interface Gasto {
   tarjeta_id: number | null
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
+  tarjeta_marca?: TarjetaMarca | null
   categoria_id: number | null
   categoria_nombre?: string | null
   cuota_actual: number | null
