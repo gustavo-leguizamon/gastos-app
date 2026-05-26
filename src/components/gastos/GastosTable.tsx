@@ -57,6 +57,7 @@ interface Props {
 
 export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
+  const triggerRefresh = useGastosStore(s => s.triggerRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -843,14 +844,22 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         open={pagoGasto !== null}
         gasto={pagoGasto}
         onClose={() => setPagoGasto(null)}
-        onChanged={() => { refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated)); triggerResumenRefresh() }}
+        onChanged={(fullReload) => {
+          refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated))
+          triggerResumenRefresh()
+          if (fullReload) triggerRefresh()
+        }}
       />
 
       <GastoItemDialog
         open={itemGasto !== null}
         gasto={itemGasto}
         onClose={() => setItemGasto(null)}
-        onChanged={() => { refreshGasto(itemGasto!.id, updated => setItemGasto(updated)); triggerResumenRefresh() }}
+        onChanged={(fullReload) => {
+          refreshGasto(itemGasto!.id, updated => setItemGasto(updated))
+          triggerResumenRefresh()
+          if (fullReload) triggerRefresh()
+        }}
       />
 
       <CopiarGastoDialog

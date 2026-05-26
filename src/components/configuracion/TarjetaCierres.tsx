@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -35,10 +39,11 @@ const emptyForm = (): FormState => ({
   fecha_proximo_cierre: '',
 })
 
-export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
+export default function TarjetaCierres({ tarjetaId, onCierresChange }: { tarjetaId: number; onCierresChange?: () => void }) {
   const [cierres, setCierres] = useState<TarjetaCierre[]>([])
   const [form, setForm] = useState<FormState>(emptyForm())
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
 
   const load = () =>
     fetch(`/api/tarjetas/${tarjetaId}/cierres`)
@@ -47,7 +52,7 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
 
   useEffect(() => { load() }, [tarjetaId])
 
-  const resetForm = () => { setForm(emptyForm()); setEditingId(null) }
+  const resetForm = () => { setForm(emptyForm()); setEditingId(null); setFormOpen(false) }
 
   const handleSubmit = async () => {
     const payload = {
@@ -82,6 +87,7 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
       }
       resetForm()
       await load()
+      onCierresChange?.()
     } catch {
       toast.error('Error al guardar')
     }
@@ -96,6 +102,7 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
       fecha_vencimiento: c.fecha_vencimiento ?? '',
       fecha_proximo_cierre: c.fecha_proximo_cierre ?? '',
     })
+    setFormOpen(true)
   }
 
   const handleDelete = async (id: number) => {
@@ -103,6 +110,7 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
       await fetch(`/api/tarjetas/${tarjetaId}/cierres/${id}`, { method: 'DELETE' })
       toast.success('Cierre eliminado')
       await load()
+      onCierresChange?.()
     } catch {
       toast.error('Error al eliminar')
     }
@@ -110,34 +118,60 @@ export default function TarjetaCierres({ tarjetaId }: { tarjetaId: number }) {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            select size="small" label="Mes" sx={{ flex: 1 }}
-            SelectProps={{ native: true }}
-            value={form.mes}
-            onChange={e => setForm(p => ({ ...p, mes: Number(e.target.value) }))}
-          >
-            {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-          </TextField>
-          <TextField
-            size="small" type="number" label="Año" sx={{ flex: 1 }}
-            value={form.anio}
-            onChange={e => setForm(p => ({ ...p, anio: Number(e.target.value) || p.anio }))}
-          />
-        </Box>
-        <AppDateField size="small" label="Fecha de cierre" value={form.fecha_cierre} onChange={e => setForm(p => ({ ...p, fecha_cierre: e.target.value }))} />
-        <AppDateField size="small" label="Fecha de vencimiento" value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
-        <AppDateField size="small" label="Fecha de próximo cierre" value={form.fecha_proximo_cierre} onChange={e => setForm(p => ({ ...p, fecha_proximo_cierre: e.target.value }))} />
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button size="small" variant="contained" startIcon={editingId ? <CheckIcon /> : <AddIcon />} onClick={handleSubmit}>
-            {editingId ? 'Guardar' : 'Agregar'}
-          </Button>
-          {editingId && (
-            <Button size="small" startIcon={<CloseIcon />} onClick={resetForm}>Cancelar</Button>
-          )}
-        </Box>
-      </Box>
+      <Accordion
+        expanded={formOpen}
+        onChange={(_, exp) => setFormOpen(exp)}
+        disableGutters
+        sx={{
+          boxShadow: 'none',
+          bgcolor: 'transparent',
+          '&:before': { display: 'none' },
+          mb: 1,
+        }}
+      >
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon fontSize="small" />}
+          sx={{
+            minHeight: 0,
+            px: 1,
+            '& .MuiAccordionSummary-content': { my: 0.5 },
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            {editingId ? 'Editar cierre' : 'Agregar cierre'}
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 1, pt: 0 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                select size="small" label="Mes" sx={{ flex: 1 }}
+                SelectProps={{ native: true }}
+                value={form.mes}
+                onChange={e => setForm(p => ({ ...p, mes: Number(e.target.value) }))}
+              >
+                {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </TextField>
+              <TextField
+                size="small" type="number" label="Año" sx={{ flex: 1 }}
+                value={form.anio}
+                onChange={e => setForm(p => ({ ...p, anio: Number(e.target.value) || p.anio }))}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
+              <AppDateField sx={{ flex: 1, minWidth: 140 }} size="small" label="Fecha de cierre" value={form.fecha_cierre} onChange={e => setForm(p => ({ ...p, fecha_cierre: e.target.value }))} />
+              <AppDateField sx={{ flex: 1, minWidth: 140 }} size="small" label="Fecha de vencimiento" value={form.fecha_vencimiento} onChange={e => setForm(p => ({ ...p, fecha_vencimiento: e.target.value }))} />
+              <AppDateField sx={{ flex: 1, minWidth: 140 }} size="small" label="Fecha de próximo cierre" value={form.fecha_proximo_cierre} onChange={e => setForm(p => ({ ...p, fecha_proximo_cierre: e.target.value }))} />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button size="small" variant="contained" startIcon={editingId ? <CheckIcon /> : <AddIcon />} onClick={handleSubmit}>
+                {editingId ? 'Guardar' : 'Agregar'}
+              </Button>
+              <Button size="small" startIcon={<CloseIcon />} onClick={resetForm}>Cancelar</Button>
+            </Box>
+          </Box>
+        </AccordionDetails>
+      </Accordion>
 
       <Divider sx={{ mb: 1 }} />
 

@@ -36,7 +36,25 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
     },
     include: ITEM_INCLUDE,
   })
-  return NextResponse.json(toItemResponse(item))
+  // Sync con el pago linkeado (si existe): refleja fecha + monto del item en el pago.
+  // Si la fecha del item quedó null, mantenemos la fecha actual del pago.
+  let syncedPago = false
+  if (item.pagoId) {
+    try {
+      await prisma.pago.update({
+        where: { id: item.pagoId },
+        data: {
+          monto: item.monto,
+          ...(item.fecha ? { fecha: item.fecha } : {}),
+        },
+      })
+      syncedPago = true
+      console.log(`[PUT item] id=${item.id} sync→pago: id=${item.pagoId} actualizado`)
+    } catch (err) {
+      console.error('Sync item→pago falló:', err)
+    }
+  }
+  return NextResponse.json({ ...toItemResponse(item), synced_pago: syncedPago })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string; itemId: string } }) {

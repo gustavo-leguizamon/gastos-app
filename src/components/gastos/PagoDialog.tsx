@@ -38,7 +38,7 @@ interface Props {
   open: boolean
   gasto: Gasto | null
   onClose: () => void
-  onChanged: () => void
+  onChanged: (fullReload?: boolean) => void
 }
 
 export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
@@ -71,9 +71,10 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
         body: JSON.stringify({ fecha: editing.fecha, monto: montoNum }),
       })
       if (!res.ok) throw new Error()
+      const updated = await res.json()
       toast.success('Pago actualizado')
       setEditing(null)
-      onChanged()
+      onChanged(updated?.synced_items > 0)
     } catch {
       toast.error('Error al actualizar el pago')
     } finally {

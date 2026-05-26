@@ -62,37 +62,34 @@ Client components
   → Prisma queries Postgres (Neon) via DATABASE_URL
 ```
 
-The database is hosted on **Neon** (serverless Postgres, free tier). The connection string lives in `DATABASE_URL` — set in `.env` locally (gitignored) and in Vercel env vars for production. The legacy SQLite file at `data/gastos.db` is no longer used; it's kept in `/data/*.db` (gitignored) only as a historical local snapshot. `package.json` runs `prisma generate` via `postinstall` so Vercel builds get the client without an extra script.
-
-**Migration note:** the initial data migration from SQLite to Postgres was done via `scripts/migrate-sqlite-to-postgres.js` (truncates Postgres tables, copies rows from `data/gastos.db` preserving IDs, resets sequences). Kept in the repo as archival — requires re-installing `sql.js` to run again.
+The database is hosted on **Neon** (serverless Postgres, free tier). The connection string lives in `DATABASE_URL` — set in `.env` locally (gitignored) and in Vercel env vars for production. `package.json` runs `prisma generate` via `postinstall` so Vercel builds get the client without an extra script. La migración inicial SQLite→Postgres se hizo vía `scripts/migrate-sqlite-to-postgres.js` (archival).
 
 ### PWA (mobile install)
 
-The app is installable as a PWA on Android (and iOS Safari with limitations). Configured via:
-- `public/manifest.json` — name, icons (192/512/maskable-512 PNG), `start_url: /gastos`, `display: standalone`, `theme_color: #1976d2`.
-- `public/sw.js` — minimal service worker. Caches GET requests to static assets (network-first, cache fallback). **Skips `/api/*` and `/_next/data/*`** so data stays fresh and writes always hit the server.
-- `src/components/layout/ServiceWorkerRegister.tsx` — client component that registers `/sw.js` only in production (avoids interfering with `npm run dev`). Mounted from `src/app/layout.tsx`.
-- `src/app/layout.tsx` exports `metadata` with `manifest`, `icons`, `appleWebApp`, `themeColor`, and `viewport`. (Next 13 keeps `themeColor`/`viewport` inside `metadata`; the standalone `Viewport` export came in Next 14.)
-- Icons in `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (with safe-area padding for Android adaptive icons). Placeholder design — replace with branded artwork when available.
+Instalable como PWA en Android (iOS Safari limitado). Configurado vía:
+- `public/manifest.json` — icons (192/512/maskable-512), `start_url: /gastos`, `display: standalone`, `theme_color: #1976d2`.
+- `public/sw.js` — service worker minimal. Cachea GET de assets estáticos (network-first, cache fallback). **Skipea `/api/*` y `/_next/data/*`**.
+- `src/components/layout/ServiceWorkerRegister.tsx` — registra `/sw.js` solo en producción. Montado desde `src/app/layout.tsx`.
+- `src/app/layout.tsx` exporta `metadata` con `manifest`, `icons`, `appleWebApp`, `themeColor`, `viewport`.
+- Icons en `public/`: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
 
-When changing manifest fields or the SW, **bump `CACHE_NAME` in `sw.js`** so installed clients re-fetch. Service workers cache aggressively; old clients can be stuck on stale versions otherwise.
+Al cambiar el manifest o el SW, **bumpear `CACHE_NAME` en `sw.js`** para forzar re-fetch en clients instalados.
 
 ### Responsive / mobile UI
 
-The app has dedicated mobile layouts at `theme.breakpoints.down('sm')` (≤600px) or `down('md')` (≤900px) where appropriate. Use `useMediaQuery(theme.breakpoints.down(...))` from MUI to bifurcate rendering instead of CSS-only hacks — the data shapes shown on mobile vs desktop differ enough that conditional render is cleaner.
+Layouts dedicados a `theme.breakpoints.down('sm')` (≤600px) o `down('md')` (≤900px). Usar `useMediaQuery(theme.breakpoints.down(...))` para bifurcar render (no CSS-only).
 
-- **`TopBar`**: hamburger + `Drawer` on `<md`; inline `Button` nav on `>=md`. Logo/title flex-grows on mobile to push the menu icon to the edge.
+- **`TopBar`**: hamburger + `Drawer` en `<md`; nav inline en `>=md`.
 - **`AppLayout`**: padding `p: { xs: 1.5, sm: 3 }`.
-- **`gastos/page.tsx`**: "Nuevo Gasto" is a `Fab` at bottom-right (`circular` on `<sm`, `extended` on `>=sm`). "Copiar mes" collapses to an `IconButton` on `<sm`. The old `position: fixed; top` button was removed because it overlapped the AppBar.
-- **`FiltrosGastos`**: stacks vertically on `<md`. Búsqueda full-width on top, then casa, then the two toggle groups in a single row sharing 50/50.
-- **`GastosTable`**: renders **cards instead of DataGrid on `<sm`**. Each card shows description, chip, fecha, categoría, cuotas, 3-column totals (Total/Pagado/Restante), optional extras row, expand for sub-items, and a kebab menu (`MoreVertIcon`) with the 5 actions (Sub-items, Pagos, Copiar, Editar, Eliminar). Sub-items expand inline with their own incluye_en_total/vencimiento checkboxes. Desktop keeps the existing DataGrid.
+- **`gastos/page.tsx`**: "Nuevo Gasto" es `Fab` bottom-right (circular `<sm`, extended `>=sm`). "Copiar mes" colapsa a `IconButton` en `<sm`.
+- **`FiltrosGastos`**: stack vertical en `<md`.
+- **`GastosTable`**: renderiza **cards en vez de DataGrid en `<sm`**. Cada card: descripción, chip, fecha, categoría, cuotas, totales 3-col (Total/Pagado/Restante), expand para sub-items, kebab menu (`MoreVertIcon`) con 5 acciones. Sub-items expanden inline con checkboxes incluye_en_total/vencimiento. Desktop mantiene DataGrid.
 - **`GastoDialog`, `PagoDialog`, `CopiarMesDialog`, `CopiarGastoDialog`**: `fullScreen={isMobile}` (`<sm`).
-- **`GastoItemDialog`**: `fullScreen` on `<md`. The two-column layout (340px left + flex right) becomes vertical stack on `<md` — resumen + form on top, items list below.
-- **`PagoDialog`**: the "Registrar pago" form (Fecha + Monto + Button) stacks vertically on `<sm`, same with the inline-edit row.
-- **`CopiarMesDialog`**: origen/destino stack vertically on `<sm`; the `ArrowForwardIcon` swaps to `ArrowDownwardIcon`.
-- **`inversiones/page.tsx`**: the movimientos `AppDataGrid` is replaced by a vertical list of cards on `<sm`. The mobile cards iterate `rows` directly (which is already in fecha desc + id desc order, matching the default DataGrid sort) — do **not** re-reverse on mobile. The new-movimiento form also stacks vertically on `<sm`.
+- **`GastoItemDialog`**: `fullScreen` en `<md`. Layout 2-col se vuelve stack vertical.
+- **`PagoDialog`**, **`CopiarMesDialog`**: forms stackean vertical en `<sm`.
+- **`inversiones/page.tsx`**: movimientos `AppDataGrid` reemplazado por lista vertical de cards en `<sm`. Mobile itera `rows` directo (ya en fecha desc + id desc).
 
-When adding new pages or tables, prefer the same pattern: build a card-based mobile view rather than letting DataGrid scroll horizontally.
+Al agregar páginas/tablas, preferir card-based mobile en vez de scroll horizontal del DataGrid.
 
 ### Naming convention mismatch (important)
 
@@ -209,7 +206,9 @@ Un gasto puede marcarse como **"resumen de tarjeta"** vía el flag `es_tarjeta` 
 - El select de **Tarjeta** se muestra siempre (independiente del `tipo_pago`).
 - La **descripción** se bloquea y se sincroniza automáticamente con el formato `Nombre (Banco)` de la tarjeta seleccionada (si la tarjeta no tiene banco, solo se usa el `nombre`). Implementado en un `useEffect` que llama `setValue('descripcion', ...)` al cambiar `esTarjeta` o `tarjetaId`.
 
-**Cierres de tarjeta** (`TarjetaCierre`): las fechas `fechaCierre`, `fechaVencimiento` y `fechaProximoCierre` que antes vivían en cada gasto "resumen de tarjeta" ahora viven en una tabla aparte `TarjetaCierre` con un registro por `(tarjetaId, mes, anio)` (constraint único). Se cargan/editan en `/configuracion` → Tarjetas → click en cualquier parte de la fila de la tarjeta para expandir el panel inline. El componente `TarjetaCierres` ya no contiene su propio Accordion — es solo el contenido (form + lista). El Accordion vive en `configuracion/page.tsx` envolviendo toda la fila de la tarjeta (logo + nombre/banco como AccordionSummary, panel de cierres como AccordionDetails). Los botones de Edit/Delete del summary llevan `e.stopPropagation()` para no toggle el accordion. Se usa `TransitionProps={{ unmountOnExit: true }}` para que `TarjetaCierres` solo se monte (y haga su fetch) cuando se expande la tarjeta. CRUD vía `/api/tarjetas/[id]/cierres` (GET/POST) y `/api/tarjetas/[id]/cierres/[cierreId]` (PUT/DELETE). Cascade `onDelete: Cascade` al borrar la tarjeta. El gasto "resumen de tarjeta" sigue existiendo como contenedor (con `esTarjeta = true`) pero ya no guarda esas fechas — toda la lógica de propagación las lee desde `TarjetaCierre`. Migración `20260516010000_add_tarjeta_cierre` crea la tabla, backfillea desde los gastos `esTarjeta = true` existentes (un cierre por `(tarjetaId, mes, anio)`, tomando el de menor `id` si hay duplicados), y dropea las columnas `fechaCierre`/`fechaProximoCierre` de `Gasto`.
+**Cierres de tarjeta** (`TarjetaCierre`): las fechas `fechaCierre`, `fechaVencimiento` y `fechaProximoCierre` que antes vivían en cada gasto "resumen de tarjeta" ahora viven en una tabla aparte `TarjetaCierre` con un registro por `(tarjetaId, mes, anio)` (constraint único). Se cargan/editan en `/configuracion` → Tarjetas → click en cualquier parte de la fila de la tarjeta para expandir el panel inline. El componente `TarjetaCierres` ya no contiene su propio Accordion — es solo el contenido (form + lista). El Accordion vive en `configuracion/page.tsx` envolviendo toda la fila de la tarjeta (logo + nombre/banco como AccordionSummary, panel de cierres como AccordionDetails). Los botones de Edit/Delete del summary llevan `e.stopPropagation()` para no toggle el accordion. Se usa `TransitionProps={{ unmountOnExit: true }}` para que `TarjetaCierres` solo se monte (y haga su fetch) cuando se expande la tarjeta. `TarjetaCierres` acepta un callback opcional `onCierresChange` que se dispara después de cada save/delete; la página de configuración lo usa para re-fetchear `/api/tarjetas` y refrescar el indicador de alerta sin recargar.
+
+**Indicador "cierre incompleto"**: en el summary de cada tarjeta se muestra un `WarningAmberIcon` (con Tooltip) cuando no existe un `TarjetaCierre` para el mes/año actual, o cuando existe pero falta alguna de las 3 fechas (`fechaCierre` / `fechaVencimiento` / `fechaProximoCierre`). El check es client-side a partir del array `cierres` que viene en cada `Tarjeta` del GET `/api/tarjetas`. CRUD vía `/api/tarjetas/[id]/cierres` (GET/POST) y `/api/tarjetas/[id]/cierres/[cierreId]` (PUT/DELETE). Cascade `onDelete: Cascade` al borrar la tarjeta. El gasto "resumen de tarjeta" sigue existiendo como contenedor (con `esTarjeta = true`) pero ya no guarda esas fechas — toda la lógica de propagación las lee desde `TarjetaCierre`. Migración `20260516010000_add_tarjeta_cierre` crea la tabla, backfillea desde los gastos `esTarjeta = true` existentes (un cierre por `(tarjetaId, mes, anio)`, tomando el de menor `id` si hay duplicados), y dropea las columnas `fechaCierre`/`fechaProximoCierre` de `Gasto`.
 
 Las respuestas de `/api/gastos` incluyen un campo opcional **`cierre`** que matchea el `TarjetaCierre` correspondiente a `(gasto.tarjetaId, gasto.mes, gasto.anio)` cuando existe (forma: `{ fecha_cierre, fecha_vencimiento, fecha_proximo_cierre } | null`). Esto se hace incluyendo `tarjeta: { include: { cierres: true } }` en la query y filtrando en el mapper `toGastoResponse`. `GastosTable` usa este campo para el tooltip del icono `CreditCardIcon` en filas con `es_tarjeta = true` — muestra las 3 fechas si hay un cierre cargado, o un mensaje "configurarlo en /configuracion" si todavía no se cargó para ese mes/año.
 
@@ -229,6 +228,13 @@ La propagación está envuelta en try/catch — si falla, el pago original se ma
 **Cascade al eliminar el pago:** `GastoItem.pagoId` referencia a `Pago` con `onDelete: Cascade`. Cuando un pago se elimina (vía `DELETE /api/gastos/[id]/pagos/[pagoId]` o por cascada al borrar su gasto), Postgres borra automáticamente cualquier sub-item propagado que esté linkeado, manteniendo la consistencia entre el resumen de tarjeta y los pagos efectivamente realizados.
 
 **Cascade inverso (al borrar el sub-item):** el handler `DELETE /api/gastos/[id]/items/[itemId]` verifica si el item tiene `pagoId`. Si lo tiene, en vez de borrar el item directamente, borra el **Pago** referenciado — y el cascade del FK arrastra el item automáticamente. Así, eliminar el sub-item propagado desde el resumen de tarjeta también deshace el pago original en el gasto crédito que lo originó. Si el item no tiene `pagoId` (item común sin propagación), se borra directamente como siempre.
+
+**Sincronización bidireccional al editar (fecha + monto):**
+- `PUT /api/gastos/[id]/pagos/[pagoId]` actualiza el pago y luego ejecuta `prisma.gastoItem.updateMany({ where: { pagoId }, data: { fecha, monto } })`. La respuesta incluye `synced_items: number` con la cantidad de items actualizados.
+- `PUT /api/gastos/[id]/items/[itemId]` actualiza el item y, si `item.pagoId` no es null, hace `prisma.pago.update({ where: { id: pagoId }, data: { monto, ...(item.fecha ? { fecha: item.fecha } : {}) } })`. Si el usuario dejó la fecha del item en `null`, se preserva la fecha actual del pago (porque `Pago.fecha` es NOT NULL). La respuesta incluye `synced_pago: boolean`.
+- Ambos sincs van envueltos en try/catch — fallar el sync no bloquea la edición principal. Logs en el server console: `[PUT pago]` / `[PUT item]`.
+- El `descripcion`, `categoria_id` y demás campos del item no se reflejan en el pago (no existen del lado del pago), y viceversa. Solo se sincroniza el par (fecha, monto).
+- **Refresh del cliente:** `PagoDialog` y `GastoItemDialog` reciben el flag de sync de la respuesta y lo propagan al `onChanged(fullReload)`. `GastosTable` dispara `triggerRefresh()` (reload completo de la tabla del mes actual) cuando hubo sync, así si el usuario navega luego al mes del entity linkeado ya ve los datos frescos. Sin el flag, solo se refresca el gasto actual + las cards de resumen.
 
 ### Autocompletado de descripciones
 
@@ -298,7 +304,7 @@ Ambos dialogs propagan al body el flag `es_tarjeta` del origen para que los gast
 | `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
-| `GET/POST /api/tarjetas` | Credit cards CRUD (incluye campo opcional `marca`: `visa`/`mastercard`/`amex`/`diners`/`discover`/`jcb`/`otra`) |
+| `GET/POST /api/tarjetas` | Credit cards CRUD (incluye campo opcional `marca`: `visa`/`mastercard`/`amex`/`diners`/`discover`/`jcb`/`otra`). El GET además incluye el array `cierres: TarjetaCierre[]` (todos los cierres de la tarjeta) para que la pantalla de configuración pueda señalizar tarjetas sin cierre completo del mes actual. |
 | `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres de tarjeta (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
 | `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
 | `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` seteada y **< today**. Acepta `mes`, `anio`, `today` (YYYY-MM-DD). Devuelve `{ id, nombre, banco, marca, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
@@ -334,9 +340,9 @@ API responses use snake_case (`monto_actual`, `monto_extra`, `inversion_id`) per
 - DataGrid below the form. **Default sort: `fecha` descending, then `id` descending as tiebreaker.** Since the free DataGrid only supports single-column sort, the `id` tiebreaker is implemented by pre-reversing the rows array (after computing `cambio` in ascending order) so stable sort by `fecha desc` keeps the same-fecha rows in `id desc` order. The `cambio` computation always runs in ascending order internally (in the `rows` memo), independent of the visual sort, so values stay correct regardless of how the user sorts.
 - When no inversiones exist, the page shows an empty-state card prompting the user to create one with the **+** button.
 
-**Migration note:** the original `Inversion` table (single-level, with `fecha`/`montoActual`/`montoExtra` directly) was migrated via `prisma/migrate-inversiones.sql`. That script renames the old table to `Movimiento`, creates a new `Inversion` parent with a default row named "General", and back-fills `inversionId = 1` for all existing snapshots. Kept in the repo as a one-shot historical migration — do not re-run.
+**Migration note:** la tabla original `Inversion` (single-level) se migró vía `prisma/migrate-inversiones.sql` (archival — no re-ejecutar).
 
-**Nav menus:** navigation is handled solely by `TopBar.tsx` (horizontal AppBar). `Sidebar.tsx` has been deleted. When adding new routes, update only the `NAV` array in `TopBar.tsx`.
+**Nav menus:** navegación handled por `TopBar.tsx` (horizontal AppBar). Al agregar rutas, actualizar solo el array `NAV` en `TopBar.tsx`.
 
 **`AppDataGrid` (`src/components/shared/AppDataGrid.tsx`):** generic wrapper around MUI `DataGrid` that all grids in the project must use. Provides: `density="compact"`, base `sx` styles (border, borderRadius, hover), row selection management, and keyboard Delete support. Key props:
 - `onDeleteKeyPress(id)` — called when `Delete` key is pressed on the selected row; enables selection and the keyboard listener. Each grid's parent calls `setDeleteId(id)` here to open its existing `ConfirmDialog`.
@@ -364,6 +370,7 @@ Client components pass `today` as a query param to `/api/resumen` so the server 
 ### Path alias
 
 `@/*` maps to `src/*` (configured in `tsconfig.json`).
+
 
 
 

@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   if (casa_id) where.casaId = Number(casa_id)
   if (tipo_pago) where.tipoPago = tipo_pago
 
-  const gastos = await prisma.gasto.findMany({ where, include: INCLUDE, orderBy: { fechaVencimiento: 'asc' } })
+  const gastos = await prisma.gasto.findMany({ where, include: INCLUDE, orderBy: [{ fechaVencimiento: 'asc' }, { id: 'asc' }] })
   return NextResponse.json(gastos.map(toGastoResponse))
 }
 

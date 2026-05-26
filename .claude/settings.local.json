@@ -46,7 +46,10 @@
       "Bash(powershell *)",
       "PowerShell(\\(Get-Content 'C:\\\\Users\\\\GustavoLeguizamon\\\\Desktop\\\\app\\\\gapp\\\\gastos-app\\\\src\\\\app\\\\configuracion\\\\page.tsx' | Measure-Object -Line\\).Lines)",
       "Bash(dir *)",
-      "PowerShell(Add-Content *)"
+      "PowerShell(Add-Content *)",
+      "PowerShell(Get-Item *)",
+      "Bash(findstr /N \"pagoId\" \"C:\\\\Users\\\\GustavoLeguizamon\\\\Desktop\\\\app\\\\gapp\\\\gastos-app\\\\node_modules\\\\.prisma\\\\client\\\\index.d.ts\")",
+      "PowerShell(Test-Path *)"
     ]
   },
   "hooks": {

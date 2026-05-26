@@ -17,6 +17,7 @@ export interface Tarjeta {
   nombre: string
   banco: string | null
   marca: TarjetaMarca | null
+  cierres?: TarjetaCierre[]
 }
 
 export interface TarjetaCierre {

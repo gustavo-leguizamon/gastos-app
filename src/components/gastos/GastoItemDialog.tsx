@@ -49,7 +49,7 @@ interface Props {
   open: boolean
   gasto: Gasto | null
   onClose: () => void
-  onChanged: () => void
+  onChanged: (fullReload?: boolean) => void
 }
 
 export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Props) {
@@ -121,9 +121,10 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         }),
       })
       if (!res.ok) throw new Error()
+      const updated = await res.json()
       toast.success('Item actualizado')
       setEditing(null)
-      onChanged()
+      onChanged(!!updated?.synced_pago)
     } catch {
       toast.error('Error al actualizar item')
     } finally {

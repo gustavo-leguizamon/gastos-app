@@ -30,6 +30,7 @@ import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import toast from 'react-hot-toast'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
@@ -59,7 +60,7 @@ function useSimpleCrud<T extends { id: number }>(endpoint: string) {
     await load()
   }
 
-  return { items, add, update, remove }
+  return { items, add, update, remove, reload: load }
 }
 
 export default function ConfiguracionPage() {
@@ -74,7 +75,7 @@ export default function ConfiguracionPage() {
   const [editingMoneda, setEditingMoneda] = useState<Moneda | null>(null)
 
   // Tarjetas
-  const { items: tarjetas, add: addTarjeta, update: updateTarjeta, remove: removeTarjeta } = useSimpleCrud<Tarjeta>('/api/tarjetas')
+  const { items: tarjetas, add: addTarjeta, update: updateTarjeta, remove: removeTarjeta, reload: reloadTarjetas } = useSimpleCrud<Tarjeta>('/api/tarjetas')
   const [nuevaTarjeta, setNuevaTarjeta] = useState<{ nombre: string; banco: string; marca: TarjetaMarca | '' }>({ nombre: '', banco: '', marca: '' })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
@@ -363,6 +364,14 @@ export default function ConfiguracionPage() {
                       </Box>
                     ) : (() => {
                       const accent = marcaColor(t.marca) ?? '#6366f1'
+                      const now = new Date()
+                      const currentMes = now.getMonth() + 1
+                      const currentAnio = now.getFullYear()
+                      const currentCierre = t.cierres?.find(c => c.mes === currentMes && c.anio === currentAnio)
+                      const incompleto = !currentCierre || !currentCierre.fecha_cierre || !currentCierre.fecha_vencimiento || !currentCierre.fecha_proximo_cierre
+                      const alertaMsg = !currentCierre
+                        ? `No hay cierre cargado para ${String(currentMes).padStart(2, '0')}/${currentAnio}`
+                        : 'Faltan fechas en el cierre del mes actual'
                       return (
                         <Accordion
                           disableGutters
@@ -389,6 +398,11 @@ export default function ConfiguracionPage() {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                               <BrandLogo marca={t.marca} width={44} height={32} />
                               <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                              {incompleto && (
+                                <Tooltip arrow title={alertaMsg}>
+                                  <WarningAmberIcon sx={{ color: 'warning.main', fontSize: 20, flexShrink: 0 }} />
+                                </Tooltip>
+                              )}
                             </Box>
                             <Box
                               sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}
@@ -399,7 +413,7 @@ export default function ConfiguracionPage() {
                             </Box>
                           </AccordionSummary>
                           <AccordionDetails sx={{ px: 1.5, pt: 0 }}>
-                            <TarjetaCierres tarjetaId={t.id} />
+                            <TarjetaCierres tarjetaId={t.id} onCierresChange={reloadTarjetas} />
                           </AccordionDetails>
                         </Accordion>
                       )
