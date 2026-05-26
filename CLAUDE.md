@@ -358,6 +358,18 @@ The `document` keydown listener in `AppDataGrid` only fires if the selected row 
 
 **`AppToggle` (`src/components/shared/AppToggle.tsx`):** toggle estándar de la app — wrapper de `<FormControlLabel control={<Switch />} label />`. Reemplaza a `Checkbox` en toda la app: todas las opciones booleanas con label se renderizan como Switch (visualmente: deslizador en vez de cuadradito). Acepta todas las props de `Switch` (incluido `size`, `color`) más `label` y `labelPlacement`. Usado en: `GastoForm` (es_tarjeta, pagado_completo, usa_cuotas, confirmado), `GastoItemDialog` (incluir_en_total, incluir_en_vencimiento — alta y edición), `configuracion/page.tsx` (settings de estimación). Para toggles **sin label** (ej. inline en celdas de `GastosTable` o cards mobile), usar `<Switch size="small" />` de MUI directamente — el wrapper solo aplica cuando hay label.
 
+**`AppSelect` (`src/components/shared/AppSelect.tsx`):** select estándar de la app — wrapper de MUI `Autocomplete` con API simplificada. Permite **tipear para filtrar entre las opciones** disponibles (mucho más rápido cuando hay varias). Reemplaza a `Select` en toda la app donde hay múltiples opciones. API:
+- `label: string` — label del input.
+- `options: { value, label, render? }[]` — `value` es `string | number`, `label` es el texto buscable. `render` opcional renderiza contenido rico (íconos, etc.) dentro del dropdown.
+- `value: string | number | null` + `onChange(v)` — controlado.
+- `emptyLabel?: string` — si está seteado, agrega una opción al inicio (ej. "Todas", "Sin especificar") cuyo `onChange` reporta `null`.
+- `disableClearable?: boolean` — oculta el botón "X" cuando el valor no debe ser nulleable.
+- `size`, `fullWidth`, `sx`, `error`, `helperText`, `placeholder` — passthrough a `Autocomplete` / `TextField`.
+
+Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta — con `render` para `BrandLogo`, Moneda, Categoría), `GastoItemDialog` (Categoría alta + edición), `CopiarGastoDialog` (Mes/Año destino), `CopiarMesDialog` (Mes/Año origen + destino).
+
+**Excepción:** `configuracion/page.tsx` → `estim_missing_behavior` (solo 2 opciones) sigue usando `Select` clásico — un autocomplete tipeable no aporta valor con tan pocas opciones.
+
 ### Dates and timezones
 
 **Never use `new Date().toISOString().split('T')[0]` to get today's date** — `toISOString()` returns UTC, which causes off-by-one errors for timezones behind UTC (e.g. Argentina UTC-3 can show tomorrow's date after 21hs local). Always compute local date using:

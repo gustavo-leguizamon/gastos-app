@@ -6,10 +6,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
+import AppSelect from '@/components/shared/AppSelect'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -159,18 +156,22 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
               Desde
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <FormControl size="small" sx={{ flex: 1 }}>
-                <InputLabel>Mes</InputLabel>
-                <Select value={srcMes} label="Mes" onChange={e => setSrcMes(Number(e.target.value))}>
-                  {MESES.map((n, i) => <MenuItem key={i + 1} value={i + 1}>{n}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ width: 90 }}>
-                <InputLabel>Año</InputLabel>
-                <Select value={srcAnio} label="Año" onChange={e => setSrcAnio(Number(e.target.value))}>
-                  {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <AppSelect
+                label="Mes"
+                options={MESES.map((n, i) => ({ value: i + 1, label: n }))}
+                value={srcMes}
+                onChange={(v) => setSrcMes(Number(v))}
+                disableClearable
+                sx={{ flex: 1 }}
+              />
+              <AppSelect
+                label="Año"
+                options={years.map(y => ({ value: y, label: String(y) }))}
+                value={srcAnio}
+                onChange={(v) => setSrcAnio(Number(v))}
+                disableClearable
+                sx={{ width: 90 }}
+              />
             </Box>
           </Box>
 
@@ -184,18 +185,22 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
               Hacia
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <FormControl size="small" sx={{ flex: 1 }}>
-                <InputLabel>Mes</InputLabel>
-                <Select value={dstMes} label="Mes" onChange={e => setDstMes(Number(e.target.value))}>
-                  {MESES.map((n, i) => <MenuItem key={i + 1} value={i + 1}>{n}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ width: 90 }}>
-                <InputLabel>Año</InputLabel>
-                <Select value={dstAnio} label="Año" onChange={e => setDstAnio(Number(e.target.value))}>
-                  {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <AppSelect
+                label="Mes"
+                options={MESES.map((n, i) => ({ value: i + 1, label: n }))}
+                value={dstMes}
+                onChange={(v) => setDstMes(Number(v))}
+                disableClearable
+                sx={{ flex: 1 }}
+              />
+              <AppSelect
+                label="Año"
+                options={years.map(y => ({ value: y, label: String(y) }))}
+                value={dstAnio}
+                onChange={(v) => setDstAnio(Number(v))}
+                disableClearable
+                sx={{ width: 90 }}
+              />
             </Box>
           </Box>
         </Box>

@@ -6,10 +6,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
+import AppSelect from '@/components/shared/AppSelect'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
@@ -125,21 +122,22 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <FormControl size="small" sx={{ flex: 1 }}>
-            <InputLabel>Mes</InputLabel>
-            <Select value={mes} label="Mes" onChange={e => setMes(Number(e.target.value))}>
-              {MESES.map((nombre, i) => (
-                <MenuItem key={i + 1} value={i + 1}>{nombre}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ width: 100 }}>
-            <InputLabel>Año</InputLabel>
-            <Select value={anio} label="Año" onChange={e => setAnio(Number(e.target.value))}>
-              {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-            </Select>
-          </FormControl>
+          <AppSelect
+            label="Mes"
+            options={MESES.map((nombre, i) => ({ value: i + 1, label: nombre }))}
+            value={mes}
+            onChange={(v) => setMes(Number(v))}
+            disableClearable
+            sx={{ flex: 1 }}
+          />
+          <AppSelect
+            label="Año"
+            options={years.map(y => ({ value: y, label: String(y) }))}
+            value={anio}
+            onChange={(v) => setAnio(Number(v))}
+            disableClearable
+            sx={{ width: 100 }}
+          />
         </Box>
       </DialogContent>
 

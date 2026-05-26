@@ -14,10 +14,7 @@ import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
+import AppSelect from '@/components/shared/AppSelect'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -263,17 +260,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                 inputProps={{ min: 1, step: 1 }}
               />
             </Box>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Categoría (opcional)</InputLabel>
-              <Select
-                label="Categoría (opcional)"
-                value={categoriaId ?? ''}
-                onChange={e => setCategoriaId(e.target.value === '' ? null : Number(e.target.value))}
-              >
-                <MenuItem value="">Sin especificar</MenuItem>
-                {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <AppSelect
+              label="Categoría (opcional)"
+              options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
+              value={categoriaId}
+              onChange={(v) => setCategoriaId(v == null ? null : Number(v))}
+              fullWidth
+              emptyLabel="Sin especificar"
+            />
             <Box sx={{ display: 'flex', gap: 2 }}>
               <AppToggle
                 size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)}
@@ -342,17 +336,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         inputProps={{ min: 1, step: 1 }}
                       />
                     </Box>
-                    <FormControl size="small" fullWidth>
-                      <InputLabel>Categoría (opcional)</InputLabel>
-                      <Select
-                        label="Categoría (opcional)"
-                        value={editing.categoria_id ?? ''}
-                        onChange={e => setEditing(p => p ? { ...p, categoria_id: e.target.value === '' ? null : Number(e.target.value) } : p)}
-                      >
-                        <MenuItem value="">Sin especificar</MenuItem>
-                        {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
-                      </Select>
-                    </FormControl>
+                    <AppSelect
+                      label="Categoría (opcional)"
+                      options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
+                      value={editing.categoria_id ?? null}
+                      onChange={(v) => setEditing(p => p ? { ...p, categoria_id: v == null ? null : Number(v) } : p)}
+                      fullWidth
+                      emptyLabel="Sin especificar"
+                    />
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <AppToggle
                         size="small" checked={editing.incluye_en_total} onChange={e => setEditing(p => p ? { ...p, incluye_en_total: e.target.checked } : p)}

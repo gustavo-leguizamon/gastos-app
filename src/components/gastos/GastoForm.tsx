@@ -9,16 +9,12 @@ import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
 import Autocomplete from '@mui/material/Autocomplete'
 import AppDateField from '@/components/shared/AppDateField'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
-import FormHelperText from '@mui/material/FormHelperText'
 import AppToggle from '@/components/shared/AppToggle'
+import AppSelect from '@/components/shared/AppSelect'
 import type { Casa, Moneda, Tarjeta, Categoria, Gasto, GastoFormData } from '@/lib/types'
 
 const schema = yup.object({
@@ -163,13 +159,16 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="casa_id"
             control={control}
             render={({ field }) => (
-              <FormControl fullWidth size="small" error={!!errors.casa_id}>
-                <InputLabel>Casa</InputLabel>
-                <Select {...field} label="Casa" value={field.value || ''}>
-                  {casas.map(c => <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>)}
-                </Select>
-                {errors.casa_id && <FormHelperText>{errors.casa_id.message}</FormHelperText>}
-              </FormControl>
+              <AppSelect
+                label="Casa"
+                options={casas.map(c => ({ value: c.id, label: c.nombre }))}
+                value={field.value ?? null}
+                onChange={(v) => field.onChange(v)}
+                fullWidth
+                error={!!errors.casa_id}
+                helperText={errors.casa_id?.message}
+                disableClearable
+              />
             )}
           />
         </Grid>
@@ -256,21 +255,26 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
               name="tarjeta_id"
               control={control}
               render={({ field }) => (
-                <FormControl fullWidth size="small" error={!!errors.tarjeta_id}>
-                  <InputLabel>Tarjeta{tipoPago === 'C' ? '' : ' (opcional)'}</InputLabel>
-                  <Select {...field} label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`} value={field.value ?? ''} onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}>
-                    {tipoPago !== 'C' && <MenuItem value="">Sin especificar</MenuItem>}
-                    {tarjetas.map(t => (
-                      <MenuItem key={t.id} value={t.id}>
-                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                          <BrandLogo marca={t.marca} width={30} height={22} />
-                          <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {errors.tarjeta_id && <FormHelperText>{errors.tarjeta_id.message}</FormHelperText>}
-                </FormControl>
+                <AppSelect
+                  label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`}
+                  options={tarjetas.map(t => ({
+                    value: t.id,
+                    label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
+                    render: () => (
+                      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                        <BrandLogo marca={t.marca} width={30} height={22} />
+                        <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
+                      </Box>
+                    ),
+                  }))}
+                  value={field.value ?? null}
+                  onChange={(v) => field.onChange(v == null ? null : Number(v))}
+                  fullWidth
+                  error={!!errors.tarjeta_id}
+                  helperText={errors.tarjeta_id?.message}
+                  emptyLabel={tipoPago === 'C' ? undefined : 'Sin especificar'}
+                  disableClearable={tipoPago === 'C'}
+                />
               )}
             />
           </Grid>
@@ -282,13 +286,20 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="moneda_id"
             control={control}
             render={({ field }) => (
-              <FormControl fullWidth size="small" error={!!errors.moneda_id}>
-                <InputLabel>Moneda</InputLabel>
-                <Select {...field} label="Moneda" value={field.value || ''} onChange={(e) => { field.onChange(Number(e.target.value)); if (monedas.find(m => m.id === Number(e.target.value))?.codigo === 'ARS') setValue('tipo_cambio', 1) }}>
-                  {monedas.map(m => <MenuItem key={m.id} value={m.id}>{m.simbolo} {m.codigo} - {m.nombre}</MenuItem>)}
-                </Select>
-                {errors.moneda_id && <FormHelperText>{errors.moneda_id.message}</FormHelperText>}
-              </FormControl>
+              <AppSelect
+                label="Moneda"
+                options={monedas.map(m => ({ value: m.id, label: `${m.simbolo} ${m.codigo} - ${m.nombre}` }))}
+                value={field.value ?? null}
+                onChange={(v) => {
+                  const id = v == null ? null : Number(v)
+                  field.onChange(id)
+                  if (id != null && monedas.find(m => m.id === id)?.codigo === 'ARS') setValue('tipo_cambio', 1)
+                }}
+                fullWidth
+                error={!!errors.moneda_id}
+                helperText={errors.moneda_id?.message}
+                disableClearable
+              />
             )}
           />
         </Grid>
@@ -519,18 +530,14 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="categoria_id"
             control={control}
             render={({ field }) => (
-              <FormControl fullWidth size="small">
-                <InputLabel>Categoría (opcional)</InputLabel>
-                <Select
-                  {...field}
-                  label="Categoría (opcional)"
-                  value={field.value ?? ''}
-                  onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                >
-                  <MenuItem value="">Sin especificar</MenuItem>
-                  {categorias.map(l => <MenuItem key={l.id} value={l.id}>{l.nombre}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <AppSelect
+                label="Categoría (opcional)"
+                options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
+                value={field.value ?? null}
+                onChange={(v) => field.onChange(v == null ? null : Number(v))}
+                fullWidth
+                emptyLabel="Sin especificar"
+              />
             )}
           />
         </Grid>

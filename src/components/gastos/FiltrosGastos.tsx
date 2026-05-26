@@ -2,11 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
 import IconButton from '@mui/material/IconButton'
+import AppSelect from '@/components/shared/AppSelect'
 import Typography from '@mui/material/Typography'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
@@ -82,19 +79,14 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
       />
 
       {/* Casa */}
-      <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 }, order: { xs: 2, md: 2 } }}>
-        <InputLabel>Casa</InputLabel>
-        <Select
-          label="Casa"
-          value={filtros.casa_id ?? ''}
-          onChange={(e) => setFiltros({ casa_id: e.target.value === '' ? null : Number(e.target.value) })}
-        >
-          <MenuItem value="">Todas</MenuItem>
-          {casas.map((c) => (
-            <MenuItem key={c.id} value={c.id}>{c.nombre}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <AppSelect
+        label="Casa"
+        options={casas.map(c => ({ value: c.id, label: c.nombre }))}
+        value={filtros.casa_id}
+        onChange={(v) => setFiltros({ casa_id: v == null ? null : Number(v) })}
+        emptyLabel="Todas"
+        sx={{ minWidth: { xs: '100%', md: 160 }, order: { xs: 2, md: 2 } }}
+      />
 
       {/* Toggles agrupados: en mobile se muestran lado a lado en una fila */}
       <Box
