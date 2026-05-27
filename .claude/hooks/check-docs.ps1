@@ -10,7 +10,14 @@ try {
 $root = (Get-Location).Path
 $claudeMd = Join-Path $root 'CLAUDE.md'
 if (-not (Test-Path $claudeMd)) { exit 0 }
-$cmMtime = (Get-Item $claudeMd).LastWriteTime
+
+# Tomar el mtime mas reciente entre CLAUDE.md y cualquier doc en docs/claude/*.md
+$docFiles = @(Get-Item $claudeMd)
+$docsDir = Join-Path $root 'docs\claude'
+if (Test-Path $docsDir) {
+    $docFiles += Get-ChildItem -Path $docsDir -Filter '*.md' -File
+}
+$cmMtime = ($docFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
 
 # Cooldown: if hook already reminded in the last 3 minutes, skip
 $sentinel = Join-Path $root '.claude\.docs-reminded'
@@ -37,7 +44,7 @@ if (-not $newer) { exit 0 }
 New-Item -ItemType File -Path $sentinel -Force | Out-Null
 
 $files = ($newer | ForEach-Object { $_.FullName.Substring($root.Length + 1) }) -join ', '
-$reason = "Se detectaron cambios de codigo posteriores a la ultima edicion de CLAUDE.md en: $files. Revisa si el comportamiento de la app cambio (nuevas funcionalidades, campos, rutas API, calculos, dialogs, filtros, etc.) y actualiza la seccion correspondiente de CLAUDE.md antes de terminar. Si los cambios son puramente cosmeticos o refactor sin cambio de comportamiento observable, edita CLAUDE.md tocando solo su mtime (por ejemplo agregando una linea en blanco al final) y confirma explicitamente que la doc sigue vigente."
+$reason = "Se detectaron cambios de codigo posteriores a la ultima edicion de la documentacion (CLAUDE.md o docs/claude/*.md) en: $files. Revisa si el comportamiento de la app cambio (nuevas funcionalidades, campos, rutas API, calculos, dialogs, filtros, etc.) y actualiza la seccion correspondiente (el archivo de docs/claude/ que aplique, o CLAUDE.md) antes de terminar. Si los cambios son puramente cosmeticos o refactor sin cambio de comportamiento observable, tocale el mtime a CLAUDE.md (por ejemplo agregando una linea en blanco al final) y confirma explicitamente que la doc sigue vigente."
 
 $out = @{ decision = 'block'; reason = $reason } | ConvertTo-Json -Compress
 Write-Output $out
