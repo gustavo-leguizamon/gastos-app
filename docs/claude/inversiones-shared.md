@@ -6,18 +6,19 @@ Sección standalone (`/inversiones`, desde `TopBar`) para tracking de balance sn
 
 **Two-level model:**
 - `Inversion` (parent): `id`, `nombre`, `createdAt`. ABM inline en la página.
-- `Movimiento` (child): `id`, `inversionId`, `fecha`, `montoActual`, `montoExtra`, `createdAt`. `onDelete: Cascade`.
+- `Movimiento` (child): `id`, `inversionId`, `fecha`, `montoActual`, `movimiento`, `createdAt`. `onDelete: Cascade`.
 
-Responses snake_case (`monto_actual`, `monto_extra`, `inversion_id`).
+Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
 
 **Computed columns** (no almacenados, derivados client-side después de sort por `fecha` asc, ties por `id`):
-- `monto_actualizado = monto_actual + monto_extra`
+- `monto_actualizado = monto_actual + movimiento`
 - `cambio = monto_actualizado(actual) - monto_actualizado(previo)` — `null` para la primera fila (`—`). Positivo verde, negativo rojo.
 - `dia` — weekday en español parseado de `fecha` como **local** date (split `-` + `new Date(y, m-1, d)` para evitar TZ shift).
 
 **UI** (`src/app/inversiones/page.tsx`):
 - Tabs arriba, una por inversion. A la derecha: edit/delete icons sobre el tab activo; **+** abre dialog de create.
-- Form debajo de tabs (Fecha / Monto actual / Monto extra) hace create/edit (Editar carga valores; "Cancelar" sale del modo edit).
+- Form debajo de tabs (Fecha / Monto actual / Movimiento) hace create/edit (Editar carga valores; "Cancelar" sale del modo edit). El campo "Movimiento" (antes "Monto extra") representa depósito (positivo) o retiro (negativo) aplicado sobre `monto_actual`.
+- **Fallback de Monto actual:** si el usuario deja "Monto actual" vacío pero llena "Movimiento", el form resuelve `monto_actual` al del movimiento más reciente (sort fecha desc, id desc; excluyendo la fila en edición). Caso de uso: registrar un depósito/retiro sin re-chequear el balance. Si no hay movimientos previos o ambos campos están vacíos, error.
 - DataGrid debajo. **Default sort: `fecha` desc, luego `id` desc.** Como el DataGrid free solo soporta single-column sort, el tiebreaker `id` se implementa pre-reverseando el array (después de computar `cambio` en asc) para que stable sort por `fecha desc` mantenga ties en `id desc`. El cómputo de `cambio` corre siempre en asc internamente (en el memo `rows`), independiente del sort visual.
 - Sin inversiones, empty-state card con prompt al **+**.
 

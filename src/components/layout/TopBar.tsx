@@ -24,6 +24,9 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SettingsIcon from '@mui/icons-material/Settings'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import PaidIcon from '@mui/icons-material/Paid'
+
+const SUELDOS_ALLOWED_EMAIL = 'gustavoleguizamn@gmail.com'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
@@ -31,12 +34,17 @@ const NAV = [
   { label: 'Configuración', href: '/configuracion', icon: <SettingsIcon fontSize="small" /> },
 ]
 
+const SUELDOS_ITEM = { label: 'Sueldos', href: '/sueldos', icon: <PaidIcon fontSize="small" /> }
+
 export default function TopBar() {
   const pathname = usePathname()
   const theme = useTheme()
   const isCompact = useMediaQuery(theme.breakpoints.down('md'))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { data: session } = useSession()
+
+  const canSeeSueldos = session?.user?.email?.toLowerCase() === SUELDOS_ALLOWED_EMAIL
+  const navItems = canSeeSueldos ? [NAV[0], NAV[1], SUELDOS_ITEM, NAV[2]] : NAV
 
   return (
     <>
@@ -63,7 +71,7 @@ export default function TopBar() {
           </Typography>
           {!isCompact && (
             <Box sx={{ display: 'flex', gap: 1 }}>
-              {NAV.map((item) => {
+              {navItems.map((item) => {
                 const active = pathname.startsWith(item.href)
                 return (
                   <Button
@@ -105,7 +113,7 @@ export default function TopBar() {
             <Typography variant="h6" fontWeight={700} color="primary.main">GastosApp</Typography>
           </Box>
           <List>
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const active = pathname.startsWith(item.href)
               return (
                 <ListItemButton

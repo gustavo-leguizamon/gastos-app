@@ -147,8 +147,20 @@ export interface Movimiento {
   inversion_id: number
   fecha: string
   monto_actual: number
-  monto_extra: number
+  movimiento: number
   created_at: string
+}
+
+export interface Sueldo {
+  id: number
+  fecha: string
+  sueldo_teorico: number
+  sueldo_ars: number
+  sueldo_usd: number
+  cotizacion_bna: number
+  cotizacion_mep: number
+  created_at: string
+  updated_at: string
 }
 
 export interface FiltrosGastos {

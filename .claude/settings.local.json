@@ -49,7 +49,10 @@
       "PowerShell(Add-Content *)",
       "PowerShell(Get-Item *)",
       "Bash(findstr /N \"pagoId\" \"C:\\\\Users\\\\GustavoLeguizamon\\\\Desktop\\\\app\\\\gapp\\\\gastos-app\\\\node_modules\\\\.prisma\\\\client\\\\index.d.ts\")",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "Bash(Get-ChildItem C:UsersGustavoLeguizamonDesktopappgappgastos-appdocsclaude *)",
+      "PowerShell(npx prisma migrate status)",
+      "PowerShell(npx prisma migrate deploy)"
     ]
   },
   "hooks": {

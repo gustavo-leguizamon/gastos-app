@@ -8,7 +8,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
     data: {
       fecha: body.fecha,
       montoActual: Number(body.monto_actual),
-      montoExtra: Number(body.monto_extra ?? 0),
+      movimiento: Number(body.movimiento ?? 0),
     },
   })
   return NextResponse.json({
@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
     inversion_id: mov.inversionId,
     fecha: mov.fecha,
     monto_actual: mov.montoActual,
-    monto_extra: mov.montoExtra,
+    movimiento: mov.movimiento,
     created_at: mov.createdAt.toISOString(),
   })
 }

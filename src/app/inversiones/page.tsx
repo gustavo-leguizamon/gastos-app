@@ -44,7 +44,7 @@ export default function InversionesPage() {
 
   const [fecha, setFecha] = useState(todayLocal())
   const [montoActual, setMontoActual] = useState('')
-  const [montoExtra, setMontoExtra] = useState('')
+  const [movimientoMonto, setMovimientoMonto] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [toDelete, setToDelete] = useState<Movimiento | null>(null)
   const [saving, setSaving] = useState(false)
@@ -79,7 +79,7 @@ export default function InversionesPage() {
   const resetForm = () => {
     setFecha(todayLocal())
     setMontoActual('')
-    setMontoExtra('')
+    setMovimientoMonto('')
     setEditingId(null)
   }
 
@@ -89,14 +89,34 @@ export default function InversionesPage() {
       toast.error('Creá una inversión primero')
       return
     }
-    if (!fecha || montoActual === '') {
-      toast.error('Completá Fecha y Monto actual')
+    if (!fecha) {
+      toast.error('Completá la fecha')
       return
+    }
+    if (montoActual === '' && movimientoMonto === '') {
+      toast.error('Completá Monto actual o Movimiento')
+      return
+    }
+    let montoActualResolved: number
+    if (montoActual === '') {
+      const lastByDate = [...movimientos]
+        .filter(m => !editingId || m.id !== editingId)
+        .sort((a, b) => {
+          if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha)
+          return b.id - a.id
+        })[0]
+      if (!lastByDate) {
+        toast.error('No hay movimientos previos: cargá un Monto actual')
+        return
+      }
+      montoActualResolved = lastByDate.monto_actual
+    } else {
+      montoActualResolved = Number(montoActual)
     }
     const body = {
       fecha,
-      monto_actual: Number(montoActual),
-      monto_extra: montoExtra === '' ? 0 : Number(montoExtra),
+      monto_actual: montoActualResolved,
+      movimiento: movimientoMonto === '' ? 0 : Number(movimientoMonto),
     }
     setSaving(true)
     try {
@@ -123,7 +143,7 @@ export default function InversionesPage() {
     setEditingId(mov.id)
     setFecha(mov.fecha)
     setMontoActual(String(mov.monto_actual))
-    setMontoExtra(String(mov.monto_extra))
+    setMovimientoMonto(String(mov.movimiento))
   }
 
   const onDeleteMov = async () => {
@@ -205,14 +225,14 @@ export default function InversionesPage() {
     })
     let prevActualizado: number | null = null
     const ascRows = sorted.map((mov) => {
-      const actualizado = mov.monto_actual + mov.monto_extra
+      const actualizado = mov.monto_actual + mov.movimiento
       const cambio = prevActualizado === null ? null : actualizado - prevActualizado
       prevActualizado = actualizado
       return {
         id: mov.id,
         fecha: mov.fecha,
         monto_actual: mov.monto_actual,
-        monto_extra: mov.monto_extra,
+        movimiento: mov.movimiento,
         monto_actualizado: actualizado,
         cambio,
         _raw: mov,
@@ -237,7 +257,7 @@ export default function InversionesPage() {
       },
     },
     { field: 'monto_actual', headerName: 'Monto actual', width: 160, type: 'number', valueFormatter: (value: number) => fmtARS(value) },
-    { field: 'monto_extra', headerName: 'Monto extra', width: 160, type: 'number', valueFormatter: (value: number) => fmtARS(value) },
+    { field: 'movimiento', headerName: 'Movimiento', width: 160, type: 'number', valueFormatter: (value: number) => fmtARS(value) },
     {
       field: 'monto_actualizado',
       headerName: 'Monto actualizado',
@@ -346,7 +366,7 @@ export default function InversionesPage() {
               >
                 <AppDateField label="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
                 <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
-                <TextField label="Monto extra" type="number" value={montoExtra} onChange={(e) => setMontoExtra(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
+                <TextField label="Movimiento" type="number" value={movimientoMonto} onChange={(e) => setMovimientoMonto(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={saving}>
                   {editingId ? 'Guardar' : 'Agregar'}
                 </Button>
@@ -394,8 +414,8 @@ export default function InversionesPage() {
                             <Typography variant="body2" fontWeight={600}>{fmtARS(row.monto_actual)}</Typography>
                           </Box>
                           <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Monto extra</Typography>
-                            <Typography variant="body2" fontWeight={600}>{fmtARS(row.monto_extra)}</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Movimiento</Typography>
+                            <Typography variant="body2" fontWeight={600}>{fmtARS(row.movimiento)}</Typography>
                           </Box>
                           <Box>
                             <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Actualizado</Typography>

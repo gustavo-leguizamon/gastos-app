@@ -116,7 +116,7 @@ model Movimiento {
   inversionId Int
   fecha       String
   montoActual Float
-  montoExtra  Float    @default(0)
+  movimiento  Float    @default(0)
   createdAt   DateTime @default(now())
 
   inversion Inversion @relation(fields: [inversionId], references: [id], onDelete: Cascade)
@@ -129,6 +129,18 @@ model Settings {
   estimIncluirCuotasVigentes  Boolean  @default(true)
   estimExcluirUltimaCuota     Boolean  @default(true)
   updatedAt                   DateTime @updatedAt
+}
+
+model Sueldo {
+  id             Int      @id @default(autoincrement())
+  fecha          String
+  sueldoTeorico  Float    @default(0)
+  sueldoArs      Float    @default(0)
+  sueldoUsd      Float    @default(0)
+  cotizacionBna  Float    @default(0)
+  cotizacionMep  Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Pago {

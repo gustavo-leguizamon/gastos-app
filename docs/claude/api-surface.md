@@ -23,5 +23,7 @@
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos |
 | `PUT/DELETE /api/inversiones/[id]/movimientos/[movId]` | Edit / remove a movimiento |
+| `GET/POST /api/sueldos` | List / create sueldos — **restringido** al email permitido (403 si no) |
+| `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
 
 Todos los responses de `/api/gastos` incluyen `pagos` y `items` vía constante `INCLUDE` y mapper `toGastoResponse()` en cada route file.

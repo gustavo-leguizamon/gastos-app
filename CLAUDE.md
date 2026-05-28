@@ -23,6 +23,7 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 | `docs/claude/tarjetas.md` | Logos de marca, `es_tarjeta`, `TarjetaCierre`, propagación de pagos a tarjeta (incluye cascade y sync bidireccional), tarjetas cerradas dashboard |
 | `docs/claude/api-surface.md` | Tabla completa de routes `/api/*` |
 | `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`) |
+| `docs/claude/sueldos.md` | Sección Sueldos (acceso restringido por email, modelo, cálculo Neto/Bruto, coloreado) |
 
 ## Commands
 

@@ -6,7 +6,7 @@ function toResponse(m: {
   inversionId: number
   fecha: string
   montoActual: number
-  montoExtra: number
+  movimiento: number
   createdAt: Date
 }) {
   return {
@@ -14,7 +14,7 @@ function toResponse(m: {
     inversion_id: m.inversionId,
     fecha: m.fecha,
     monto_actual: m.montoActual,
-    monto_extra: m.montoExtra,
+    movimiento: m.movimiento,
     created_at: m.createdAt.toISOString(),
   }
 }
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       inversionId: Number(params.id),
       fecha: body.fecha,
       montoActual: Number(body.monto_actual),
-      montoExtra: Number(body.monto_extra ?? 0),
+      movimiento: Number(body.movimiento ?? 0),
     },
   })
   return NextResponse.json(toResponse(mov), { status: 201 })
