@@ -462,8 +462,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
 
         {/* Cuotas (solo si usa cuotas) */}
         {usaCuotas && (
-          <>
-            <Grid item xs={12} sm={6}>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
               <Controller
                 name="cuota_actual"
                 control={control}
@@ -472,18 +472,17 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                     {...field}
                     value={field.value ?? ''}
                     onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                    fullWidth
-                    label="Cuota actual"
+                    label="Cuota"
                     type="number"
                     size="small"
+                    sx={{ width: 90 }}
                     inputProps={{ min: 1, step: 1 }}
                     error={!!errors.cuota_actual}
                     helperText={errors.cuota_actual?.message}
                   />
                 )}
               />
-            </Grid>
-            <Grid item xs={12} sm={6}>
+              <Typography sx={{ mt: 1, color: 'text.secondary' }}>/</Typography>
               <Controller
                 name="cuotas_totales"
                 control={control}
@@ -492,18 +491,18 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                     {...field}
                     value={field.value ?? ''}
                     onChange={e => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                    fullWidth
-                    label="Total de cuotas"
+                    label="Total"
                     type="number"
                     size="small"
+                    sx={{ width: 90 }}
                     inputProps={{ min: 1, step: 1 }}
                     error={!!errors.cuotas_totales}
                     helperText={errors.cuotas_totales?.message}
                   />
                 )}
               />
-            </Grid>
-          </>
+            </Box>
+          </Grid>
         )}
 
         {/* Notas */}

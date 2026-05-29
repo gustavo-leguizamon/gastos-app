@@ -214,17 +214,19 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           value={fecha} onChange={e => setFecha(e.target.value)}
         />
       </Box>
-      <Box sx={{ display: 'flex', gap: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <TextField
-          size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
+          size="small" label="Cuota" type="number" sx={{ width: 90 }}
           value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
           inputProps={{ min: 1, step: 1 }}
         />
+        <Typography sx={{ color: 'text.secondary' }}>/</Typography>
         <TextField
-          size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
+          size="small" label="Total" type="number" sx={{ width: 90 }}
           value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
           inputProps={{ min: 1, step: 1 }}
         />
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>(opcional)</Typography>
       </Box>
       <AppSelect
         label="Categoría (opcional)"
@@ -351,15 +353,16 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         onChange={e => setEditing(p => p ? { ...p, fecha: e.target.value } : p)}
                       />
                     </Box>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <TextField
-                        size="small" label="Cuota actual" type="number" sx={{ flex: 1 }}
+                        size="small" label="Cuota" type="number" sx={{ width: 90 }}
                         value={editing.cuota_actual}
                         onChange={e => setEditing(p => p ? { ...p, cuota_actual: e.target.value } : p)}
                         inputProps={{ min: 1, step: 1 }}
                       />
+                      <Typography sx={{ color: 'text.secondary' }}>/</Typography>
                       <TextField
-                        size="small" label="Total cuotas" type="number" sx={{ flex: 1 }}
+                        size="small" label="Total" type="number" sx={{ width: 90 }}
                         value={editing.cuotas_totales}
                         onChange={e => setEditing(p => p ? { ...p, cuotas_totales: e.target.value } : p)}
                         inputProps={{ min: 1, step: 1 }}
