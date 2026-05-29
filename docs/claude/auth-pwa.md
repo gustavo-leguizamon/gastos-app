@@ -41,7 +41,7 @@ Layouts dedicados a `theme.breakpoints.down('sm')` (≤600px) o `down('md')` (�
 - **`FiltrosGastos`**: stack vertical en `<md`.
 - **`GastosTable`**: renderiza **cards en vez de DataGrid en `<sm`**. Cada card: descripción, chip, fecha, categoría, cuotas, totales 3-col (Total/Pagado/Restante), expand para sub-items, kebab menu (`MoreVertIcon`) con 5 acciones. Sub-items expanden inline con checkboxes incluye_en_total/vencimiento. Desktop mantiene DataGrid.
 - **`GastoDialog`, `PagoDialog`, `CopiarMesDialog`, `CopiarGastoDialog`**: `fullScreen={isMobile}` (`<sm`).
-- **`GastoItemDialog`**: `fullScreen` en `<md`. Layout 2-col se vuelve stack vertical.
+- **`GastoItemDialog`**: `fullScreen` en `<md`. Layout 2-col se vuelve stack vertical (resumen + form arriba, lista abajo). En `<md` el form "Agregar sub-item" va dentro de un `Accordion` **cerrado por defecto** para que la lista de items cargados sea visible de entrada; en `>=md` el form se mantiene fijo. Los campos del form están extraídos en una variable `addItemFields` reusada por ambas ramas.
 - **`PagoDialog`**, **`CopiarMesDialog`**: forms stackean vertical en `<sm`.
 - **`inversiones/page.tsx`**: movimientos `AppDataGrid` reemplazado por lista vertical de cards en `<sm`. Mobile itera `rows` directo (ya en fecha desc + id desc).
 
