@@ -52,8 +52,10 @@ Propagación en try/catch — si falla, el pago original se mantiene. Esta lógi
 - `PUT /api/gastos/[id]/pagos/[pagoId]` actualiza el pago y ejecuta `prisma.gastoItem.updateMany({ where: { pagoId }, data: { fecha, monto } })`. Response incluye `synced_items: number`.
 - `PUT /api/gastos/[id]/items/[itemId]` actualiza el item y, si `item.pagoId != null`, `prisma.pago.update({ where: { id: pagoId }, data: { monto, ...(item.fecha ? { fecha: item.fecha } : {}) } })`. Si fecha del item es `null`, preserva la actual del pago (NOT NULL). Response incluye `synced_pago: boolean`.
 - Ambos sincs en try/catch — fallar el sync no bloquea la edición. Logs server: `[PUT pago]` / `[PUT item]`.
-- Solo se sincroniza `(fecha, monto)`. `descripcion`, `categoria_id`, etc. no se reflejan.
+- Solo se sincroniza `(fecha, monto)`. `descripcion`, `categoria_id`, etc. no se reflejan entre pago↔item.
 - **Refresh del cliente:** `PagoDialog` y `GastoItemDialog` reciben el flag de sync y lo propagan a `onChanged(fullReload)`. `GastosTable` dispara `triggerRefresh()` cuando hubo sync. Sin el flag, solo refresca gasto actual + cards.
+
+**Sync de descripción del gasto fuente → sub-items propagados:** `PUT /api/gastos/[id]` (editar el gasto crédito que origina los pagos) ejecuta `prisma.gastoItem.updateMany({ where: { pago: { gastoId } }, data: { descripcion } })`. Como el sub-item se generó con `descripcion = gasto fuente.descripcion`, al renombrar el gasto fuente se reflejan todos los sub-items linkeados a sus pagos. `GastoDialog.onSaved = triggerRefresh` recarga la tabla; si el sub-item vive en otro mes se ve al navegar. En try/catch — no bloquea la edición.
 
 ## Tarjetas cerradas (dashboard de gastos)
 

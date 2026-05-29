@@ -110,6 +110,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include: INCLUDE,
   })
 
+  // Sync de descripción a los sub-items propagados de tarjeta: el sub-item se generó
+  // con descripcion = gasto fuente.descripcion. Si cambió, reflejarlo en todos los
+  // items cuyo pago pertenece a este gasto.
+  try {
+    await prisma.gastoItem.updateMany({
+      where: { pago: { gastoId: gasto.id } },
+      data: { descripcion: gasto.descripcion },
+    })
+  } catch (err) {
+    console.error('Sync descripción gasto→items propagados falló:', err)
+  }
+
   return NextResponse.json(toGastoResponse(gasto))
 }
 
