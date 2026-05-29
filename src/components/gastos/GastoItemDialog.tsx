@@ -15,8 +15,12 @@ import IconButton from '@mui/material/IconButton'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
@@ -182,6 +186,74 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     return a.fecha.localeCompare(b.fecha)
   })
 
+  const addItemFields = (
+    <>
+      <Autocomplete
+        freeSolo
+        options={descripciones}
+        value={descripcion}
+        onInputChange={(_, val) => setDescripcion(val)}
+        onChange={(_, val) => setDescripcion(val ?? '')}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            size="small" label="Descripción" fullWidth
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          />
+        )}
+      />
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <TextField
+          size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+          value={monto} onChange={e => setMonto(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          inputProps={{ min: 0, step: 0.01 }}
+        />
+        <AppDateField
+          size="small" label="Fecha (opcional)" sx={{ width: 155 }}
+          value={fecha} onChange={e => setFecha(e.target.value)}
+        />
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <TextField
+          size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
+          value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
+          inputProps={{ min: 1, step: 1 }}
+        />
+        <TextField
+          size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
+          value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
+          inputProps={{ min: 1, step: 1 }}
+        />
+      </Box>
+      <AppSelect
+        label="Categoría (opcional)"
+        options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
+        value={categoriaId}
+        onChange={(v) => setCategoriaId(v == null ? null : Number(v))}
+        fullWidth
+        emptyLabel="Sin especificar"
+      />
+      <Box sx={{ display: 'flex', gap: 2 }}>
+        <AppToggle
+          size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)}
+          label={<Typography variant="caption">Incluir en total</Typography>}
+        />
+        <AppToggle
+          size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)}
+          label={<Typography variant="caption">Incluir en vencimiento</Typography>}
+        />
+      </Box>
+      <Button
+        variant="contained"
+        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+        onClick={handleAdd} disabled={saving}
+      >
+        Agregar
+      </Button>
+    </>
+  )
+
   return (
     <Dialog
       open={open}
@@ -219,73 +291,30 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
             </Box>
           </Box>
 
-          {/* Formulario nuevo item */}
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography variant="subtitle2" fontWeight={700}>Agregar sub-item</Typography>
-            <Autocomplete
-              freeSolo
-              options={descripciones}
-              value={descripcion}
-              onInputChange={(_, val) => setDescripcion(val)}
-              onChange={(_, val) => setDescripcion(val ?? '')}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  size="small" label="Descripción" fullWidth
-                  onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                />
-              )}
-            />
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <TextField
-                size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
-                value={monto} onChange={e => setMonto(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                inputProps={{ min: 0, step: 0.01 }}
-              />
-              <AppDateField
-                size="small" label="Fecha (opcional)" sx={{ width: 155 }}
-                value={fecha} onChange={e => setFecha(e.target.value)}
-              />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <TextField
-                size="small" label="Cuota actual (opcional)" type="number" sx={{ flex: 1 }}
-                value={cuotaActual} onChange={e => setCuotaActual(e.target.value)}
-                inputProps={{ min: 1, step: 1 }}
-              />
-              <TextField
-                size="small" label="Total cuotas (opcional)" type="number" sx={{ flex: 1 }}
-                value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)}
-                inputProps={{ min: 1, step: 1 }}
-              />
-            </Box>
-            <AppSelect
-              label="Categoría (opcional)"
-              options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-              value={categoriaId}
-              onChange={(v) => setCategoriaId(v == null ? null : Number(v))}
-              fullWidth
-              emptyLabel="Sin especificar"
-            />
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <AppToggle
-                size="small" checked={incluyeEnTotal} onChange={e => setIncluyeEnTotal(e.target.checked)}
-                label={<Typography variant="caption">Incluir en total</Typography>}
-              />
-              <AppToggle
-                size="small" checked={incluyeEnVencimiento} onChange={e => setIncluyeEnVencimiento(e.target.checked)}
-                label={<Typography variant="caption">Incluir en vencimiento</Typography>}
-              />
-            </Box>
-            <Button
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-              onClick={handleAdd} disabled={saving}
+          {/* Formulario nuevo item — Accordion colapsable en mobile, fijo en desktop */}
+          {isMobile ? (
+            <Accordion
+              disableGutters
+              elevation={0}
+              square
+              sx={{ bgcolor: 'transparent', '&:before': { display: 'none' }, borderBottom: '1px solid', borderColor: 'divider' }}
             >
-              Agregar
-            </Button>
-          </Box>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AddIcon fontSize="small" color="primary" />
+                  <Typography variant="subtitle2" fontWeight={700}>Agregar sub-item</Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 2, pt: 0, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {addItemFields}
+              </AccordionDetails>
+            </Accordion>
+          ) : (
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Typography variant="subtitle2" fontWeight={700}>Agregar sub-item</Typography>
+              {addItemFields}
+            </Box>
+          )}
         </Box>
 
         {/* Columna derecha: lista de items */}
