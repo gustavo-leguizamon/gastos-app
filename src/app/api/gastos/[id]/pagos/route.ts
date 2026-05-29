@@ -103,6 +103,8 @@ async function propagatePagoToTarjeta(opts: {
       incluyeEnVencimiento: false,
       pagoId: opts.pagoId,
       categoriaId: source.categoriaId ?? null,
+      cuotaActual: source.cuotaActual ?? null,
+      cuotasTotales: source.cuotasTotales ?? null,
     },
   })
 }

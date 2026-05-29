@@ -52,7 +52,8 @@
       "PowerShell(Test-Path *)",
       "Bash(Get-ChildItem C:UsersGustavoLeguizamonDesktopappgappgastos-appdocsclaude *)",
       "PowerShell(npx prisma migrate status)",
-      "PowerShell(npx prisma migrate deploy)"
+      "PowerShell(npx prisma migrate deploy)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30; Write-Output \"EXIT: $LASTEXITCODE\")"
     ]
   },
   "hooks": {
