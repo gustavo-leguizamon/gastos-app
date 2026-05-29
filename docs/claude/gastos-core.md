@@ -132,6 +132,6 @@ Ambos llaman `triggerRefresh()` al terminar.
 3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `descripcion` (case-insensitive vía `mode: 'insensitive'`).
 4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuya descripción normalizada (`trim().toLowerCase()`) **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
 5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, `categoria_id`, etc.) y todos los sub-items candidatos. Devuelve `{ created: true, gasto_id, added_items }`.
-6. **Incremento de cuota:** cada sub-item copiado que esté en cuotas no finalizadas (`cuotaActual < cuotasTotales`) se crea con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Esto aplica tanto en merge como en creación, sea o no `esTarjeta`.
+6. **Incremento de cuota:** tanto el **gasto principal** (al crearlo nuevo) como cada **sub-item** copiado, si están en cuotas no finalizadas (`cuotaActual < cuotasTotales`), se copian con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Aplica sea o no `esTarjeta`. El gasto sólo incrementa en la rama de creación (en merge no se toca el gasto destino existente).
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
