@@ -3,6 +3,7 @@
 | Route | Purpose |
 |---|---|
 | `GET/POST /api/gastos` | List (with filters) / create gastos |
+| `POST /api/gastos/copiar` | Copia un gasto (`{ source_id, mes, anio }`) con merge: si ya existe (descripción+mes+año+casa, case-insensitive) agrega sólo sub-items faltantes; si no, crea el gasto. Filtra sub-items por cuotas pendientes si `esTarjeta` e incrementa `cuotaActual` +1 para cuotas no finalizadas. |
 | `GET/PUT/DELETE /api/gastos/[id]` | Single gasto CRUD |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |
 | `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |

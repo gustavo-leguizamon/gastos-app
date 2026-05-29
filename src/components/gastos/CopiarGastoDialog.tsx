@@ -43,59 +43,20 @@ export default function CopiarGastoDialog({ open, gasto, onClose, onCopied }: Pr
   const handleCopy = async () => {
     setLoading(true)
     try {
-      // Calcular nueva fecha de vencimiento con el mismo día pero nuevo mes/año
-      const diaVenc = gasto.fecha_vencimiento.split('-')[2]
-      const nuevaFecha = `${anio}-${String(mes).padStart(2, '0')}-${diaVenc}`
-
-      const res = await fetch('/api/gastos', {
+      const res = await fetch('/api/gastos/copiar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          casa_id: gasto.casa_id,
-          descripcion: gasto.descripcion,
-          fecha_vencimiento: nuevaFecha,
-          tipo_pago: gasto.tipo_pago,
-          moneda_id: gasto.moneda_id,
-          tipo_cambio: gasto.tipo_cambio,
-          total_moneda: gasto.total_moneda,
-          total_pagado: 0,
-          pasaje_mes_siguiente: 0,
-          prestamo_a_otro: 0,
-          tarjeta_id: gasto.tarjeta_id,
-          cuota_actual: gasto.cuota_actual,
-          cuotas_totales: gasto.cuotas_totales,
-          mes,
-          anio,
-          notas: gasto.notas ?? '',
-          confirmado: false,
-          categoria_id: gasto.categoria_id,
-          es_tarjeta: gasto.es_tarjeta,
-        }),
+        body: JSON.stringify({ source_id: gasto.id, mes, anio }),
       })
       if (!res.ok) throw new Error()
-      const nuevoGasto = await res.json()
-
-      // Copiar sub-items si existen
-      if (gasto.items?.length) {
-        await Promise.all(gasto.items.map(item =>
-          fetch(`/api/gastos/${nuevoGasto.id}/items`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              descripcion: item.descripcion,
-              monto: item.monto,
-              fecha: item.fecha,
-              cuota_actual: item.cuota_actual,
-              cuotas_totales: item.cuotas_totales,
-              incluye_en_total: item.incluye_en_total,
-              incluye_en_vencimiento: item.incluye_en_vencimiento,
-              categoria_id: item.categoria_id,
-            }),
-          })
-        ))
+      const result = await res.json()
+      if (result.merged) {
+        toast.success(result.added_items > 0
+          ? `El gasto ya existía: se agregaron ${result.added_items} sub-item(s) a ${MESES[mes - 1]} ${anio}`
+          : `El gasto ya existía en ${MESES[mes - 1]} ${anio}, sin sub-items nuevos para agregar`)
+      } else {
+        toast.success(`Gasto copiado a ${MESES[mes - 1]} ${anio}`)
       }
-
-      toast.success(`Gasto copiado a ${MESES[mes - 1]} ${anio}`)
       onClose()
       onCopied()
     } catch {

@@ -118,7 +118,20 @@ Si hay matches abre `Dialog` con la lista (sub-items con `SubdirectoryArrowRight
 
 ## Copy dialogs
 
-- **`CopiarGastoDialog`** — copia un gasto (+ sub-items). Resetea pagos a cero, `confirmado: false`, ajusta `fechaVencimiento` al mismo día del mes destino.
-- **`CopiarMesDialog`** — copia todos los gastos del mes origen al mes destino. Origen default = filtro activo; destino default = mes siguiente. Muestra preview de count y `LinearProgress` durante el loop.
+Ambos dialogs delegan la copia al endpoint server-side **`POST /api/gastos/copiar`** (`{ source_id, mes, anio }`), que centraliza la lógica de merge, dedup y manejo de cuotas. Ya **no** arman el body del gasto/items en el cliente.
 
-Ambos llaman `triggerRefresh()` al terminar. Propagan al body el flag `es_tarjeta` del origen. Las fechas de cierre **ya no se copian** (viven en `TarjetaCierre` por mes/año independientes).
+- **`CopiarGastoDialog`** — copia un gasto. Llama al endpoint una vez. El toast indica si fue creado o mergeado (y cuántos sub-items se agregaron).
+- **`CopiarMesDialog`** — copia todos los gastos del mes origen al mes destino. Origen default = filtro activo; destino default = mes siguiente. Hace un loop llamando al endpoint por cada gasto, con `LinearProgress`.
+
+Ambos llaman `triggerRefresh()` al terminar.
+
+### Lógica de `POST /api/gastos/copiar`
+
+1. Carga el gasto origen (con items). Calcula `fechaVencimiento` destino = mismo día, nuevo mes/año.
+2. **Sub-items candidatos:** si el gasto es `esTarjeta`, sólo los que tienen **cuotas pendientes** (`cuotaActual != null && cuotasTotales != null && cuotaActual < cuotasTotales`). Para gastos normales, todos los sub-items.
+3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `descripcion` (case-insensitive vía `mode: 'insensitive'`).
+4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuya descripción normalizada (`trim().toLowerCase()`) **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
+5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, `categoria_id`, etc.) y todos los sub-items candidatos. Devuelve `{ created: true, gasto_id, added_items }`.
+6. **Incremento de cuota:** cada sub-item copiado que esté en cuotas no finalizadas (`cuotaActual < cuotasTotales`) se crea con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Esto aplica tanto en merge como en creación, sea o no `esTarjeta`.
+
+Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).

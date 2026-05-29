@@ -73,55 +73,12 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
 
     for (const g of gastos) {
       try {
-        const diaVenc = g.fecha_vencimiento.split('-')[2]
-        const nuevaFecha = `${dstAnio}-${String(dstMes).padStart(2, '0')}-${diaVenc}`
-
-        const res = await fetch('/api/gastos', {
+        const res = await fetch('/api/gastos/copiar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            casa_id: g.casa_id,
-            descripcion: g.descripcion,
-            fecha_vencimiento: nuevaFecha,
-            tipo_pago: g.tipo_pago,
-            moneda_id: g.moneda_id,
-            tipo_cambio: g.tipo_cambio,
-            total_moneda: g.total_moneda,
-            total_pagado: 0,
-            pasaje_mes_siguiente: 0,
-            prestamo_a_otro: 0,
-            tarjeta_id: g.tarjeta_id,
-            cuota_actual: g.cuota_actual,
-            cuotas_totales: g.cuotas_totales,
-            mes: dstMes,
-            anio: dstAnio,
-            notas: g.notas ?? '',
-            confirmado: false,
-            categoria_id: g.categoria_id,
-            es_tarjeta: g.es_tarjeta,
-          }),
+          body: JSON.stringify({ source_id: g.id, mes: dstMes, anio: dstAnio }),
         })
         if (!res.ok) throw new Error()
-        const nuevo = await res.json()
-
-        if (g.items?.length) {
-          await Promise.all(g.items.map(item =>
-            fetch(`/api/gastos/${nuevo.id}/items`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                descripcion: item.descripcion,
-                monto: item.monto,
-                fecha: item.fecha,
-                cuota_actual: item.cuota_actual,
-                cuotas_totales: item.cuotas_totales,
-                incluye_en_total: item.incluye_en_total,
-                incluye_en_vencimiento: item.incluye_en_vencimiento,
-                categoria_id: item.categoria_id,
-              }),
-            })
-          ))
-        }
         copied++
       } catch {
         errors++
