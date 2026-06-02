@@ -65,7 +65,7 @@ Sub-items ordenados por `fecha` asc (nulls last) — en `buildFlatRows` y `Gasto
 
 Ambos `Gasto` y `GastoItem` tienen `categoriaId` FK opcional a `Categoria`. (Renombrado de `Lugar` vía migración `20260516000000_rename_lugar_to_categoria` con `ALTER TABLE`/`RENAME COLUMN`.)
 
-`GastoItemDialog` layout 2-col (`maxWidth="md"`, height 90vh): izq (340px) resumen + add form; der lista scrollable. Overflow independiente.
+`GastoItemDialog` layout 2-col (`maxWidth="md"`, height 90vh): izq (340px) resumen + add form; der lista scrollable. Overflow independiente. La columna derecha tiene un buscador (`filtroItems`) arriba de la lista que filtra los sub-items por descripción y categoría (case-insensitive); el resumen de la izquierda sigue calculándose sobre todos los items, no sobre los filtrados.
 
 Al agregar/editar/borrar items, se llama `triggerResumenRefresh()` junto con `refreshGasto()` (importante para unconfirmed gastos cuyo total deriva de items).
 
@@ -121,7 +121,7 @@ Si hay matches abre `Dialog` con la lista (sub-items con `SubdirectoryArrowRight
 Ambos dialogs delegan la copia al endpoint server-side **`POST /api/gastos/copiar`** (`{ source_id, mes, anio }`), que centraliza la lógica de merge, dedup y manejo de cuotas. Ya **no** arman el body del gasto/items en el cliente.
 
 - **`CopiarGastoDialog`** — copia un gasto. Llama al endpoint una vez. El toast indica si fue creado o mergeado (y cuántos sub-items se agregaron).
-- **`CopiarMesDialog`** — copia todos los gastos del mes origen al mes destino. Origen default = filtro activo; destino default = mes siguiente. Hace un loop llamando al endpoint por cada gasto, con `LinearProgress`.
+- **`CopiarMesDialog`** — copia los gastos del mes origen al mes destino. Origen default = filtro activo; destino default = mes siguiente. Muestra una lista de checkboxes con todos los gastos del mes origen (descripción, fecha, # sub-items) — **todos seleccionados por defecto**, con un "Seleccionar todos" (checkbox con estado indeterminate). El usuario puede destildar los que no quiera copiar. Hace un loop llamando al endpoint sólo por los gastos seleccionados, con `LinearProgress`. El botón y el resumen reflejan la cantidad seleccionada (`selectedIds`).
 
 Ambos llaman `triggerRefresh()` al terminar.
 

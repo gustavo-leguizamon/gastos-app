@@ -9,6 +9,9 @@ import Button from '@mui/material/Button'
 import AppSelect from '@/components/shared/AppSelect'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Divider from '@mui/material/Divider'
 import CircularProgress from '@mui/material/CircularProgress'
 import LinearProgress from '@mui/material/LinearProgress'
 import useMediaQuery from '@mui/material/useMediaQuery'
@@ -39,6 +42,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
   const [dstMes, setDstMes] = useState(filtros.mes === 12 ? 1 : filtros.mes + 1)
   const [dstAnio, setDstAnio] = useState(filtros.mes === 12 ? filtros.anio + 1 : filtros.anio)
   const [gastos, setGastos] = useState<Gasto[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [loadingGastos, setLoadingGastos] = useState(false)
   const [copying, setCopying] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -60,18 +64,35 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
     setLoadingGastos(true)
     fetch(`/api/gastos?mes=${srcMes}&anio=${srcAnio}`)
       .then(r => r.json())
-      .then(data => setGastos(Array.isArray(data) ? data : []))
+      .then(data => {
+        const list = Array.isArray(data) ? data : []
+        setGastos(list)
+        setSelectedIds(new Set(list.map((g: Gasto) => g.id)))
+      })
       .finally(() => setLoadingGastos(false))
   }, [open, srcMes, srcAnio])
 
+  const toggleSelected = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  const allSelected = gastos.length > 0 && selectedIds.size === gastos.length
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(gastos.map(g => g.id)))
+  }
+
   const handleCopy = async () => {
-    if (gastos.length === 0) return
+    const seleccionados = gastos.filter(g => selectedIds.has(g.id))
+    if (seleccionados.length === 0) return
     setCopying(true)
     setProgress(0)
     let copied = 0
     let errors = 0
 
-    for (const g of gastos) {
+    for (const g of seleccionados) {
       try {
         const res = await fetch('/api/gastos/copiar', {
           method: 'POST',
@@ -83,7 +104,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
       } catch {
         errors++
       }
-      setProgress(Math.round(((copied + errors) / gastos.length) * 100))
+      setProgress(Math.round(((copied + errors) / seleccionados.length) * 100))
     }
 
     setCopying(false)
@@ -173,15 +194,51 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
             <Typography variant="body2" color="text.secondary">
               {gastos.length === 0
                 ? `No hay gastos en ${MESES[srcMes - 1]} ${srcAnio}.`
-                : <>Se copiarán <strong style={{ color: '#fff' }}>{gastos.length} gasto{gastos.length !== 1 ? 's' : ''}</strong>
-                  {gastos.filter(g => g.items?.length > 0).length > 0 &&
-                    <> (incluye sub-items de {gastos.filter(g => g.items?.length > 0).length} fila{gastos.filter(g => g.items?.length > 0).length !== 1 ? 's' : ''})</>
-                  } a <strong style={{ color: '#fff' }}>{MESES[dstMes - 1]} {dstAnio}</strong>.
+                : <>Se copiarán <strong style={{ color: '#fff' }}>{selectedIds.size} de {gastos.length} gasto{gastos.length !== 1 ? 's' : ''}</strong> a <strong style={{ color: '#fff' }}>{MESES[dstMes - 1]} {dstAnio}</strong>.
                   <br />Los pagos, total pagado, pasaje y préstamo se resetean. Todos quedarán como <strong style={{ color: '#f59e0b' }}>no confirmados</strong>.</>
               }
             </Typography>
           )}
         </Box>
+
+        {/* Selección de gastos */}
+        {!loadingGastos && gastos.length > 0 && (
+          <Box sx={{ mt: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Box sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={allSelected}
+                    indeterminate={selectedIds.size > 0 && !allSelected}
+                    onChange={toggleAll}
+                  />
+                }
+                label={<Typography variant="caption" fontWeight={600}>Seleccionar todos</Typography>}
+              />
+              <Typography variant="caption" color="text.secondary">{selectedIds.size} seleccionados</Typography>
+            </Box>
+            <Divider />
+            <Box sx={{ maxHeight: 240, overflowY: 'auto', px: 1 }}>
+              {gastos.map(g => (
+                <Box key={g.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Checkbox
+                    size="small"
+                    checked={selectedIds.has(g.id)}
+                    onChange={() => toggleSelected(g.id)}
+                  />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography variant="body2" noWrap>{g.descripcion}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {g.fecha_vencimiento}
+                      {g.items?.length > 0 ? ` · ${g.items.length} sub-item${g.items.length !== 1 ? 's' : ''}` : ''}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {copying && (
           <Box sx={{ mt: 2 }}>
@@ -204,10 +261,10 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
         <Button
           variant="contained"
           onClick={handleCopy}
-          disabled={copying || loadingGastos || gastos.length === 0 || sameMonthYear}
+          disabled={copying || loadingGastos || selectedIds.size === 0 || sameMonthYear}
           startIcon={copying ? <CircularProgress size={16} color="inherit" /> : <ContentCopyIcon />}
         >
-          Copiar {gastos.length > 0 ? `${gastos.length} gasto${gastos.length !== 1 ? 's' : ''}` : ''}
+          Copiar {selectedIds.size > 0 ? `${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}` : ''}
         </Button>
       </DialogActions>
     </Dialog>

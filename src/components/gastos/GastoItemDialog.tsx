@@ -68,6 +68,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [filtroItems, setFiltroItems] = useState('')
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
@@ -179,12 +180,18 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     }
   }
 
-  const sortedItems = [...items].sort((a, b) => {
-    if (!a.fecha && !b.fecha) return 0
-    if (!a.fecha) return 1
-    if (!b.fecha) return -1
-    return a.fecha.localeCompare(b.fecha)
-  })
+  const sortedItems = [...items]
+    .filter(i => {
+      if (!filtroItems.trim()) return true
+      const q = filtroItems.toLowerCase()
+      return i.descripcion.toLowerCase().includes(q) || i.categoria_nombre?.toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      if (!a.fecha && !b.fecha) return 0
+      if (!a.fecha) return 1
+      if (!b.fecha) return -1
+      return a.fecha.localeCompare(b.fecha)
+    })
 
   const addItemFields = (
     <>
@@ -321,9 +328,20 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
 
         {/* Columna derecha: lista de items */}
         <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
+          {items.length > 0 && (
+            <Box sx={{ px: 1, pb: 1 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Buscar sub-item…"
+                value={filtroItems}
+                onChange={e => setFiltroItems(e.target.value)}
+              />
+            </Box>
+          )}
           {sortedItems.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              No hay sub-items cargados aún.
+              {items.length === 0 ? 'No hay sub-items cargados aún.' : 'No se encontraron sub-items para esa búsqueda.'}
             </Typography>
           ) : (
             sortedItems.map(item => (
