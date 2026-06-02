@@ -59,6 +59,7 @@ function toGastoResponse(g: any) {
       cuotas_totales: i.cuotasTotales ?? null,
       incluye_en_total: i.incluyeEnTotal,
       incluye_en_vencimiento: i.incluyeEnVencimiento,
+      verificado: i.verificado ?? false,
       categoria_id: i.categoriaId ?? null,
       categoria_nombre: i.categoria?.nombre ?? null,
       created_at: i.createdAt?.toISOString(),

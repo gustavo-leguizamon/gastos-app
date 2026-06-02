@@ -47,6 +47,7 @@ export interface GastoItem {
   cuotas_totales: number | null
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
+  verificado: boolean
   categoria_id: number | null
   categoria_nombre?: string | null
   created_at: string

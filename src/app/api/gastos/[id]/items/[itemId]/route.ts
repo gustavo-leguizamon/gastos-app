@@ -14,6 +14,7 @@ function toItemResponse(item: any) {
     cuotas_totales: item.cuotasTotales ?? null,
     incluye_en_total: item.incluyeEnTotal,
     incluye_en_vencimiento: item.incluyeEnVencimiento,
+    verificado: item.verificado ?? false,
     categoria_id: item.categoriaId ?? null,
     categoria_nombre: item.categoria?.nombre ?? null,
     created_at: item.createdAt.toISOString(),
@@ -32,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
       cuotasTotales: body.cuotas_totales ?? null,
       incluyeEnTotal: body.incluye_en_total ?? true,
       incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
+      verificado: body.verificado ?? false,
       categoriaId: body.categoria_id ?? null,
     },
     include: ITEM_INCLUDE,
@@ -64,6 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data: {
       ...(body.incluye_en_total !== undefined && { incluyeEnTotal: body.incluye_en_total }),
       ...(body.incluye_en_vencimiento !== undefined && { incluyeEnVencimiento: body.incluye_en_vencimiento }),
+      ...(body.verificado !== undefined && { verificado: body.verificado }),
     },
     include: ITEM_INCLUDE,
   })

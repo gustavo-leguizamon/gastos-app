@@ -12,6 +12,7 @@ import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
@@ -26,6 +27,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
 import type { Gasto, GastoItem, Categoria } from '@/lib/types'
@@ -43,6 +46,7 @@ type EditState = {
   cuotas_totales: string
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
+  verificado: boolean
   categoria_id: number | null
 }
 
@@ -99,6 +103,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     cuotas_totales: item.cuotas_totales != null ? String(item.cuotas_totales) : '',
     incluye_en_total: item.incluye_en_total,
     incluye_en_vencimiento: item.incluye_en_vencimiento,
+    verificado: item.verificado,
     categoria_id: item.categoria_id ?? null,
   })
 
@@ -119,6 +124,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: editing.cuotas_totales ? Number(editing.cuotas_totales) : null,
           incluye_en_total: editing.incluye_en_total,
           incluye_en_vencimiento: editing.incluye_en_vencimiento,
+          verificado: editing.verificado,
           categoria_id: editing.categoria_id,
         }),
       })
@@ -180,6 +186,20 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     }
   }
 
+  const handleToggleVerificado = async (item: GastoItem) => {
+    try {
+      const res = await fetch(`/api/gastos/${gasto.id}/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verificado: !item.verificado }),
+      })
+      if (!res.ok) throw new Error()
+      onChanged()
+    } catch {
+      toast.error('Error al actualizar')
+    }
+  }
+
   const sortedItems = [...items]
     .filter(i => {
       if (!filtroItems.trim()) return true
@@ -187,10 +207,15 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
       return i.descripcion.toLowerCase().includes(q) || i.categoria_nombre?.toLowerCase().includes(q)
     })
     .sort((a, b) => {
-      if (!a.fecha && !b.fecha) return 0
-      if (!a.fecha) return 1
-      if (!b.fecha) return -1
-      return a.fecha.localeCompare(b.fecha)
+      if (a.fecha && b.fecha) {
+        const cmp = a.fecha.localeCompare(b.fecha)
+        if (cmp !== 0) return cmp
+      } else if (!a.fecha && b.fecha) {
+        return 1
+      } else if (a.fecha && !b.fecha) {
+        return -1
+      }
+      return a.id - b.id
     })
 
   const addItemFields = (
@@ -418,8 +443,17 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                     </Box>
                   </Box>
                 ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'center', py: 0.75, px: 1, gap: 1 }}>
-                    <SubdirectoryArrowRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
+                  <Box sx={{
+                    display: 'flex', alignItems: 'center', py: 0.75, px: 1, gap: 1,
+                    bgcolor: item.verificado ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.10)',
+                  }}>
+                    <Tooltip title={item.verificado ? 'Verificado — clic para desmarcar' : 'Marcar como correcto'}>
+                      <IconButton size="small" onClick={() => handleToggleVerificado(item)} sx={{ flexShrink: 0 }}>
+                        {item.verificado
+                          ? <CheckCircleIcon fontSize="small" sx={{ color: '#22c55e' }} />
+                          : <RadioButtonUncheckedIcon fontSize="small" sx={{ color: '#f59e0b' }} />}
+                      </IconButton>
+                    </Tooltip>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="body2" noWrap>{item.descripcion}</Typography>
                       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>

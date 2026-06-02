@@ -95,6 +95,7 @@ model GastoItem {
   cuotasTotales        Int?
   incluyeEnTotal       Boolean  @default(true)
   incluyeEnVencimiento Boolean  @default(false)
+  verificado           Boolean  @default(false)
   categoriaId          Int?
   pagoId               Int?
   createdAt            DateTime @default(now())
