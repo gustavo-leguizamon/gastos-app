@@ -70,6 +70,8 @@ Ambos `Gasto` y `GastoItem` tienen `categoriaId` FK opcional a `Categoria`. (Ren
 
 Al agregar/editar/borrar items, se llama `triggerResumenRefresh()` junto con `refreshGasto()` (importante para unconfirmed gastos cuyo total deriva de items).
 
+El **monto de sub-items admite valores negativos** (sin `min: 0`, validación sólo rechaza NaN). Útil para reversiones: un consumo positivo que debita y luego un negativo que lo cancela, dejando ambos movimientos visibles. La suma de items maneja negativos sin cambios.
+
 ## State management
 
 `src/store/gastosStore.ts` (Zustand):

@@ -110,7 +110,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const handleSaveEdit = async () => {
     if (!editing || !editing.descripcion.trim() || !editing.monto) return
     const montoNum = parseFloat(editing.monto)
-    if (isNaN(montoNum) || montoNum < 0) { toast.error('Monto inválido'); return }
+    if (isNaN(montoNum)) { toast.error('Monto inválido'); return }
     setSavingEdit(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/items/${editing.id}`, {
@@ -143,7 +143,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const handleAdd = async () => {
     if (!descripcion.trim() || !monto) { toast.error('Descripción y monto son requeridos'); return }
     const montoNum = parseFloat(monto)
-    if (isNaN(montoNum) || montoNum < 0) { toast.error('Ingresá un monto válido'); return }
+    if (isNaN(montoNum)) { toast.error('Ingresá un monto válido'); return }
     setSaving(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/items`, {
@@ -239,7 +239,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
           value={monto} onChange={e => setMonto(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          inputProps={{ min: 0, step: 0.01 }}
+          inputProps={{ step: 0.01 }}
         />
         <AppDateField
           size="small" label="Fecha (opcional)" sx={{ width: 155 }}
@@ -388,7 +388,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
                         value={editing.monto}
                         onChange={e => setEditing(p => p ? { ...p, monto: e.target.value } : p)}
-                        inputProps={{ min: 0, step: 0.01 }}
+                        inputProps={{ step: 0.01 }}
                       />
                       <AppDateField
                         size="small" label="Fecha (opcional)" sx={{ width: 150 }}
