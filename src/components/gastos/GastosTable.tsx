@@ -26,6 +26,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import BrandLogo from '@/components/shared/BrandLogo'
@@ -36,6 +37,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
 import CopiarGastoDialog from './CopiarGastoDialog'
+import EvolucionGastoDialog from './EvolucionGastoDialog'
 import type { Gasto, FiltrosGastos } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -65,6 +67,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [itemGasto, setItemGasto] = useState<Gasto | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
+  const [evolucionGasto, setEvolucionGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
   const [sortModel, setSortModel] = useState<GridSortModel>([])
 
@@ -373,7 +376,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     {
       field: 'actions',
       headerName: '',
-      width: 160,
+      width: 190,
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
@@ -413,6 +416,11 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             <Tooltip title="Copiar a otro mes">
               <IconButton size="small" onClick={() => setCopiarGasto(row as Gasto)}>
                 <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Evolución mensual">
+              <IconButton size="small" onClick={() => setEvolucionGasto(row as Gasto)}>
+                <ShowChartIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Editar">
@@ -819,6 +827,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Copiar a otro mes</ListItemText>
         </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) setEvolucionGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><ShowChartIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Evolución mensual</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => { if (menuAnchor) onEdit(menuAnchor.gasto); setMenuAnchor(null) }}>
           <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Editar</ListItemText>
@@ -867,6 +879,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         gasto={copiarGasto}
         onClose={() => setCopiarGasto(null)}
         onCopied={() => { setCopiarGasto(null); onDeleted() }}
+      />
+
+      <EvolucionGastoDialog
+        open={evolucionGasto !== null}
+        gasto={evolucionGasto}
+        mes={filtros.mes}
+        anio={filtros.anio}
+        onClose={() => setEvolucionGasto(null)}
       />
     </>
   )

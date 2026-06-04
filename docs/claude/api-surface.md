@@ -3,6 +3,7 @@
 | Route | Purpose |
 |---|---|
 | `GET/POST /api/gastos` | List (with filters) / create gastos |
+| `GET /api/gastos/evolucion` | Serie mensual de `total_ars` de un gasto a través de los meses. Params: `descripcion` (match case-insensitive), `mes`, `anio` (mes actual / fin de ventana), `meses` (cantidad de meses a mostrar, default 6, acotado 2–24), `casa_id` (opcional). Devuelve `{ mes, anio, label, total_ars }[]` ordenado cronológicamente, con 0 en meses sin match. Suma todos los gastos que matchean por mes; usa la suma de sub-items `incluye_en_total` cuando el gasto no está confirmado. |
 | `POST /api/gastos/copiar` | Copia un gasto (`{ source_id, mes, anio }`) con merge: si ya existe (descripción+mes+año+casa, case-insensitive) agrega sólo sub-items faltantes; si no, crea el gasto. Filtra sub-items por cuotas pendientes si `esTarjeta` e incrementa `cuotaActual` +1 para cuotas no finalizadas. |
 | `GET/PUT/DELETE /api/gastos/[id]` | Single gasto CRUD |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |

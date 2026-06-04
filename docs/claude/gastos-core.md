@@ -138,3 +138,13 @@ Ambos llaman `triggerRefresh()` al terminar.
 6. **Incremento de cuota:** tanto el **gasto principal** (al crearlo nuevo) como cada **sub-item** copiado, si están en cuotas no finalizadas (`cuotaActual < cuotasTotales`), se copian con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Aplica sea o no `esTarjeta`. El gasto sólo incrementa en la rama de creación (en merge no se toca el gasto destino existente).
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
+
+## Evolución del gasto (gráfico mensual)
+
+`EvolucionGastoDialog` (`src/components/gastos/EvolucionGastoDialog.tsx`) muestra la evolución del **Total ARS** de un gasto a través de los meses, como un `LineChart` de `@mui/x-charts` (curva `monotoneX`, tooltip al pasar el mouse que muestra el valor del mes).
+
+- Se abre desde `GastosTable`: icono `ShowChartIcon` ("Evolución mensual") en la columna de acciones (desktop) y opción en el menú de tres puntos (mobile).
+- Ventana por defecto **6 meses** terminando en el mes/año del filtro activo (incluye el mes actual). Se cambia en pantalla con un `AppSelect` (presets 3/6/9/12/18/24), que vuelve a pedir los datos y recalcula.
+- Identifica el gasto entre meses por **descripción (case-insensitive) + `casa_id`** del gasto desde el que se abrió (misma lógica de match que copiar/merge).
+- Pide los datos a `GET /api/gastos/evolucion`. Bajo el gráfico muestra promedio / máximo / mínimo de los meses con datos (>0).
+- `@mui/x-charts` v7 se agregó como dependencia para este gráfico.

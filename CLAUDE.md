@@ -19,7 +19,7 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 | Archivo | Contenido |
 |---|---|
 | `docs/claude/auth-pwa.md` | NextAuth + Google OAuth + whitelist, PWA/service worker, responsive/mobile UI |
-| `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, autocompletado descripciones, vencimientos hoy, copy dialogs |
+| `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, autocompletado descripciones, vencimientos hoy, copy dialogs, evolución mensual (gráfico) |
 | `docs/claude/tarjetas.md` | Logos de marca, `es_tarjeta`, `TarjetaCierre`, propagación de pagos a tarjeta (incluye cascade y sync bidireccional), tarjetas cerradas dashboard |
 | `docs/claude/api-surface.md` | Tabla completa de routes `/api/*` |
 | `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`) |
