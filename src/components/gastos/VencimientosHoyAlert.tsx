@@ -39,19 +39,9 @@ export default function VencimientosHoyAlert() {
         const out: Entrada[] = []
         for (const g of gastos) {
           if (!g.confirmado) continue
-          if (g.fecha_vencimiento === today) {
-            if (g.total_restante > 0) {
-              out.push({
-                key: `g-${g.id}`,
-                tipo: 'gasto',
-                descripcion: g.descripcion,
-                casa_nombre: g.casa_nombre,
-                monto: g.total_restante,
-              })
-            }
-          } else {
-            // Sub-items con incluye_en_vencimiento y fecha === hoy (para no duplicar cuando el gasto padre vence hoy)
-            for (const it of g.items ?? []) {
+          if ((g.items?.length ?? 0) > 0) {
+            // Gasto con sub-items: sólo cuentan los sub-items marcados "incluir en vencimiento" cuya fecha sea hoy.
+            for (const it of g.items) {
               if (it.incluye_en_vencimiento && it.fecha === today) {
                 out.push({
                   key: `i-${it.id}`,
@@ -63,6 +53,15 @@ export default function VencimientosHoyAlert() {
                 })
               }
             }
+          } else if (g.fecha_vencimiento === today && g.total_restante > 0) {
+            // Gasto sin sub-items: vence por su propia fechaVencimiento.
+            out.push({
+              key: `g-${g.id}`,
+              tipo: 'gasto',
+              descripcion: g.descripcion,
+              casa_nombre: g.casa_nombre,
+              monto: g.total_restante,
+            })
           }
         }
         if (out.length > 0) {
