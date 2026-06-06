@@ -62,7 +62,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   const handleSaveEdit = async () => {
     if (!editing) return
     const montoNum = parseFloat(editing.monto)
-    if (!editing.fecha || isNaN(montoNum) || montoNum <= 0) { toast.error('Fecha y monto válidos requeridos'); return }
+    if (!editing.fecha || isNaN(montoNum) || montoNum === 0) { toast.error('Fecha y monto válidos requeridos'); return }
     setSavingEdit(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/pagos/${editing.id}`, {
@@ -84,7 +84,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
 
   const handleAdd = async () => {
     const montoNum = parseFloat(monto)
-    if (!fecha || isNaN(montoNum) || montoNum <= 0) { toast.error('Ingresá una fecha y un monto válido'); return }
+    if (!fecha || isNaN(montoNum) || montoNum === 0) { toast.error('Ingresá una fecha y un monto válido'); return }
     setSaving(true)
     try {
       const res = await fetch(`/api/gastos/${gasto.id}/pagos`, {
@@ -165,7 +165,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
                       value={editing.monto}
                       onChange={e => setEditing(s => s ? { ...s, monto: e.target.value } : s)}
                       onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
-                      inputProps={{ min: 0.01, step: 0.01 }}
+                      inputProps={{ step: 0.01 }}
                       sx={{ flex: 1 }}
                     />
                     <IconButton size="small" color="primary" onClick={handleSaveEdit} disabled={savingEdit}>

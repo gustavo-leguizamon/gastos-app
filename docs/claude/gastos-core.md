@@ -49,6 +49,8 @@ Card adicional en el resumen que proyecta el gasto del próximo mes basado en hi
 
 Pagos vía modelo `Pago` (tabla separada), no el legacy `Gasto.totalPagado`. La columna `totalPagado` sigue en la DB pero se ignora. Routes: `GET|POST /api/gastos/[id]/pagos`, `PUT|DELETE /api/gastos/[id]/pagos/[pagoId]`. `PUT` acepta `{ fecha, monto }` para editar inline desde `PagoDialog`.
 
+El **monto de pagos admite valores negativos** (validación en `PagoDialog` sólo rechaza NaN y `=== 0`, sin `min`). Sirve para reflejar una devolución posterior a un pago. La propagación a tarjeta de crédito (sub-item en el resumen) conserva el signo, así una devolución genera un sub-item negativo.
+
 ## Sub-items (GastoItem)
 
 Cada `Gasto` puede tener sub-items informativos (`GastoItem`) — ej. cargos individuales bajo un resumen de tarjeta. **No afectan cálculos de pago**; son display-only. Routes: `GET|POST /api/gastos/[id]/items`, `PUT|PATCH|DELETE /api/gastos/[id]/items/[itemId]`.
