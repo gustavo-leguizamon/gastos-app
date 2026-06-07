@@ -171,6 +171,7 @@ export async function GET(req: NextRequest) {
     total_tarjetas: r(total_tarjetas),
     total_pasajes: r(total_pasajes),
     total_restante: r(total_restante),
+    total_restante_neto: r(total_restante - total_pasajes),
     total_pagado: r(total_pagado),
     pagar_hoy: r(pagar_hoy),
     total_proximo_mes: r(total_proximo_mes),

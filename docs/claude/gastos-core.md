@@ -12,8 +12,9 @@
 - `total_prestamos = SUM(prestamo_a_otro)`
 - `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C' AND prestamo_a_otro === 0` — gastos crédito con `prestamo_a_otro > 0` se excluyen para no restar dos veces.
 - `total_pasajes = SUM(pasaje_mes_siguiente)` — montos pasados al mes siguiente también restan al neto.
+- `total_restante_neto = total_restante - total_pasajes` — el restante del mes descontando lo que se pasa al mes siguiente.
 
-Se muestran como breakdown secundario dentro de la card "Total Gastos" (solo si al menos uno es no-cero).
+Se muestran como breakdown secundario dentro de las cards: "Total Gastos" muestra `total_gastos_neto` + componentes (préstamos/tarjetas/pasajes) si alguno es no-cero; "Restante" muestra `total_restante_neto` + el monto de pasajes si `total_pasajes > 0`.
 
 **Unconfirmed gastos en resumen:** gastos con `confirmado = false` se excluyen de todos los totales, **excepto** cuando tienen sub-items — en ese caso, la suma de sus sub-items con `incluyeEnTotal = true` se usa en vez del total del gasto.
 

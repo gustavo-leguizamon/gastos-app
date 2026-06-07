@@ -132,6 +132,7 @@ export interface Resumen {
   total_tarjetas: number
   total_pasajes: number
   total_restante: number
+  total_restante_neto: number
   total_pagado: number
   pagar_hoy: number
   total_proximo_mes: number
