@@ -207,6 +207,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
       return i.descripcion.toLowerCase().includes(q) || i.categoria_nombre?.toLowerCase().includes(q)
     })
     .sort((a, b) => {
+      if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
+        return a.incluye_en_vencimiento ? -1 : 1
+      }
       if (a.fecha && b.fecha) {
         const cmp = a.fecha.localeCompare(b.fecha)
         if (cmp !== 0) return cmp

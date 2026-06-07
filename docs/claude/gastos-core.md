@@ -63,7 +63,7 @@ Cada `GastoItem` tiene tres flags booleanos:
 
 Los flags `incluye_en_total` / `incluye_en_vencimiento` se renderizan como checkboxes inline en la columna de acciones (no columnas separadas). `PATCH` para toggle parcial. Toggle de `incluye_en_vencimiento` llama `triggerResumenRefresh()`.
 
-Sub-items ordenados por `fecha` asc (nulls last) — en `buildFlatRows` y `GastoItemDialog`. En `GastoItemDialog` el desempate ante misma fecha (o ambos sin fecha) es por `id` asc. La fila total de sub-items aparece **antes** de los items individuales al expandir.
+Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en vencimiento primero) y luego por `fecha` asc (nulls last) — en `buildFlatRows`, `renderSubItems` y `GastoItemDialog`. En `GastoItemDialog` el desempate ante misma fecha (o ambos sin fecha) es por `id` asc. La fila total de sub-items aparece **antes** de los items individuales al expandir; luego van los incluidos en vencimiento y por último el resto.
 
 **Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y `sortModel` controlado. Al click en header el sort aplica solo a filas de gasto (vía `sortGastos()`), y `buildFlatRows` arma flat rows desde los gastos ya ordenados. Sub-items y fila de totales quedan pegados al padre. Comparador soporta `number` y strings (`localeCompare`); nulos al final.
 

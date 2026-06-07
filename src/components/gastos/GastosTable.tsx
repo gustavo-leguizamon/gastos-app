@@ -486,6 +486,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       result.push({ ...g, _type: 'gasto' })
       if (expandedIds.has(g.id) && g.items?.length) {
         const sortedItems = [...g.items].sort((a, b) => {
+          if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
+            return a.incluye_en_vencimiento ? -1 : 1
+          }
           if (!a.fecha && !b.fecha) return 0
           if (!a.fecha) return 1
           if (!b.fecha) return -1
@@ -661,6 +664,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   const renderSubItems = (g: Gasto) => {
     const sortedItems = [...g.items].sort((a, b) => {
+      if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
+        return a.incluye_en_vencimiento ? -1 : 1
+      }
       if (!a.fecha && !b.fecha) return 0
       if (!a.fecha) return 1
       if (!b.fecha) return -1
