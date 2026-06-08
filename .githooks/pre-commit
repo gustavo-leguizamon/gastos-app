@@ -1,0 +1,17 @@
+#!/bin/sh
+# Corre la suite de tests antes de cada commit. Si algún test falla, el commit se aborta.
+# Se activa con: git config core.hooksPath .githooks  (el script `prepare` de package.json
+# lo hace automáticamente tras `npm install`).
+
+echo "🧪 Corriendo tests antes del commit (npm run test:run)..."
+npm run test:run
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ Tests fallaron — commit abortado. Arreglá los tests o usá 'git commit --no-verify' para saltearlos (no recomendado)."
+  exit 1
+fi
+
+echo "✅ Tests OK."
+exit 0
