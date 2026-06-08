@@ -29,11 +29,11 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 
 ```bash
 # Development
-npm run dev        # Start dev server at localhost:3001
+npm run dev        # Start dev server at localhost:3002
 
 # Build & production
 npm run build
-npm start          # Runs on port 3001
+npm start          # Runs on port 3002
 
 # Database
 npx prisma generate          # Regenerate Prisma client after schema changes (requires dev server stopped)
