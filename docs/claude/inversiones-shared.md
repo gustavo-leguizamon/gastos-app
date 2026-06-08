@@ -71,3 +71,14 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `
 - `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
 
 Usado para relaciones M2M: `GastoForm` (Categorías) y `GastoItemDialog` (Categorías alta + edición).
+
+## CategoriasCell
+
+`src/components/shared/CategoriasCell.tsx` — display read-only de la lista de categorías de un gasto o sub-item. Centraliza el formato usado en la grilla principal y en todos los listados de sub-items. Comportamiento:
+- **Orden alfabético** (`localeCompare('es', { sensitivity: 'base' })`).
+- Render en **una sola línea**; si no entran en el ancho disponible se truncan con ellipsis (`whiteSpace: nowrap` + `textOverflow: ellipsis`, `width: 100%`).
+- **Tooltip** con la lista completa al hacer hover.
+
+Props: `categorias: {id,nombre}[]`, `empty?` (qué renderizar si no hay categorías, default `null`), `prefix?` (ej. `'📍 '`), `typographyProps?` (override de `color`/`sx`, etc.).
+
+Usado en: `GastosTable` (columna `categorias` desktop para filas gasto e item, y cards mobile de gasto/item) y `GastoItemDialog` (listado de sub-items). El ancho efectivo lo da el contenedor (la columna del DataGrid o el `flex:1 minWidth:0` de la card/listado).

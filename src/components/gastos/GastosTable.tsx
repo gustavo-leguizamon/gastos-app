@@ -30,6 +30,7 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import BrandLogo from '@/components/shared/BrandLogo'
+import CategoriasCell from '@/components/shared/CategoriasCell'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -369,11 +370,12 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       renderCell: ({ row }) => {
         if (row._type === 'items_total') return null
         const cats: { id: number; nombre: string }[] = row._type === 'item' ? (row._categorias ?? []) : (row.categorias ?? [])
-        if (cats.length === 0) return row._type === 'item' ? null : '-'
         return (
-          <Typography variant="caption" color="text.secondary" sx={{ pl: row._type === 'item' ? 1 : 0 }}>
-            {cats.map(c => c.nombre).join(', ')}
-          </Typography>
+          <CategoriasCell
+            categorias={cats}
+            empty={row._type === 'item' ? null : '-'}
+            typographyProps={{ sx: { pl: row._type === 'item' ? 1 : 0 } }}
+          />
         )
       },
     },
@@ -584,11 +586,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                     Cuota {g.cuota_actual ?? '?'}/{g.cuotas_totales ?? '?'}
                   </Typography>
                 )}
-                {(g.categorias ?? []).length > 0 && (
-                  <Typography variant="caption" color="text.secondary">
-                    📍 {g.categorias.map(c => c.nombre).join(', ')}
-                  </Typography>
-                )}
+                <CategoriasCell categorias={g.categorias} prefix="📍 " />
               </Box>
             </Box>
             <IconButton
@@ -709,7 +707,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   {item.cuota_actual ?? '?'}/{item.cuotas_totales ?? '?'}
                 </Typography>
               )}
-              {(item.categorias ?? []).length > 0 && <Typography variant="caption" color="text.disabled">📍 {item.categorias.map(c => c.nombre).join(', ')}</Typography>}
+              <CategoriasCell categorias={item.categorias} prefix="📍 " typographyProps={{ color: 'text.disabled' }} />
               <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Tooltip title="Incluido en total">
                   <Switch

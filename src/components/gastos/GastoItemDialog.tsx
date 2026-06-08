@@ -16,6 +16,7 @@ import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
+import CategoriasCell from '@/components/shared/CategoriasCell'
 import Accordion from '@mui/material/Accordion'
 import AccordionSummary from '@mui/material/AccordionSummary'
 import AccordionDetails from '@mui/material/AccordionDetails'
@@ -466,11 +467,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                             Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
                           </Typography>
                         )}
-                        {(item.categorias ?? []).map(c => (
-                          <Typography key={c.id} variant="caption" color="text.secondary">
-                            📍 {c.nombre}
-                          </Typography>
-                        ))}
+                        <CategoriasCell categorias={item.categorias} prefix="📍 " />
                       </Box>
                     </Box>
                     <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>
