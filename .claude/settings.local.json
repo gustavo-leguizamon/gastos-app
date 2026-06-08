@@ -32,7 +32,21 @@
       "Bash(ls *)",
       "Bash(powershell *)",
       "WebSearch",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(npm ls *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.devDependencies,null,2\\)\\)\")",
+      "PowerShell(ConvertTo-Json *)",
+      "PowerShell(npx vitest run src/app/api/gastos/route.test.ts 2>&1 | Select-Object -Last 35)",
+      "PowerShell(if \\(Test-Path node_modules/undici/package.json\\) { \\(Get-Content node_modules/undici/package.json -Raw | ConvertFrom-Json\\).version } else { \"undici NOT found\" })",
+      "PowerShell(npx vitest run src/app/api/gastos/route.test.ts 2>&1 | Select-Object -Last 30)",
+      "PowerShell(npx tsc --noEmit; if \\($?\\) { \"TYPECHECK OK\" })",
+      "PowerShell(git config *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Git\\\\bin\\\\sh.exe\" .githooks/pre-commit 2>&1 | Select-Object -Last 6)",
+      "PowerShell($sh = \\(Get-Command sh -ErrorAction SilentlyContinue\\).Source; if \\(-not $sh\\) { $sh = \\(Get-Command bash -ErrorAction SilentlyContinue\\).Source }; \"Using: $sh\"; if \\($sh\\) { & $sh .githooks/pre-commit 2>&1 | Select-Object -Last 6 })",
+      "Bash(sh .githooks/pre-commit)",
+      "Bash(echo \"HOOK EXIT=$?\")",
+      "Bash(echo \"EXIT=$?\")",
+      "PowerShell(npx tsc --noEmit; if \\($?\\) { \"TYPECHECK OK\" } else { \"TYPECHECK FAILED\" })"
     ]
   },
   "hooks": {

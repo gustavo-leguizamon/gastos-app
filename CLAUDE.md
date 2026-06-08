@@ -35,6 +35,10 @@ npm run dev        # Start dev server at localhost:3002
 npm run build
 npm start          # Runs on port 3002
 
+# Tests (Vitest)
+npm test           # Watch mode
+npm run test:run   # Single run (CI / pre-commit)
+
 # Database
 npx prisma generate          # Regenerate Prisma client after schema changes (requires dev server stopped)
 npx prisma migrate dev        # Run migrations in development
@@ -45,7 +49,37 @@ npx prisma db seed            # Seed initial data (currencies, default house)
 
 **Important:** After any `prisma/schema.prisma` change, the dev server must be stopped before running `npx prisma generate` — the running server holds a lock on the Windows DLL.
 
-There are no tests configured in this project.
+## Testing (regla obligatoria)
+
+El proyecto usa **Vitest** (`vitest@0.34`, pin obligado por Node 16 — versiones 1.x+ requieren Node 18/20+). Config en `vitest.config.ts` (alias `@` → `src` definido a mano, sin `vite-tsconfig-paths` porque rompe con el require ESM bajo Node 16). Los tests viven junto al código en `src/**/*.test.ts`.
+
+Para que las routes (`NextRequest`/`NextResponse`) se puedan importar bajo Node 16, `vitest.setup.ts` polyfillea los globals web (`Request`/`Response`/`fetch`) desde `undici@5`.
+
+Hay dos capas de tests:
+
+**1. Lógica de negocio pura** — la lógica de cálculo se extrae de los route handlers (que importan Prisma/Next) a módulos puros en `src/lib/`:
+
+| Módulo | Qué cubre | Test |
+|---|---|---|
+| `src/lib/gastos-compute.ts` (`toGastoResponse`) | Mapping camelCase→snake_case, `total_ars`/`total_pagado`/`total_restante`, match de cierre de tarjeta por mes/año, mapeo de pagos e items. Importado por `gastos/route.ts` y `gastos/[id]/route.ts`. | `gastos-compute.test.ts` |
+| `src/lib/resumen-compute.ts` (`computeResumen`) | Agregados del resumen (gastos/pagado/restante/tarjetas/préstamos/pasajes/neto), `pagar_hoy`, estimado próximo mes (promedio con meses previos, `missingBehavior`, cuotas vigentes, excluir última cuota). Importado por `resumen/route.ts`. | `resumen-compute.test.ts` |
+| `src/lib/fechas.ts` (`shiftMonth`) | Aritmética de meses con wraparound de año. Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
+
+**2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:
+
+| Route | Qué cubre | Test |
+|---|---|---|
+| `gastos/route.ts` | GET arma `where` desde query params; POST mapea body y aplica defaults. | `gastos/route.test.ts` |
+| `gastos/[id]/route.ts` | GET 404/mapeo; PUT mapping + sync de descripción a items propagados; DELETE. | `gastos/[id]/route.test.ts` |
+| `gastos/[id]/items/route.ts` | POST mapping y defaults de flags. | `gastos/[id]/items/route.test.ts` |
+| `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: shift +1/+2 según próximo cierre, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |
+
+**Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
+- Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.
+- Route nueva o cambio de mapping/filtros → test con `vi.mock('@/lib/db')` siguiendo los existentes.
+- Criterio: si la lógica puede romperse silenciosamente en un cambio futuro, debe tener test.
+
+**Pre-commit:** el hook `.githooks/pre-commit` corre `npm run test:run` y aborta el commit si algún test falla. Se activa solo tras `npm install` (script `prepare` → `git config core.hooksPath .githooks`). Para activarlo manualmente: `git config core.hooksPath .githooks`. Para saltearlo en un commit puntual (no recomendado): `git commit --no-verify`.
 
 ## Stack
 

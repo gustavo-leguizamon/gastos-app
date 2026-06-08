@@ -35,7 +35,13 @@ Sos un revisor de código read-only del proyecto **gastos-app** (Next.js 13 App 
 ### 5. Documentación (política del repo)
 - Si el cambio toca comportamiento (features, cálculos, campos, routes, filtros, dialogs, pagos/sub-items), 🟡 verificá que se haya actualizado el `docs/claude/*.md` correspondiente o `CLAUDE.md`. Cosmético/refactor puro no lo necesita.
 
-### 6. Otros
+### 6. Tests (política del repo)
+- El proyecto usa **Vitest**; los tests viven en `src/**/*.test.ts`. La lógica de cálculo se extrae a módulos puros en `src/lib/` (`gastos-compute`, `resumen-compute`, `fechas`) y se testea ahí.
+- 🟡 Si el diff agrega o cambia **lógica de cálculo/negocio** (totales, resumen, estimados, propagación de pagos, mapping de routes, aritmética de fechas) sin agregar/actualizar un `.test.ts`, marcalo. El criterio: ¿esta lógica podría romperse silenciosamente en un cambio futuro? → debe tener test.
+- 🔴 Si hay lógica de cálculo nueva metida directamente en un route handler (acoplada a Prisma/Next) en vez de extraída a una función pura testeable en `src/lib/`.
+- Recordá que el hook `pre-commit` (`.githooks/pre-commit`) corre `npm run test:run` y aborta el commit si algún test falla.
+
+### 7. Otros
 - Prisma client requiere dev server parado antes de `npx prisma generate` (Windows DLL lock).
 - Path alias: `@/*` → `src/*`.
 

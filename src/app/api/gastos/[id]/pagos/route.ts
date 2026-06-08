@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { shiftMonth } from '@/lib/fechas'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const pagos = await prisma.pago.findMany({
@@ -13,12 +14,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     monto: p.monto,
     created_at: p.createdAt.toISOString(),
   })))
-}
-
-// Avanza un (mes, anio) por n meses
-function shiftMonth(mes: number, anio: number, n: number) {
-  const m0 = mes - 1 + n
-  return { mes: ((m0 % 12) + 12) % 12 + 1, anio: anio + Math.floor(m0 / 12) }
 }
 
 async function propagatePagoToTarjeta(opts: {
