@@ -49,8 +49,8 @@ model TarjetaCierre {
 model Categoria {
   id     Int         @id @default(autoincrement())
   nombre String
-  gastos Gasto[]
-  items  GastoItem[]
+  gastos Gasto[]     @relation("GastoCategorias")
+  items  GastoItem[] @relation("GastoItemCategorias")
 }
 
 model Gasto {
@@ -66,7 +66,6 @@ model Gasto {
   pasajeMesSiguiente   Float    @default(0)
   prestamo_a_otro      Float    @default(0)
   tarjetaId            Int?
-  categoriaId          Int?
   cuotaActual          Int?
   cuotasTotales        Int?
   mes                  Int
@@ -80,7 +79,7 @@ model Gasto {
   casa    Casa     @relation(fields: [casaId], references: [id])
   moneda  Moneda   @relation(fields: [monedaId], references: [id])
   tarjeta   Tarjeta?   @relation(fields: [tarjetaId], references: [id])
-  categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  categorias Categoria[] @relation("GastoCategorias")
   pagos     Pago[]
   items     GastoItem[]
 }
@@ -96,12 +95,11 @@ model GastoItem {
   incluyeEnTotal       Boolean  @default(true)
   incluyeEnVencimiento Boolean  @default(false)
   verificado           Boolean  @default(false)
-  categoriaId          Int?
   pagoId               Int?
   createdAt            DateTime @default(now())
 
   gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
-  categoria Categoria? @relation(fields: [categoriaId], references: [id])
+  categorias Categoria[] @relation("GastoItemCategorias")
   pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
 }
 

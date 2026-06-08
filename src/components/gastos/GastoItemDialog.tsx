@@ -15,7 +15,7 @@ import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
-import AppSelect from '@/components/shared/AppSelect'
+import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import Accordion from '@mui/material/Accordion'
 import AccordionSummary from '@mui/material/AccordionSummary'
 import AccordionDetails from '@mui/material/AccordionDetails'
@@ -47,7 +47,7 @@ type EditState = {
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
   verificado: boolean
-  categoria_id: number | null
+  categoria_ids: number[]
 }
 
 interface Props {
@@ -65,7 +65,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [cuotasTotales, setCuotasTotales] = useState('')
   const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
-  const [categoriaId, setCategoriaId] = useState<number | null>(null)
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -104,7 +104,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     incluye_en_total: item.incluye_en_total,
     incluye_en_vencimiento: item.incluye_en_vencimiento,
     verificado: item.verificado,
-    categoria_id: item.categoria_id ?? null,
+    categoria_ids: item.categoria_ids ?? [],
   })
 
   const handleSaveEdit = async () => {
@@ -125,7 +125,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           incluye_en_total: editing.incluye_en_total,
           incluye_en_vencimiento: editing.incluye_en_vencimiento,
           verificado: editing.verificado,
-          categoria_id: editing.categoria_id,
+          categoria_ids: editing.categoria_ids,
         }),
       })
       if (!res.ok) throw new Error()
@@ -157,13 +157,13 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
           incluye_en_total: incluyeEnTotal,
           incluye_en_vencimiento: incluyeEnVencimiento,
-          categoria_id: categoriaId,
+          categoria_ids: categoriaIds,
         }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
       setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
-      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setCategoriaId(null)
+      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setCategoriaIds([])
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -204,7 +204,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     .filter(i => {
       if (!filtroItems.trim()) return true
       const q = filtroItems.toLowerCase()
-      return i.descripcion.toLowerCase().includes(q) || i.categoria_nombre?.toLowerCase().includes(q)
+      return i.descripcion.toLowerCase().includes(q) || (i.categorias ?? []).some(c => c.nombre.toLowerCase().includes(q))
     })
     .sort((a, b) => {
       if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
@@ -263,13 +263,13 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         />
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>(opcional)</Typography>
       </Box>
-      <AppSelect
-        label="Categoría (opcional)"
+      <AppMultiSelect
+        label="Categorías (opcional)"
         options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-        value={categoriaId}
-        onChange={(v) => setCategoriaId(v == null ? null : Number(v))}
+        value={categoriaIds}
+        onChange={(v) => setCategoriaIds(v.map(Number))}
         fullWidth
-        emptyLabel="Sin especificar"
+        placeholder="Sin especificar"
       />
       <Box sx={{ display: 'flex', gap: 2 }}>
         <AppToggle
@@ -414,13 +414,13 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         inputProps={{ min: 1, step: 1 }}
                       />
                     </Box>
-                    <AppSelect
-                      label="Categoría (opcional)"
+                    <AppMultiSelect
+                      label="Categorías (opcional)"
                       options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-                      value={editing.categoria_id ?? null}
-                      onChange={(v) => setEditing(p => p ? { ...p, categoria_id: v == null ? null : Number(v) } : p)}
+                      value={editing.categoria_ids ?? []}
+                      onChange={(v) => setEditing(p => p ? { ...p, categoria_ids: v.map(Number) } : p)}
                       fullWidth
-                      emptyLabel="Sin especificar"
+                      placeholder="Sin especificar"
                     />
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <AppToggle
@@ -466,11 +466,11 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                             Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
                           </Typography>
                         )}
-                        {item.categoria_nombre && (
-                          <Typography variant="caption" color="text.secondary">
-                            📍 {item.categoria_nombre}
+                        {(item.categorias ?? []).map(c => (
+                          <Typography key={c.id} variant="caption" color="text.secondary">
+                            📍 {c.nombre}
                           </Typography>
-                        )}
+                        ))}
                       </Box>
                     </Box>
                     <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>

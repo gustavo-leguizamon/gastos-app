@@ -19,7 +19,7 @@ const mp = prisma as any
 function source(overrides: Record<string, any> = {}) {
   return {
     id: 1, casaId: 10, descripcion: 'Visa', tipoPago: 'C', tarjetaId: 7,
-    mes: 6, anio: 2026, categoriaId: null, cuotaActual: null, cuotasTotales: null,
+    mes: 6, anio: 2026, categorias: [], cuotaActual: null, cuotasTotales: null,
     ...overrides,
   }
 }

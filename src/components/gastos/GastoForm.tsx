@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
+import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import type { Casa, Moneda, Tarjeta, Categoria, Gasto, GastoFormData } from '@/lib/types'
 
 const schema = yup.object({
@@ -42,7 +43,7 @@ const schema = yup.object({
   anio: yup.number().required(),
   notas: yup.string().optional().default(''),
   confirmado: yup.boolean().required().default(true),
-  categoria_id: yup.number().nullable().optional(),
+  categoria_ids: yup.array().of(yup.number()).default([]),
   es_tarjeta: yup.boolean().required().default(false),
   pagado_completo: yup.boolean().required().default(false),
 })
@@ -84,7 +85,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       anio: gasto?.anio ?? defaultAnio,
       notas: gasto?.notas ?? '',
       confirmado: gasto?.confirmado ?? true,
-      categoria_id: gasto?.categoria_id ?? null,
+      categoria_ids: gasto?.categoria_ids ?? [],
       es_tarjeta: gasto?.es_tarjeta ?? false,
       pagado_completo: true,
     },
@@ -523,19 +524,19 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           />
         </Grid>
 
-        {/* Categoria */}
+        {/* Categorias */}
         <Grid item xs={12} sm={6}>
           <Controller
-            name="categoria_id"
+            name="categoria_ids"
             control={control}
             render={({ field }) => (
-              <AppSelect
-                label="Categoría (opcional)"
+              <AppMultiSelect
+                label="Categorías (opcional)"
                 options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-                value={field.value ?? null}
-                onChange={(v) => field.onChange(v == null ? null : Number(v))}
+                value={field.value ?? []}
+                onChange={(v) => field.onChange(v.map(Number))}
                 fullWidth
-                emptyLabel="Sin especificar"
+                placeholder="Sin especificar"
               />
             )}
           />

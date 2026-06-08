@@ -22,7 +22,7 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 | `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, autocompletado descripciones, vencimientos hoy, copy dialogs, evolución mensual (gráfico) |
 | `docs/claude/tarjetas.md` | Logos de marca, `es_tarjeta`, `TarjetaCierre`, propagación de pagos a tarjeta (incluye cascade y sync bidireccional), tarjetas cerradas dashboard |
 | `docs/claude/api-surface.md` | Tabla completa de routes `/api/*` |
-| `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`) |
+| `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`, `AppMultiSelect`) |
 | `docs/claude/sueldos.md` | Sección Sueldos (acceso restringido por email, modelo, cálculo Neto/Bruto, coloreado) |
 
 ## Commands
@@ -107,7 +107,7 @@ El Prisma schema usa **camelCase** (`casaId`, `tipoPago`, `totalMoneda`, etc.), 
 | `tipo_cambio` | Exchange rate to ARS; always 1 when `moneda.codigo === 'ARS'` |
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
 | `confirmado` | Si el monto está confirmado. Default `true` en alta; siempre `false` al copiar. Filas no confirmadas se renderizan con fondo naranja e icono warning. "Total ARS" muestra suma de sub-items (en naranja) en vez de `totalMoneda × tipoCambio` cuando no confirmado y hay items. |
-| `categoria_id` | FK opcional a `Categoria` (ej: Auto, Supermercado, Mascotas). Disponible en `Gasto` y `GastoItem`. |
+| `categoria_ids` / `categorias` | Relación **muchos-a-muchos** con `Categoria` (ej: Auto, Supermercado, Mascotas) en `Gasto` y `GastoItem`. API expone `categoria_ids: number[]` (body) y `categorias: {id,nombre}[]` (display). UI usa `AppMultiSelect`. Ver `docs/claude/gastos-core.md`. |
 
 ## Dates and timezones (IMPORTANT)
 
@@ -123,3 +123,4 @@ Los client components pasan `today` como query param a `/api/resumen` para que e
 ## Path alias
 
 `@/*` mapea a `src/*` (configurado en `tsconfig.json`).
+

@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'source_id, mes y anio son requeridos' }, { status: 400 })
   }
 
-  const source = await prisma.gasto.findUnique({ where: { id: sourceId }, include: { items: true } })
+  const source = await prisma.gasto.findUnique({
+    where: { id: sourceId },
+    include: { items: { include: { categorias: true } }, categorias: true },
+  })
   if (!source) return NextResponse.json({ error: 'Gasto origen no encontrado' }, { status: 404 })
 
   const diaVenc = source.fechaVencimiento.split('-')[2] ?? '01'
@@ -49,7 +52,8 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   })
 
-  const itemData = (item: typeof source.items[number]) => ({
+  const itemCreateData = (item: typeof source.items[number], gastoId: number) => ({
+    gastoId,
     descripcion: item.descripcion,
     monto: item.monto,
     fecha: item.fecha,
@@ -57,18 +61,14 @@ export async function POST(req: NextRequest) {
     cuotasTotales: item.cuotasTotales,
     incluyeEnTotal: item.incluyeEnTotal,
     incluyeEnVencimiento: item.incluyeEnVencimiento,
-    categoriaId: item.categoriaId,
+    categorias: { connect: (item.categorias ?? []).map((c: any) => ({ id: c.id })) },
   })
 
   if (existente) {
     // Merge: agregar sólo los sub-items que no existan (por descripción normalizada)
     const existentesDesc = new Set(existente.items.map(i => norm(i.descripcion)))
     const nuevos = candidatos.filter(i => !existentesDesc.has(norm(i.descripcion)))
-    if (nuevos.length) {
-      await prisma.gastoItem.createMany({
-        data: nuevos.map(i => ({ gastoId: existente.id, ...itemData(i) })),
-      })
-    }
+    await Promise.all(nuevos.map(i => prisma.gastoItem.create({ data: itemCreateData(i, existente.id) })))
     return NextResponse.json({ merged: true, gasto_id: existente.id, added_items: nuevos.length })
   }
 
@@ -92,16 +92,12 @@ export async function POST(req: NextRequest) {
       anio,
       notas: source.notas,
       confirmado: false,
-      categoriaId: source.categoriaId,
+      categorias: { connect: (source.categorias ?? []).map((c: any) => ({ id: c.id })) },
       esTarjeta: source.esTarjeta,
     },
   })
 
-  if (candidatos.length) {
-    await prisma.gastoItem.createMany({
-      data: candidatos.map(i => ({ gastoId: nuevo.id, ...itemData(i) })),
-    })
-  }
+  await Promise.all(candidatos.map(i => prisma.gastoItem.create({ data: itemCreateData(i, nuevo.id) })))
 
   return NextResponse.json({ created: true, gasto_id: nuevo.id, added_items: candidatos.length }, { status: 201 })
 }

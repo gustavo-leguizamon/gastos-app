@@ -58,6 +58,16 @@ El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccio
 - `disableClearable?: boolean`.
 - `size`, `fullWidth`, `sx`, `error`, `helperText`, `placeholder` — passthrough.
 
-Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `BrandLogo`, Moneda, Categoría), `GastoItemDialog` (Categoría alta + edición), `CopiarGastoDialog` (Mes/Año destino), `CopiarMesDialog` (Mes/Año origen + destino).
+Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `BrandLogo`, Moneda), `CopiarGastoDialog` (Mes/Año destino), `CopiarMesDialog` (Mes/Año origen + destino).
 
 **Excepción:** `configuracion/page.tsx` → `estim_missing_behavior` (2 opciones) sigue con `Select` clásico.
+
+## AppMultiSelect
+
+`src/components/shared/AppMultiSelect.tsx` — multi-select — wrapper de MUI `Autocomplete` con `multiple`. Selección de varias opciones mostradas como chips, con typeahead. API:
+- `label: string`
+- `options: { value, label }[]` — `value` es `string | number`.
+- `value: (string | number)[]` + `onChange(values)` — controlado.
+- `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
+
+Usado para relaciones M2M: `GastoForm` (Categorías) y `GastoItemDialog` (Categorías alta + edición).

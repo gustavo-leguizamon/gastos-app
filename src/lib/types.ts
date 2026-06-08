@@ -48,8 +48,8 @@ export interface GastoItem {
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
   verificado: boolean
-  categoria_id: number | null
-  categoria_nombre?: string | null
+  categoria_ids: number[]
+  categorias: Categoria[]
   created_at: string
 }
 
@@ -82,8 +82,8 @@ export interface Gasto {
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
   tarjeta_marca?: TarjetaMarca | null
-  categoria_id: number | null
-  categoria_nombre?: string | null
+  categoria_ids: number[]
+  categorias: Categoria[]
   cuota_actual: number | null
   cuotas_totales: number | null
   mes: number
@@ -120,7 +120,7 @@ export interface GastoFormData {
   anio: number
   notas: string
   confirmado: boolean
-  categoria_id: number | null
+  categoria_ids: number[]
   es_tarjeta: boolean
   pagado_completo?: boolean
 }

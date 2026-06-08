@@ -67,7 +67,7 @@ Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en venci
 
 **Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y `sortModel` controlado. Al click en header el sort aplica solo a filas de gasto (vía `sortGastos()`), y `buildFlatRows` arma flat rows desde los gastos ya ordenados. Sub-items y fila de totales quedan pegados al padre. Comparador soporta `number` y strings (`localeCompare`); nulos al final.
 
-Ambos `Gasto` y `GastoItem` tienen `categoriaId` FK opcional a `Categoria`. (Renombrado de `Lugar` vía migración `20260516000000_rename_lugar_to_categoria` con `ALTER TABLE`/`RENAME COLUMN`.)
+Ambos `Gasto` y `GastoItem` tienen una relación **muchos-a-muchos** con `Categoria` (`categorias`), no un FK único. Implementada como relaciones implícitas de Prisma con nombres `GastoCategorias` (join table `_GastoCategorias`) y `GastoItemCategorias` (join table `_GastoItemCategorias`). En la API se exponen como `categoria_ids: number[]` (para el body de alta/edición) y `categorias: {id, nombre}[]` (para display). En el form/dialog se usa el componente `AppMultiSelect` (chips). El POST conecta con `{ connect: ids.map(id => ({ id })) }`; el PUT reemplaza con `{ set: ids.map(...) }`. Migración desde el FK único `categoriaId` (anteriormente single, renombrado de `Lugar`): se hizo por etapas con `prisma db push` + SQL de copia a las join tables, preservando las asignaciones existentes.
 
 `GastoItemDialog` layout 2-col (`maxWidth="md"`, height 90vh): izq (340px) resumen + add form; der lista scrollable. Overflow independiente. La columna derecha tiene un buscador (`filtroItems`) arriba de la lista que filtra los sub-items por descripción y categoría (case-insensitive); el resumen de la izquierda sigue calculándose sobre todos los items, no sobre los filtrados.
 
@@ -85,7 +85,7 @@ El **monto de sub-items admite valores negativos** (sin `min: 0`, validación s�
 
 Filtros client-side en `gastos/page.tsx` (lifted state, props):
 - `estadoPago: 'todos' | 'pendiente' | 'saldado'` — default `'pendiente'`. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
-- `busqueda: string` — free-text por `descripcion` y `categoria_nombre`. Renderizado en `FiltrosGastos`.
+- `busqueda: string` — free-text por `descripcion` y nombres de `categorias`. Renderizado en `FiltrosGastos`.
 
 ## GastoDialog — cierre
 
@@ -137,7 +137,7 @@ Ambos llaman `triggerRefresh()` al terminar.
 2. **Sub-items candidatos:** si el gasto es `esTarjeta`, sólo los que tienen **cuotas pendientes** (`cuotaActual != null && cuotasTotales != null && cuotaActual < cuotasTotales`). Para gastos normales, todos los sub-items.
 3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `descripcion` (case-insensitive vía `mode: 'insensitive'`).
 4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuya descripción normalizada (`trim().toLowerCase()`) **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
-5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, `categoria_id`, etc.) y todos los sub-items candidatos. Devuelve `{ created: true, gasto_id, added_items }`.
+5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, y conecta sus `categorias`, etc.) y todos los sub-items candidatos (cada uno conecta sus propias `categorias`). Devuelve `{ created: true, gasto_id, added_items }`.
 6. **Incremento de cuota:** tanto el **gasto principal** (al crearlo nuevo) como cada **sub-item** copiado, si están en cuotas no finalizadas (`cuotaActual < cuotasTotales`), se copian con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Aplica sea o no `esTarjeta`. El gasto sólo incrementa en la rama de creación (en merge no se toca el gasto destino existente).
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).

@@ -22,7 +22,7 @@ async function propagatePagoToTarjeta(opts: {
   monto: number
   pagoId: number
 }) {
-  const source = await prisma.gasto.findUnique({ where: { id: opts.sourceGastoId } })
+  const source = await prisma.gasto.findUnique({ where: { id: opts.sourceGastoId }, include: { categorias: true } })
   if (!source) return
   if (source.tipoPago !== 'C') return
   if (!source.tarjetaId) return
@@ -97,7 +97,7 @@ async function propagatePagoToTarjeta(opts: {
       incluyeEnTotal: true,
       incluyeEnVencimiento: false,
       pagoId: opts.pagoId,
-      categoriaId: source.categoriaId ?? null,
+      categorias: { connect: (source.categorias ?? []).map((c: any) => ({ id: c.id })) },
       cuotaActual: source.cuotaActual ?? null,
       cuotasTotales: source.cuotasTotales ?? null,
     },

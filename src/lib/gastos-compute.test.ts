@@ -16,7 +16,7 @@ function makeGasto(overrides: Record<string, any> = {}) {
     pasajeMesSiguiente: 0,
     prestamo_a_otro: 0,
     tarjetaId: null,
-    categoriaId: null,
+    categorias: [],
     cuotaActual: null,
     cuotasTotales: null,
     mes: 6,
@@ -107,12 +107,12 @@ describe('toGastoResponse', () => {
     expect(r.cierre).toBeNull()
   })
 
-  it('mapea sub-items a snake_case con sus flags y categoría', () => {
+  it('mapea sub-items a snake_case con sus flags y categorías', () => {
     const r = toGastoResponse(makeGasto({
       items: [{
         id: 9, gastoId: 1, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
         cuotaActual: 2, cuotasTotales: 6, incluyeEnTotal: true, incluyeEnVencimiento: false,
-        verificado: true, categoriaId: 3, categoria: { nombre: 'Auto' },
+        verificado: true, categorias: [{ id: 3, nombre: 'Auto' }, { id: 5, nombre: 'Combustible' }],
         createdAt: new Date('2026-06-03T00:00:00Z'),
       }],
     }))
@@ -120,8 +120,9 @@ describe('toGastoResponse', () => {
     expect(r.items[0]).toMatchObject({
       id: 9, gasto_id: 1, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
       cuota_actual: 2, cuotas_totales: 6, incluye_en_total: true, incluye_en_vencimiento: false,
-      verificado: true, categoria_id: 3, categoria_nombre: 'Auto',
+      verificado: true, categoria_ids: [3, 5],
     })
+    expect(r.items[0].categorias).toEqual([{ id: 3, nombre: 'Auto' }, { id: 5, nombre: 'Combustible' }])
   })
 
   it('serializa created_at/updated_at a ISO string', () => {

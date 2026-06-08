@@ -6,9 +6,9 @@ const INCLUDE = {
   casa: true,
   moneda: true,
   tarjeta: { include: { cierres: true } },
-  categoria: true,
+  categorias: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
-  items: { orderBy: { createdAt: 'asc' as const }, include: { categoria: true } },
+  items: { orderBy: { createdAt: 'asc' as const }, include: { categorias: true } },
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       anio: body.anio,
       notas: body.notas || null,
       confirmado: body.confirmado ?? true,
-      categoriaId: body.categoria_id ?? null,
+      categorias: { set: (body.categoria_ids ?? []).map((id: number) => ({ id })) },
       esTarjeta: body.es_tarjeta ?? false,
     },
     include: INCLUDE,

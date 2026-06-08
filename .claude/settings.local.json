@@ -46,7 +46,9 @@
       "Bash(sh .githooks/pre-commit)",
       "Bash(echo \"HOOK EXIT=$?\")",
       "Bash(echo \"EXIT=$?\")",
-      "PowerShell(npx tsc --noEmit; if \\($?\\) { \"TYPECHECK OK\" } else { \"TYPECHECK FAILED\" })"
+      "PowerShell(npx tsc --noEmit; if \\($?\\) { \"TYPECHECK OK\" } else { \"TYPECHECK FAILED\" })",
+      "Bash(gh --version)",
+      "PowerShell($gh = \\(Get-Command gh -ErrorAction SilentlyContinue\\); if \\($gh\\) { \"gh found: $\\($gh.Source\\)\" } else { \"gh NOT found\" })"
     ]
   },
   "hooks": {
