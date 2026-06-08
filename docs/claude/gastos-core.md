@@ -87,6 +87,10 @@ Filtros client-side en `gastos/page.tsx` (lifted state, props):
 - `estadoPago: 'todos' | 'pendiente' | 'saldado'` — default `'pendiente'`. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
 - `busqueda: string` — free-text por `descripcion` y nombres de `categorias`. Renderizado en `FiltrosGastos`.
 
+### Selector de mes (`FiltrosGastos`)
+
+Las flechas ‹ › navegan mes a mes (con wraparound de año). Además, el label "Mes Año" (ej. "Diciembre 2025") es un `ButtonBase` clickeable que abre un `Popover` para saltar directo a cualquier mes/año: navegación de año (‹ año ›) + grilla 3×4 de meses abreviados. El mes/año activo se resalta con `primary.main`. Seleccionar un mes setea `mes`+`anio` (del año mostrado en el picker) y cierra el popover. El estado `anioPicker` se inicializa con `filtros.anio` cada vez que se abre.
+
 ## GastoDialog — cierre
 
 **Cancelar** cierra directo sin pedir confirmación (`onClose` en vez de `handleRequestClose`). El `ConfirmDialog` "¿Cerrar sin guardar?" sigue activo para backdrop/ESC.

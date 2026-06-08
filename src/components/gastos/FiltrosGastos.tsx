@@ -9,12 +9,15 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
 import TextField from '@/components/shared/AppTextField'
 import InputAdornment from '@mui/material/InputAdornment'
+import Popover from '@mui/material/Popover'
+import ButtonBase from '@mui/material/ButtonBase'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import SearchIcon from '@mui/icons-material/Search'
 import type { Casa, FiltrosGastos } from '@/lib/types'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 interface Props {
   filtros: FiltrosGastos
@@ -27,6 +30,9 @@ interface Props {
 
 export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda }: Props) {
   const [casas, setCasas] = useState<Casa[]>([])
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+  // Año mostrado dentro del popover (puede diferir del filtro mientras se navega)
+  const [anioPicker, setAnioPicker] = useState(filtros.anio)
 
   useEffect(() => {
     fetch('/api/casas').then((r) => r.json()).then(setCasas)
@@ -40,6 +46,16 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
   const nextMes = () => {
     if (filtros.mes === 12) setFiltros({ mes: 1, anio: filtros.anio + 1 })
     else setFiltros({ mes: filtros.mes + 1 })
+  }
+
+  const abrirPicker = (e: React.MouseEvent<HTMLElement>) => {
+    setAnioPicker(filtros.anio)
+    setAnchorEl(e.currentTarget)
+  }
+
+  const seleccionarMes = (mes: number) => {
+    setFiltros({ mes, anio: anioPicker })
+    setAnchorEl(null)
   }
 
   return (
@@ -56,11 +72,64 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
       {/* Selector de mes */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: { xs: 'center', md: 'flex-start' } }}>
         <IconButton size="small" onClick={prevMes}><ChevronLeftIcon /></IconButton>
-        <Typography variant="body1" fontWeight={600} sx={{ minWidth: 160, textAlign: 'center' }}>
-          {MESES[filtros.mes - 1]} {filtros.anio}
-        </Typography>
+        <ButtonBase
+          onClick={abrirPicker}
+          sx={{
+            minWidth: 160,
+            borderRadius: 1,
+            px: 1,
+            py: 0.25,
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          <Typography variant="body1" fontWeight={600} sx={{ width: '100%', textAlign: 'center' }}>
+            {MESES[filtros.mes - 1]} {filtros.anio}
+          </Typography>
+        </ButtonBase>
         <IconButton size="small" onClick={nextMes}><ChevronRightIcon /></IconButton>
       </Box>
+
+      {/* Popover de selección directa mes/año */}
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Box sx={{ p: 1.5, width: 260 }}>
+          {/* Navegación de año */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <IconButton size="small" onClick={() => setAnioPicker((y) => y - 1)}><ChevronLeftIcon /></IconButton>
+            <Typography variant="body1" fontWeight={600}>{anioPicker}</Typography>
+            <IconButton size="small" onClick={() => setAnioPicker((y) => y + 1)}><ChevronRightIcon /></IconButton>
+          </Box>
+
+          {/* Grilla de meses */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.5 }}>
+            {MESES_CORTOS.map((m, i) => {
+              const activo = filtros.mes === i + 1 && filtros.anio === anioPicker
+              return (
+                <ButtonBase
+                  key={m}
+                  onClick={() => seleccionarMes(i + 1)}
+                  sx={{
+                    borderRadius: 1,
+                    py: 1,
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    color: activo ? 'primary.contrastText' : 'text.primary',
+                    bgcolor: activo ? 'primary.main' : 'transparent',
+                    '&:hover': { bgcolor: activo ? 'primary.dark' : 'action.hover' },
+                  }}
+                >
+                  {m}
+                </ButtonBase>
+              )
+            })}
+          </Box>
+        </Box>
+      </Popover>
 
       {/* Búsqueda — full width en mobile, antes que los selects */}
       <TextField
