@@ -6,6 +6,10 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(),
       create: vi.fn(),
     },
+    concepto: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+    },
   },
 }))
 
@@ -14,11 +18,12 @@ import { prisma } from '@/lib/db'
 
 const mockPrisma = prisma as unknown as {
   gastoItem: { findMany: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
+  concepto: { findFirst: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
 }
 
 function rawItem(overrides: Record<string, any> = {}) {
   return {
-    id: 1, gastoId: 3, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
+    id: 1, gastoId: 3, conceptoId: 1, concepto: { id: 1, nombre: 'Nafta' }, monto: 250, fecha: '2026-06-03',
     cuotaActual: null, cuotasTotales: null, incluyeEnTotal: true, incluyeEnVencimiento: false,
     verificado: false, categorias: [],
     createdAt: new Date('2026-06-03T00:00:00Z'),
@@ -28,6 +33,8 @@ function rawItem(overrides: Record<string, any> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockPrisma.concepto.findFirst.mockResolvedValue(null)
+  mockPrisma.concepto.create.mockResolvedValue({ id: 50 })
 })
 
 describe('GET /api/gastos/[id]/items', () => {
@@ -47,11 +54,13 @@ describe('POST /api/gastos/[id]/items', () => {
     const res = await POST({ json: async () => ({ descripcion: 'Carne', monto: 100 }) } as any, { params: { id: '3' } })
 
     expect(res.status).toBe(201)
+    expect(mockPrisma.concepto.create).toHaveBeenCalledWith(expect.objectContaining({ data: { nombre: 'Carne' } }))
     const data = mockPrisma.gastoItem.create.mock.calls[0][0].data
     expect(data).toMatchObject({
-      gastoId: 3, descripcion: 'Carne', monto: 100, fecha: null,
+      gastoId: 3, conceptoId: 50, monto: 100, fecha: null,
       incluyeEnTotal: true, incluyeEnVencimiento: false,
     })
+    expect(data).not.toHaveProperty('descripcion')
     expect(data.categorias).toEqual({ connect: [] })
   })
 

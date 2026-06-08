@@ -19,7 +19,7 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 | Archivo | Contenido |
 |---|---|
 | `docs/claude/auth-pwa.md` | NextAuth + Google OAuth + whitelist, PWA/service worker, responsive/mobile UI |
-| `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, autocompletado descripciones, vencimientos hoy, copy dialogs, evolución mensual (gráfico) |
+| `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, conceptos (descripciones normalizadas + admin), vencimientos hoy, copy dialogs, evolución mensual (gráfico) |
 | `docs/claude/tarjetas.md` | Logos de marca, `es_tarjeta`, `TarjetaCierre`, propagación de pagos a tarjeta (incluye cascade y sync bidireccional), tarjetas cerradas dashboard |
 | `docs/claude/api-surface.md` | Tabla completa de routes `/api/*` |
 | `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`, `AppMultiSelect`) |
@@ -64,6 +64,7 @@ Hay dos capas de tests:
 | `src/lib/gastos-compute.ts` (`toGastoResponse`) | Mapping camelCase→snake_case, `total_ars`/`total_pagado`/`total_restante`, match de cierre de tarjeta por mes/año, mapeo de pagos e items. Importado por `gastos/route.ts` y `gastos/[id]/route.ts`. | `gastos-compute.test.ts` |
 | `src/lib/resumen-compute.ts` (`computeResumen`) | Agregados del resumen (gastos/pagado/restante/tarjetas/préstamos/pasajes/neto), `pagar_hoy`, estimado próximo mes (promedio con meses previos, `missingBehavior`, cuotas vigentes, excluir última cuota). Importado por `resumen/route.ts`. | `resumen-compute.test.ts` |
 | `src/lib/fechas.ts` (`shiftMonth`) | Aritmética de meses con wraparound de año. Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
+| `src/lib/conceptos.ts` (`normalizeNombre`, `resolveConcepto`) | Normalización (trim + colapso de espacios) y find-or-create case-insensitive de `Concepto`. Importado por los write paths de gastos/items/pagos y `/api/conceptos`. | `conceptos.test.ts` |
 
 **2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:
 
@@ -108,6 +109,7 @@ El Prisma schema usa **camelCase** (`casaId`, `tipoPago`, `totalMoneda`, etc.), 
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
 | `confirmado` | Si el monto está confirmado. Default `true` en alta; siempre `false` al copiar. Filas no confirmadas se renderizan con fondo naranja e icono warning. "Total ARS" muestra suma de sub-items (en naranja) en vez de `totalMoneda × tipoCambio` cuando no confirmado y hay items. |
 | `categoria_ids` / `categorias` | Relación **muchos-a-muchos** con `Categoria` (ej: Auto, Supermercado, Mascotas) en `Gasto` y `GastoItem`. API expone `categoria_ids: number[]` (body) y `categorias: {id,nombre}[]` (display). UI usa `AppMultiSelect`. Ver `docs/claude/gastos-core.md`. |
+| `concepto_id` / `descripcion` | El "qué" de un gasto/sub-item es la entidad **`Concepto`** (relación 1-a-muchos), no texto libre — la columna `descripcion` **no existe** en la DB. `Gasto`/`GastoItem` tienen `conceptoId` (FK obligatoria). La API expone `descripcion` derivada de `concepto.nombre` + `concepto_id`. Los write paths reciben texto y resuelven con `resolveConcepto()` (find-or-create case-insensitive). El match de analytics (evolución, estimado, copiar) es por `conceptoId`. Ver `docs/claude/gastos-core.md` → Conceptos. |
 
 ## Dates and timezones (IMPORTANT)
 

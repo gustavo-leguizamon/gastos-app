@@ -7,7 +7,8 @@ function makeGasto(overrides: Record<string, any> = {}) {
   return {
     id: 1,
     casaId: 10,
-    descripcion: 'Internet',
+    conceptoId: 1,
+    concepto: { id: 1, nombre: 'Internet' },
     fechaVencimiento: '2026-06-10',
     tipoPago: 'D',
     monedaId: 2,
@@ -40,6 +41,12 @@ describe('toGastoResponse', () => {
     expect(r.pasaje_mes_siguiente).toBe(50)
     expect(r.prestamo_a_otro).toBe(30)
     expect(r.es_tarjeta).toBe(false)
+  })
+
+  it('deriva descripcion y concepto_id del concepto relacionado', () => {
+    const r = toGastoResponse(makeGasto({ conceptoId: 42, concepto: { id: 42, nombre: 'Netflix' } }))
+    expect(r.concepto_id).toBe(42)
+    expect(r.descripcion).toBe('Netflix')
   })
 
   it('calcula total_ars = totalMoneda * tipoCambio redondeado a 2 decimales', () => {
@@ -110,7 +117,7 @@ describe('toGastoResponse', () => {
   it('mapea sub-items a snake_case con sus flags y categorías', () => {
     const r = toGastoResponse(makeGasto({
       items: [{
-        id: 9, gastoId: 1, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
+        id: 9, gastoId: 1, conceptoId: 9, concepto: { id: 9, nombre: 'Nafta' }, monto: 250, fecha: '2026-06-03',
         cuotaActual: 2, cuotasTotales: 6, incluyeEnTotal: true, incluyeEnVencimiento: false,
         verificado: true, categorias: [{ id: 3, nombre: 'Auto' }, { id: 5, nombre: 'Combustible' }],
         createdAt: new Date('2026-06-03T00:00:00Z'),
@@ -118,7 +125,7 @@ describe('toGastoResponse', () => {
     }))
     expect(r.items).toHaveLength(1)
     expect(r.items[0]).toMatchObject({
-      id: 9, gasto_id: 1, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
+      id: 9, gasto_id: 1, concepto_id: 9, descripcion: 'Nafta', monto: 250, fecha: '2026-06-03',
       cuota_actual: 2, cuotas_totales: 6, incluye_en_total: true, incluye_en_vencimiento: false,
       verificado: true, categoria_ids: [3, 5],
     })

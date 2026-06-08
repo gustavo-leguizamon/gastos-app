@@ -1,32 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { toItemResponse } from '@/lib/gastos-compute'
+import { resolveConcepto } from '@/lib/conceptos'
 
-const ITEM_INCLUDE = { categorias: true }
-
-function toItemResponse(item: any) {
-  return {
-    id: item.id,
-    gasto_id: item.gastoId,
-    descripcion: item.descripcion,
-    monto: item.monto,
-    fecha: item.fecha ?? null,
-    cuota_actual: item.cuotaActual ?? null,
-    cuotas_totales: item.cuotasTotales ?? null,
-    incluye_en_total: item.incluyeEnTotal,
-    incluye_en_vencimiento: item.incluyeEnVencimiento,
-    verificado: item.verificado ?? false,
-    categoria_ids: (item.categorias ?? []).map((c: any) => c.id),
-    categorias: (item.categorias ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })),
-    created_at: item.createdAt.toISOString(),
-  }
-}
+const ITEM_INCLUDE = { concepto: true, categorias: true }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string; itemId: string } }) {
   const body = await req.json()
+  const conceptoId = body.concepto_id ?? await resolveConcepto(prisma, body.descripcion)
   const item = await prisma.gastoItem.update({
     where: { id: Number(params.itemId) },
     data: {
-      descripcion: body.descripcion,
+      conceptoId,
       monto: body.monto,
       fecha: body.fecha || null,
       cuotaActual: body.cuota_actual ?? null,

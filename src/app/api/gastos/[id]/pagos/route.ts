@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { shiftMonth } from '@/lib/fechas'
+import { resolveConcepto } from '@/lib/conceptos'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const pagos = await prisma.pago.findMany({
@@ -67,10 +68,14 @@ async function propagatePagoToTarjeta(opts: {
       },
     })
     const defaultVenc = targetCierre?.fechaVencimiento || `${target.anio}-${String(target.mes).padStart(2, '0')}-01`
+    const tarjetaConceptoId = await resolveConcepto(
+      prisma,
+      tarjeta.banco ? `${tarjeta.nombre} (${tarjeta.banco})` : tarjeta.nombre,
+    )
     targetCC = await prisma.gasto.create({
       data: {
         casaId: source.casaId,
-        descripcion: tarjeta.banco ? `${tarjeta.nombre} (${tarjeta.banco})` : tarjeta.nombre,
+        conceptoId: tarjetaConceptoId,
         fechaVencimiento: defaultVenc,
         tipoPago: 'D',
         monedaId: ars.id,
@@ -91,7 +96,7 @@ async function propagatePagoToTarjeta(opts: {
   await prisma.gastoItem.create({
     data: {
       gastoId: targetCC.id,
-      descripcion: source.descripcion,
+      conceptoId: source.conceptoId,
       monto: opts.monto,
       fecha: opts.fecha,
       incluyeEnTotal: true,

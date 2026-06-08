@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
+import { resolveConcepto } from '@/lib/conceptos'
 
 const INCLUDE = {
   casa: true,
   moneda: true,
   tarjeta: { include: { cierres: true } },
+  concepto: true,
   categorias: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
-  items: { orderBy: { createdAt: 'asc' as const }, include: { categorias: true } },
+  items: { orderBy: { createdAt: 'asc' as const }, include: { concepto: true, categorias: true } },
 }
 
 export async function GET(req: NextRequest) {
@@ -31,10 +33,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json()
 
+  const conceptoId = body.concepto_id ?? await resolveConcepto(prisma, body.descripcion)
+
   const gasto = await prisma.gasto.create({
     data: {
       casaId: body.casa_id,
-      descripcion: body.descripcion,
+      conceptoId,
       fechaVencimiento: body.fecha_vencimiento,
       tipoPago: body.tipo_pago,
       monedaId: body.moneda_id,

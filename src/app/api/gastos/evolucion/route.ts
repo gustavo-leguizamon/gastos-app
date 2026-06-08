@@ -27,14 +27,14 @@ function gastoTotalArs(g: any) {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const descripcion = searchParams.get('descripcion')
+  const conceptoId = Number(searchParams.get('concepto_id'))
   const casa_id = searchParams.get('casa_id')
   const mes = Number(searchParams.get('mes'))
   const anio = Number(searchParams.get('anio'))
   const mesesParam = Number(searchParams.get('meses'))
 
-  if (!descripcion || !mes || !anio) {
-    return NextResponse.json({ error: 'Faltan parámetros: descripcion, mes, anio' }, { status: 400 })
+  if (!conceptoId || !mes || !anio) {
+    return NextResponse.json({ error: 'Faltan parámetros: concepto_id, mes, anio' }, { status: 400 })
   }
 
   // Cantidad de meses a mostrar (incluye el mes actual). Default 6, acotado a 2–24.
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   const months = buildWindow(mes, anio, count)
 
   const where: any = {
-    descripcion: { equals: descripcion, mode: 'insensitive' },
+    conceptoId,
     OR: months.map(({ mes, anio }) => ({ mes, anio })),
   }
   if (casa_id) where.casaId = Number(casa_id)

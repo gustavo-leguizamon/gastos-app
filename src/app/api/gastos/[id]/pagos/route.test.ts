@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({
     tarjeta: { findUnique: vi.fn() },
     moneda: { findFirst: vi.fn() },
     gastoItem: { create: vi.fn() },
+    concepto: { findFirst: vi.fn(), create: vi.fn() },
   },
 }))
 
@@ -18,7 +19,7 @@ const mp = prisma as any
 
 function source(overrides: Record<string, any> = {}) {
   return {
-    id: 1, casaId: 10, descripcion: 'Visa', tipoPago: 'C', tarjetaId: 7,
+    id: 1, casaId: 10, conceptoId: 11, tipoPago: 'C', tarjetaId: 7,
     mes: 6, anio: 2026, categorias: [], cuotaActual: null, cuotasTotales: null,
     ...overrides,
   }
@@ -27,6 +28,8 @@ function source(overrides: Record<string, any> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   mp.pago.create.mockResolvedValue({ id: 100, gastoId: 1, fecha: '2026-06-25', monto: 500, createdAt: new Date('2026-06-25T00:00:00Z') })
+  mp.concepto.findFirst.mockResolvedValue(null)
+  mp.concepto.create.mockResolvedValue({ id: 60 })
 })
 
 describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
@@ -61,8 +64,9 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
       where: expect.objectContaining({ esTarjeta: true, tarjetaId: 7, mes: 7, anio: 2026 }),
     }))
     expect(mp.gasto.create).not.toHaveBeenCalled() // no crea porque ya existe
+    // El item propagado hereda el conceptoId del gasto fuente
     expect(mp.gastoItem.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ gastoId: 555, monto: 500, fecha: '2026-06-25', descripcion: 'Visa' }),
+      data: expect.objectContaining({ gastoId: 555, monto: 500, fecha: '2026-06-25', conceptoId: 11 }),
     }))
   })
 
@@ -89,14 +93,17 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
 
     await POST({ json: async () => ({ fecha: '2026-06-25', monto: 500 }) } as any, { params: { id: '1' } })
 
+    // El nombre de la tarjeta se resuelve a un concepto (id 60)
+    expect(mp.concepto.create).toHaveBeenCalledWith(expect.objectContaining({ data: { nombre: 'Visa (Galicia)' } }))
     expect(mp.gasto.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         esTarjeta: true, confirmado: false, tipoPago: 'D', tarjetaId: 7, mes: 7, anio: 2026,
-        descripcion: 'Visa (Galicia)',
+        conceptoId: 60,
       }),
     }))
+    expect(mp.gasto.create.mock.calls[0][0].data).not.toHaveProperty('descripcion')
     expect(mp.gastoItem.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ gastoId: 999, monto: 500 }),
+      data: expect.objectContaining({ gastoId: 999, monto: 500, conceptoId: 11 }),
     }))
   })
 })

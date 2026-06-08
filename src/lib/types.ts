@@ -37,9 +37,17 @@ export interface Categoria {
   nombre: string
 }
 
+export interface Concepto {
+  id: number
+  nombre: string
+  // Cantidad de gastos + sub-items que lo referencian (sólo en /api/conceptos).
+  uso?: number
+}
+
 export interface GastoItem {
   id: number
   gasto_id: number
+  concepto_id: number
   descripcion: string
   monto: number
   fecha: string | null
@@ -65,6 +73,7 @@ export interface Gasto {
   id: number
   casa_id: number
   casa_nombre?: string
+  concepto_id: number
   descripcion: string
   fecha_vencimiento: string
   tipo_pago: 'C' | 'D'

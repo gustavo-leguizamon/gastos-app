@@ -1,25 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { toItemResponse } from '@/lib/gastos-compute'
+import { resolveConcepto } from '@/lib/conceptos'
 
-function toItemResponse(i: any) {
-  return {
-    id: i.id,
-    gasto_id: i.gastoId,
-    descripcion: i.descripcion,
-    monto: i.monto,
-    fecha: i.fecha ?? null,
-    cuota_actual: i.cuotaActual ?? null,
-    cuotas_totales: i.cuotasTotales ?? null,
-    incluye_en_total: i.incluyeEnTotal,
-    incluye_en_vencimiento: i.incluyeEnVencimiento,
-    verificado: i.verificado ?? false,
-    categoria_ids: (i.categorias ?? []).map((c: any) => c.id),
-    categorias: (i.categorias ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })),
-    created_at: i.createdAt.toISOString(),
-  }
-}
-
-const ITEM_INCLUDE = { categorias: true }
+const ITEM_INCLUDE = { concepto: true, categorias: true }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const items = await prisma.gastoItem.findMany({
@@ -32,10 +16,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json()
+  const conceptoId = body.concepto_id ?? await resolveConcepto(prisma, body.descripcion)
   const item = await prisma.gastoItem.create({
     data: {
       gastoId: Number(params.id),
-      descripcion: body.descripcion,
+      conceptoId,
       monto: body.monto,
       fecha: body.fecha || null,
       cuotaActual: body.cuota_actual ?? null,

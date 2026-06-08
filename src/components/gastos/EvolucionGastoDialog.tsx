@@ -48,7 +48,7 @@ export default function EvolucionGastoDialog({ open, gasto, mes, anio, onClose }
     if (!open || !gasto) return
     setLoading(true)
     const params = new URLSearchParams({
-      descripcion: gasto.descripcion,
+      concepto_id: String(gasto.concepto_id),
       mes: String(mes),
       anio: String(anio),
       meses: String(meses),

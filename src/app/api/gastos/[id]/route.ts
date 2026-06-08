@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
+import { resolveConcepto } from '@/lib/conceptos'
 
 const INCLUDE = {
   casa: true,
   moneda: true,
   tarjeta: { include: { cierres: true } },
+  concepto: true,
   categorias: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
-  items: { orderBy: { createdAt: 'asc' as const }, include: { categorias: true } },
+  items: { orderBy: { createdAt: 'asc' as const }, include: { concepto: true, categorias: true } },
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -20,11 +22,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json()
 
+  const conceptoId = body.concepto_id ?? await resolveConcepto(prisma, body.descripcion)
+
   const gasto = await prisma.gasto.update({
     where: { id: Number(params.id) },
     data: {
       casaId: body.casa_id,
-      descripcion: body.descripcion,
+      conceptoId,
       fechaVencimiento: body.fecha_vencimiento,
       tipoPago: body.tipo_pago,
       monedaId: body.moneda_id,
@@ -46,16 +50,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include: INCLUDE,
   })
 
-  // Sync de descripción a los sub-items propagados de tarjeta: el sub-item se generó
-  // con descripcion = gasto fuente.descripcion. Si cambió, reflejarlo en todos los
-  // items cuyo pago pertenece a este gasto.
+  // Sync del concepto a los sub-items propagados de tarjeta: el sub-item se generó con el
+  // `conceptoId` del gasto fuente. Si el gasto pasó a apuntar a otro concepto, reflejarlo en
+  // todos los items cuyo pago pertenece a este gasto. (Renombrar el concepto en sí no necesita
+  // esto: la `descripcion` derivada se actualiza sola.)
   try {
     await prisma.gastoItem.updateMany({
       where: { pago: { gastoId: gasto.id } },
-      data: { descripcion: gasto.descripcion },
+      data: { conceptoId },
     })
   } catch (err) {
-    console.error('Sync descripción gasto→items propagados falló:', err)
+    console.error('Sync concepto gasto→items propagados falló:', err)
   }
 
   return NextResponse.json(toGastoResponse(gasto))

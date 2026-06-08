@@ -53,10 +53,22 @@ model Categoria {
   items  GastoItem[] @relation("GastoItemCategorias")
 }
 
+// Concepto: entidad canónica del "qué" de un gasto/sub-item (ej: Netflix, Luz, Expensas).
+// Reemplaza al texto libre `descripcion` como fuente de verdad: gastos e items apuntan por
+// `conceptoId` y la API expone `descripcion` derivada de `nombre`. Renombrar un concepto se
+// refleja en todo el histórico. El match para analytics (evolución, estimado, copiar) usa el id.
+model Concepto {
+  id        Int         @id @default(autoincrement())
+  nombre    String      @unique
+  createdAt DateTime    @default(now())
+  gastos    Gasto[]
+  items     GastoItem[]
+}
+
 model Gasto {
   id                   Int      @id @default(autoincrement())
   casaId               Int
-  descripcion          String
+  conceptoId           Int
   fechaVencimiento     String
   tipoPago             String
   monedaId             Int
@@ -79,6 +91,7 @@ model Gasto {
   casa    Casa     @relation(fields: [casaId], references: [id])
   moneda  Moneda   @relation(fields: [monedaId], references: [id])
   tarjeta   Tarjeta?   @relation(fields: [tarjetaId], references: [id])
+  concepto  Concepto   @relation(fields: [conceptoId], references: [id])
   categorias Categoria[] @relation("GastoCategorias")
   pagos     Pago[]
   items     GastoItem[]
@@ -87,7 +100,7 @@ model Gasto {
 model GastoItem {
   id            Int      @id @default(autoincrement())
   gastoId       Int
-  descripcion   String
+  conceptoId    Int
   monto         Float
   fecha         String?
   cuotaActual          Int?
@@ -99,6 +112,7 @@ model GastoItem {
   createdAt            DateTime @default(now())
 
   gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  concepto  Concepto   @relation(fields: [conceptoId], references: [id])
   categorias Categoria[] @relation("GastoItemCategorias")
   pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
 }

@@ -33,10 +33,10 @@ Card adicional en el resumen que proyecta el gasto del próximo mes basado en hi
 **Algoritmo:**
 
 1. **Unidades** del mes actual y de los `estim_meses_atras` meses previos. Para cada gasto:
-   - Si tiene sub-items con `incluyeEnTotal = true`: **agrupados por descripción normalizada (sumando montos)** dentro del gasto. Cada grupo es una unidad (key = `parentDesc + desc`).
-   - Si no tiene sub-items elegibles y está confirmado: el gasto es una unidad (key = `desc` solo).
+   - Si tiene sub-items con `incluyeEnTotal = true`: **agrupados por `conceptoId` (sumando montos)** dentro del gasto. Cada grupo es una unidad (key = `parentConcepto + concepto`).
+   - Si no tiene sub-items elegibles y está confirmado: el gasto es una unidad (key = `concepto` solo).
    - Gastos no confirmados sin items se ignoran.
-   - Descripciones normalizadas a `trim().toLowerCase()` antes del match.
+   - El match entre meses es por **`conceptoId`** (id estable), no por texto — ver [Conceptos](#conceptos).
    - Si en un grupo de sub-items alguno tiene `cuotaActual/cuotasTotales`, se conservan en la unidad agrupada.
 2. **Para cada unidad del mes actual:**
    - Si está en cuotas y `estim_excluir_ultima_cuota = true` y es la última: se excluye.
@@ -104,14 +104,17 @@ Filtros client-side en `gastos/page.tsx` (lifted state, props):
 - **Pasaje / Préstamo**: solo en edición (`isEditing = !!gasto`).
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (Yup `when('tipo_pago', { is: 'C', ... })`). La UI oculta "Sin especificar" y el label pierde "(opcional)". Sin tarjeta → `FormHelperText` "Seleccioná una tarjeta". `tipo_pago === 'D'` sigue siendo opcional.
 
-## Autocompletado de descripciones
+## Conceptos
 
-Para evitar variantes de naming entre períodos (rompe match del estimado), los campos "Descripción" de `GastoForm` y `GastoItemDialog` usan `Autocomplete` `freeSolo`:
+El "qué" de un gasto/sub-item (Netflix, Luz, Expensas) es una **entidad** `Concepto`, no texto libre. `Gasto` y `GastoItem` referencian por `conceptoId` (FK obligatoria); la **columna `descripcion` ya no existe** en la DB. La API expone `descripcion` derivada de `concepto.nombre` (más `concepto_id`), así todo el display/filtro del cliente sigue usando `gasto.descripcion` sin cambios.
 
-- `GastoForm`: `GET /api/gastos/descripciones`.
-- `GastoItemDialog`: `GET /api/items/descripciones` (parámetro `?parent=...` se acepta pero se ignora).
+**Por qué:** el match para analytics (evolución, estimado próximo mes, copiar/merge) se hace por `conceptoId` — id estable — en vez de comparar strings normalizados. Variantes de naming ("Netflix" / "netflix " / "Netflix  HBO") ya no rompen el match. Renombrar un concepto se refleja en todo el histórico automáticamente (la `descripcion` es derivada).
 
-Ambos endpoints devuelven la **misma unión**: `gastos.descripcion ∪ gastoItem.descripcion`, distintos, ordenados con `localeCompare('es', { sensitivity: 'base' })`. 2 queries paralelas a Prisma con `distinct: ['descripcion']` y dedup con `Set`.
+**Resolución (write paths):** los forms siguen mandando `descripcion` como texto (o `concepto_id` si ya se eligió uno). Las routes resuelven con `resolveConcepto(prisma, texto)` (`src/lib/conceptos.ts`): find-or-create case-insensitive, normalizando con `normalizeNombre` (trim + colapso de espacios internos, casing preservado). Aplica en `gastos` POST/PUT, `items` POST/PUT, y la propagación de pagos a tarjeta (el sub-item hereda `source.conceptoId`; el gasto CC `esTarjeta` resuelve el nombre de la tarjeta a concepto).
+
+**Autocompletado:** los campos "Descripción" de `GastoForm` y `GastoItemDialog` usan `Autocomplete` `freeSolo`. `GET /api/gastos/descripciones` y `GET /api/items/descripciones` devuelven ahora los **nombres de `Concepto`** (`concepto.nombre`, ordenados con `localeCompare('es', { sensitivity: 'base' })`) — antes era un `distinct` sobre texto libre.
+
+**Administración** (`/configuracion` → "Conceptos", componente `ConceptosManager`): listar (con conteo de uso), renombrar (`PATCH /api/conceptos/[id]`, rechaza colisión con 409), borrar sólo si sin uso (`DELETE`, 409 si en uso), y **fusionar** duplicados (`POST /api/conceptos/merge` con `{ source_id, target_id }`: reasigna gastos+items y borra el origen).
 
 ## Vencimientos del día alert
 
@@ -135,8 +138,8 @@ Ambos llaman `triggerRefresh()` al terminar.
 
 1. Carga el gasto origen (con items). Calcula `fechaVencimiento` destino = mismo día, nuevo mes/año.
 2. **Sub-items candidatos:** si el gasto es `esTarjeta`, sólo los que tienen **cuotas pendientes** (`cuotaActual != null && cuotasTotales != null && cuotaActual < cuotasTotales`). Para gastos normales, todos los sub-items.
-3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `descripcion` (case-insensitive vía `mode: 'insensitive'`).
-4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuya descripción normalizada (`trim().toLowerCase()`) **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
+3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `conceptoId`.
+4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuyo `conceptoId` **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
 5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, y conecta sus `categorias`, etc.) y todos los sub-items candidatos (cada uno conecta sus propias `categorias`). Devuelve `{ created: true, gasto_id, added_items }`.
 6. **Incremento de cuota:** tanto el **gasto principal** (al crearlo nuevo) como cada **sub-item** copiado, si están en cuotas no finalizadas (`cuotaActual < cuotasTotales`), se copian con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Aplica sea o no `esTarjeta`. El gasto sólo incrementa en la rama de creación (en merge no se toca el gasto destino existente).
 
@@ -148,6 +151,6 @@ Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año indepen
 
 - Se abre desde `GastosTable`: icono `ShowChartIcon` ("Evolución mensual") en la columna de acciones (desktop) y opción en el menú de tres puntos (mobile).
 - Ventana por defecto **6 meses** terminando en el mes/año del filtro activo (incluye el mes actual). Se cambia en pantalla con un `AppSelect` (presets 3/6/9/12/18/24), que vuelve a pedir los datos y recalcula.
-- Identifica el gasto entre meses por **descripción (case-insensitive) + `casa_id`** del gasto desde el que se abrió (misma lógica de match que copiar/merge).
-- Pide los datos a `GET /api/gastos/evolucion`. Bajo el gráfico muestra promedio / máximo / mínimo de los meses con datos (>0).
+- Identifica el gasto entre meses por **`concepto_id` + `casa_id`** del gasto desde el que se abrió (misma lógica de match que copiar/merge).
+- Pide los datos a `GET /api/gastos/evolucion?concepto_id=...&mes=...&anio=...` (antes el param era `descripcion`). Bajo el gráfico muestra promedio / máximo / mínimo de los meses con datos (>0).
 - `@mui/x-charts` v7 se agregó como dependencia para este gráfico.

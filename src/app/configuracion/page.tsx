@@ -33,6 +33,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import toast from 'react-hot-toast'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
+import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
 import BrandLogo from '@/components/shared/BrandLogo'
 import type { Casa, Categoria, Moneda, Tarjeta, TarjetaMarca } from '@/lib/types'
@@ -319,6 +320,18 @@ export default function ConfiguracionPage() {
           </Accordion>
         </Grid>
 
+        {/* Conceptos */}
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Conceptos</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <ConceptosManager />
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+
         {/* Tarjetas */}
         <Grid item xs={12}>
           <Accordion>
@@ -443,7 +456,7 @@ export default function ConfiguracionPage() {
                           Por cada gasto del mes actual se construyen <strong>unidades</strong>:
                         </Typography>
                         <Box component="ul" sx={{ pl: 2.5, mt: 0, mb: 1 }}>
-                          <li>Si tiene sub-items con <em>"Incluir en total"</em>, se agrupan por descripción (sumando) y cada grupo es una unidad.</li>
+                          <li>Si tiene sub-items con <em>"Incluir en total"</em>, se agrupan por concepto (sumando) y cada grupo es una unidad.</li>
                           <li>Si no, el gasto en sí es la unidad.</li>
                         </Box>
                         <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>Para cada unidad:</Typography>
@@ -451,7 +464,7 @@ export default function ConfiguracionPage() {
                           <li>Si <em>"Excluir última cuota"</em> está activo y la unidad está en su última cuota → se omite.</li>
                           <li>Si <em>"Sumar cuotas vigentes"</em> está activo y la unidad está en cuotas → se suma el monto sin promediar.</li>
                           <li>
-                            Si no, se busca el mismo gasto/sub-item por descripción (normalizada con <code>trim().toLowerCase()</code>)
+                            Si no, se busca el mismo gasto/sub-item por <strong>concepto</strong>
                             en los últimos <strong>N</strong> meses (configurado abajo).
                           </li>
                           <li>

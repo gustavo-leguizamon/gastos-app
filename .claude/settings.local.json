@@ -48,7 +48,8 @@
       "Bash(echo \"EXIT=$?\")",
       "PowerShell(npx tsc --noEmit; if \\($?\\) { \"TYPECHECK OK\" } else { \"TYPECHECK FAILED\" })",
       "Bash(gh --version)",
-      "PowerShell($gh = \\(Get-Command gh -ErrorAction SilentlyContinue\\); if \\($gh\\) { \"gh found: $\\($gh.Source\\)\" } else { \"gh NOT found\" })"
+      "PowerShell($gh = \\(Get-Command gh -ErrorAction SilentlyContinue\\); if \\($gh\\) { \"gh found: $\\($gh.Source\\)\" } else { \"gh NOT found\" })",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; Write-Output \"EXIT: $LASTEXITCODE\")"
     ]
   },
   "hooks": {

@@ -23,15 +23,13 @@ export interface ResumenResult {
 }
 
 type Unit = {
-  parentDesc: string
-  desc: string
+  parentConcepto: number
+  concepto: number
   monto: number
   cuotaActual: number | null
   cuotasTotales: number | null
   isSubitem: boolean
 }
-
-const norm = (s: string) => s.trim().toLowerCase()
 
 function buildUnits(gs: any[]): Unit[] {
   const out: Unit[] = []
@@ -39,10 +37,10 @@ function buildUnits(gs: any[]): Unit[] {
     if (!g.confirmado && g.items.length === 0) continue
     const itemsIncl = g.items.filter((i: any) => i.incluyeEnTotal)
     if (itemsIncl.length > 0) {
-      // Agrupar sub-items del mismo gasto por descripción normalizada
-      const grouped = new Map<string, Unit>()
+      // Agrupar sub-items del mismo gasto por concepto
+      const grouped = new Map<number, Unit>()
       for (const it of itemsIncl) {
-        const key = norm(it.descripcion)
+        const key = it.conceptoId
         const existing = grouped.get(key)
         if (existing) {
           existing.monto += it.monto
@@ -53,8 +51,8 @@ function buildUnits(gs: any[]): Unit[] {
           }
         } else {
           grouped.set(key, {
-            parentDesc: norm(g.descripcion),
-            desc: key,
+            parentConcepto: g.conceptoId,
+            concepto: key,
             monto: it.monto,
             cuotaActual: it.cuotaActual ?? null,
             cuotasTotales: it.cuotasTotales ?? null,
@@ -65,8 +63,8 @@ function buildUnits(gs: any[]): Unit[] {
       grouped.forEach((u) => out.push(u))
     } else if (g.confirmado) {
       out.push({
-        parentDesc: norm(g.descripcion),
-        desc: norm(g.descripcion),
+        parentConcepto: g.conceptoId,
+        concepto: g.conceptoId,
         monto: g.totalMoneda * g.tipoCambio,
         cuotaActual: g.cuotaActual ?? null,
         cuotasTotales: g.cuotasTotales ?? null,
@@ -80,9 +78,9 @@ function buildUnits(gs: any[]): Unit[] {
 function findMatch(units: Unit[], target: Unit): number | null {
   for (const u of units) {
     if (target.isSubitem) {
-      if (u.isSubitem && u.parentDesc === target.parentDesc && u.desc === target.desc) return u.monto
+      if (u.isSubitem && u.parentConcepto === target.parentConcepto && u.concepto === target.concepto) return u.monto
     } else {
-      if (!u.isSubitem && u.desc === target.desc) return u.monto
+      if (!u.isSubitem && u.concepto === target.concepto) return u.monto
     }
   }
   return null

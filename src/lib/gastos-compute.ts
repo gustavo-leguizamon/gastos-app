@@ -5,6 +5,29 @@
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 /**
+ * Mapea un `GastoItem` (camelCase, con `concepto` y `categorias` incluidos) a la forma
+ * snake_case. `descripcion` es derivada de `concepto.nombre` (la columna ya no existe).
+ */
+export function toItemResponse(i: any) {
+  return {
+    id: i.id,
+    gasto_id: i.gastoId,
+    concepto_id: i.conceptoId,
+    descripcion: i.concepto?.nombre ?? '',
+    monto: i.monto,
+    fecha: i.fecha ?? null,
+    cuota_actual: i.cuotaActual ?? null,
+    cuotas_totales: i.cuotasTotales ?? null,
+    incluye_en_total: i.incluyeEnTotal,
+    incluye_en_vencimiento: i.incluyeEnVencimiento,
+    verificado: i.verificado ?? false,
+    categoria_ids: (i.categorias ?? []).map((c: any) => c.id),
+    categorias: (i.categorias ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })),
+    created_at: i.createdAt?.toISOString(),
+  }
+}
+
+/**
  * Maps a Prisma `Gasto` (with its relations) to the snake_case response shape.
  * Computes `total_ars`, `total_pagado` y `total_restante`, y resuelve el
  * `cierre` de tarjeta correspondiente al mes/año del gasto.
@@ -31,7 +54,8 @@ export function toGastoResponse(g: any) {
     id: g.id,
     casa_id: g.casaId,
     casa_nombre: g.casa?.nombre,
-    descripcion: g.descripcion,
+    concepto_id: g.conceptoId,
+    descripcion: g.concepto?.nombre ?? '',
     fecha_vencimiento: g.fechaVencimiento,
     tipo_pago: g.tipoPago,
     moneda_id: g.monedaId,
@@ -61,20 +85,6 @@ export function toGastoResponse(g: any) {
     created_at: g.createdAt?.toISOString(),
     updated_at: g.updatedAt?.toISOString(),
     pagos,
-    items: (g.items ?? []).map((i: any) => ({
-      id: i.id,
-      gasto_id: i.gastoId,
-      descripcion: i.descripcion,
-      monto: i.monto,
-      fecha: i.fecha ?? null,
-      cuota_actual: i.cuotaActual ?? null,
-      cuotas_totales: i.cuotasTotales ?? null,
-      incluye_en_total: i.incluyeEnTotal,
-      incluye_en_vencimiento: i.incluyeEnVencimiento,
-      verificado: i.verificado ?? false,
-      categoria_ids: (i.categorias ?? []).map((c: any) => c.id),
-      categorias: (i.categorias ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })),
-      created_at: i.createdAt?.toISOString(),
-    })),
+    items: (g.items ?? []).map(toItemResponse),
   }
 }

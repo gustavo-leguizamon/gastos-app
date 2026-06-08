@@ -8,10 +8,11 @@ const SETTINGS_DEFAULT: ResumenSettings = {
   estimExcluirUltimaCuota: false,
 }
 
-// Gasto con includes mínimos para el resumen (pagos + items).
+// Gasto con includes mínimos para el resumen (pagos + items). El match del estimado es por
+// `conceptoId`: usar el mismo número en distintos meses representa "el mismo concepto".
 function makeGasto(overrides: Record<string, any> = {}) {
   return {
-    descripcion: 'Gasto',
+    conceptoId: 1,
     tipoPago: 'D',
     tipoCambio: 1,
     totalMoneda: 1000,
@@ -86,8 +87,8 @@ describe('computeResumen — gastos no confirmados', () => {
         confirmado: false,
         totalMoneda: 9999, // se ignora porque no está confirmado
         items: [
-          { descripcion: 'a', monto: 200, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
-          { descripcion: 'b', monto: 50, incluyeEnTotal: false, incluyeEnVencimiento: false, fecha: null },
+          { conceptoId: 10, monto: 200, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
+          { conceptoId: 11, monto: 50, incluyeEnTotal: false, incluyeEnVencimiento: false, fecha: null },
         ],
       })],
       [], SETTINGS_DEFAULT, TODAY,
@@ -113,9 +114,9 @@ describe('computeResumen — pagar_hoy', () => {
       [makeGasto({
         fechaVencimiento: TODAY, // se ignora porque tiene items
         items: [
-          { descripcion: 'hoy-cuenta', monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: true, fecha: TODAY },
-          { descripcion: 'hoy-no-venc', monto: 999, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: TODAY },
-          { descripcion: 'otra-fecha', monto: 999, incluyeEnTotal: true, incluyeEnVencimiento: true, fecha: '2026-06-11' },
+          { conceptoId: 20, monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: true, fecha: TODAY },
+          { conceptoId: 21, monto: 999, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: TODAY },
+          { conceptoId: 22, monto: 999, incluyeEnTotal: true, incluyeEnVencimiento: true, fecha: '2026-06-11' },
         ],
       })],
       [], SETTINGS_DEFAULT, TODAY,
@@ -127,7 +128,7 @@ describe('computeResumen — pagar_hoy', () => {
 describe('computeResumen — estimado próximo mes', () => {
   it('sin meses previos: el estimado es el monto del mes actual', () => {
     const r = computeResumen(
-      [makeGasto({ descripcion: 'Luz', totalMoneda: 1000, tipoCambio: 1 })],
+      [makeGasto({ conceptoId: 100, totalMoneda: 1000, tipoCambio: 1 })],
       [], SETTINGS_DEFAULT, TODAY,
     )
     expect(r.total_proximo_mes).toBe(1000)
@@ -136,8 +137,8 @@ describe('computeResumen — estimado próximo mes', () => {
   it('promedia con meses previos (missingBehavior=zero suma 0 si no matchea)', () => {
     const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1 }
     const r = computeResumen(
-      [makeGasto({ descripcion: 'Luz', totalMoneda: 1000, tipoCambio: 1 })],
-      [[makeGasto({ descripcion: 'Luz', totalMoneda: 500, tipoCambio: 1 })]],
+      [makeGasto({ conceptoId: 100, totalMoneda: 1000, tipoCambio: 1 })],
+      [[makeGasto({ conceptoId: 100, totalMoneda: 500, tipoCambio: 1 })]],
       settings, TODAY,
     )
     expect(r.total_proximo_mes).toBe(750) // (1000 + 500) / 2
@@ -146,8 +147,8 @@ describe('computeResumen — estimado próximo mes', () => {
   it('missingBehavior=zero penaliza un gasto que no existía el mes previo', () => {
     const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1, estimMissingBehavior: 'zero' }
     const r = computeResumen(
-      [makeGasto({ descripcion: 'Nuevo', totalMoneda: 1000, tipoCambio: 1 })],
-      [[makeGasto({ descripcion: 'Otro', totalMoneda: 500 })]],
+      [makeGasto({ conceptoId: 100, totalMoneda: 1000, tipoCambio: 1 })],
+      [[makeGasto({ conceptoId: 200, totalMoneda: 500 })]],
       settings, TODAY,
     )
     expect(r.total_proximo_mes).toBe(500) // (1000 + 0) / 2
@@ -156,8 +157,8 @@ describe('computeResumen — estimado próximo mes', () => {
   it('missingBehavior=average_found ignora meses sin match', () => {
     const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1, estimMissingBehavior: 'average_found' }
     const r = computeResumen(
-      [makeGasto({ descripcion: 'Nuevo', totalMoneda: 1000, tipoCambio: 1 })],
-      [[makeGasto({ descripcion: 'Otro', totalMoneda: 500 })]],
+      [makeGasto({ conceptoId: 100, totalMoneda: 1000, tipoCambio: 1 })],
+      [[makeGasto({ conceptoId: 200, totalMoneda: 500 })]],
       settings, TODAY,
     )
     expect(r.total_proximo_mes).toBe(1000) // sólo el valor actual
@@ -166,8 +167,8 @@ describe('computeResumen — estimado próximo mes', () => {
   it('estimIncluirCuotasVigentes usa el monto tal cual para gastos con cuotas', () => {
     const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1, estimIncluirCuotasVigentes: true }
     const r = computeResumen(
-      [makeGasto({ descripcion: 'TV', totalMoneda: 1200, tipoCambio: 1, cuotaActual: 2, cuotasTotales: 6 })],
-      [[makeGasto({ descripcion: 'TV', totalMoneda: 1, tipoCambio: 1 })]], // no debe promediar
+      [makeGasto({ conceptoId: 100, totalMoneda: 1200, tipoCambio: 1, cuotaActual: 2, cuotasTotales: 6 })],
+      [[makeGasto({ conceptoId: 100, totalMoneda: 1, tipoCambio: 1 })]], // no debe promediar
       settings, TODAY,
     )
     expect(r.total_proximo_mes).toBe(1200)
@@ -176,24 +177,24 @@ describe('computeResumen — estimado próximo mes', () => {
   it('estimExcluirUltimaCuota descarta el gasto cuando es la última cuota', () => {
     const settings = { ...SETTINGS_DEFAULT, estimExcluirUltimaCuota: true, estimIncluirCuotasVigentes: true }
     const r = computeResumen(
-      [makeGasto({ descripcion: 'TV', totalMoneda: 1200, cuotaActual: 6, cuotasTotales: 6 })],
+      [makeGasto({ conceptoId: 100, totalMoneda: 1200, cuotaActual: 6, cuotasTotales: 6 })],
       [], settings, TODAY,
     )
     expect(r.total_proximo_mes).toBe(0)
   })
 
-  it('agrupa sub-items del mismo gasto por descripción normalizada', () => {
+  it('agrupa sub-items del mismo gasto por concepto', () => {
     const r = computeResumen(
       [makeGasto({
-        descripcion: 'Super',
+        conceptoId: 1,
         items: [
-          { descripcion: 'Carne', monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
-          { descripcion: ' carne ', monto: 50, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
+          { conceptoId: 5, monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
+          { conceptoId: 5, monto: 50, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
         ],
       })],
       [], SETTINGS_DEFAULT, TODAY,
     )
-    // Ambos items "carne" se agrupan → 150 en el estimado
+    // Ambos items comparten conceptoId 5 → se agrupan → 150 en el estimado
     expect(r.total_proximo_mes).toBe(150)
   })
 })

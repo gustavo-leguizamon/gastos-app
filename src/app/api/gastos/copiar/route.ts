@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
-const norm = (s: string) => s.trim().toLowerCase()
-
 // Cuota a usar al copiar un sub-item: si está en cuotas y no finalizaron, +1.
 function nextCuota(item: { cuotaActual: number | null; cuotasTotales: number | null }) {
   if (item.cuotaActual != null && item.cuotasTotales != null && item.cuotaActual < item.cuotasTotales) {
@@ -12,8 +10,8 @@ function nextCuota(item: { cuotaActual: number | null; cuotasTotales: number | n
 }
 
 // Copia un gasto (+ sub-items) al mes/año destino con merge:
-// - Si ya existe un gasto en el destino (descripción + mes + año + casa, case-insensitive),
-//   no crea uno nuevo: agrega sólo los sub-items que no existan ya (por descripción normalizada).
+// - Si ya existe un gasto en el destino (mismo concepto + mes + año + casa),
+//   no crea uno nuevo: agrega sólo los sub-items que no existan ya (por conceptoId).
 // - Si no existe, crea el gasto (reset de pagos/montos, confirmado=false) y todos sus sub-items.
 // - Para gastos `esTarjeta`, sólo se consideran sub-items con cuotas pendientes (cuotaActual < cuotasTotales).
 // - Sub-items en cuotas no finalizadas se copian con cuotaActual incrementada en 1.
@@ -47,14 +45,14 @@ export async function POST(req: NextRequest) {
       casaId: source.casaId,
       mes,
       anio,
-      descripcion: { equals: source.descripcion, mode: 'insensitive' },
+      conceptoId: source.conceptoId,
     },
     include: { items: true },
   })
 
   const itemCreateData = (item: typeof source.items[number], gastoId: number) => ({
     gastoId,
-    descripcion: item.descripcion,
+    conceptoId: item.conceptoId,
     monto: item.monto,
     fecha: item.fecha,
     cuotaActual: nextCuota(item),
@@ -65,9 +63,9 @@ export async function POST(req: NextRequest) {
   })
 
   if (existente) {
-    // Merge: agregar sólo los sub-items que no existan (por descripción normalizada)
-    const existentesDesc = new Set(existente.items.map(i => norm(i.descripcion)))
-    const nuevos = candidatos.filter(i => !existentesDesc.has(norm(i.descripcion)))
+    // Merge: agregar sólo los sub-items que no existan (por conceptoId)
+    const existentesConcepto = new Set(existente.items.map(i => i.conceptoId))
+    const nuevos = candidatos.filter(i => !existentesConcepto.has(i.conceptoId))
     await Promise.all(nuevos.map(i => prisma.gastoItem.create({ data: itemCreateData(i, existente.id) })))
     return NextResponse.json({ merged: true, gasto_id: existente.id, added_items: nuevos.length })
   }
@@ -76,7 +74,7 @@ export async function POST(req: NextRequest) {
   const nuevo = await prisma.gasto.create({
     data: {
       casaId: source.casaId,
-      descripcion: source.descripcion,
+      conceptoId: source.conceptoId,
       fechaVencimiento: nuevaFecha,
       tipoPago: source.tipoPago,
       monedaId: source.monedaId,
