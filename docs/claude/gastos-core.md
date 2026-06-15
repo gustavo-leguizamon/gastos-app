@@ -7,6 +7,8 @@
 - `total_pagado = SUM(pagos.monto)` — del relation `Pago`, **no** de `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
+**Montos negativos:** `total_moneda` admite valores negativos (validación Yup en `GastoForm` sin `min(0)` y campo sin `min` en `inputProps`) para reflejar devoluciones/reintegros de tarjeta de crédito. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total. Los sub-items (`GastoItem.monto`) también admiten negativos. `total_pagado`/`pasaje_mes_siguiente`/`prestamo_a_otro` siguen restringidos a `>= 0`.
+
 `/api/resumen` computa estos agregados server-side para las cards. También devuelve:
 - `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas - total_pasajes`
 - `total_prestamos = SUM(prestamo_a_otro)`

@@ -25,7 +25,7 @@ const schema = yup.object({
   tipo_pago: yup.string().oneOf(['C', 'D']).required('Requerido'),
   moneda_id: yup.number().required('Requerido').min(1, 'Seleccioná una moneda'),
   tipo_cambio: yup.number().required('Requerido').min(0.0001, 'Debe ser > 0'),
-  total_moneda: yup.number().required('Requerido').min(0, 'Debe ser >= 0'),
+  total_moneda: yup.number().required('Requerido'),
   total_pagado: yup.number().min(0, 'Debe ser >= 0').required('Requerido'),
   pasaje_mes_siguiente: yup.number().min(0).required('Requerido'),
   prestamo_a_otro: yup.number().min(0).required('Requerido'),
@@ -339,7 +339,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                 label={`Total (${monedaSeleccionada?.codigo ?? 'moneda'})`}
                 type="number"
                 size="small"
-                inputProps={{ step: 0.01, min: 0 }}
+                inputProps={{ step: 0.01 }}
                 error={!!errors.total_moneda}
                 helperText={errors.total_moneda?.message}
               />
