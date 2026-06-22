@@ -148,7 +148,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
                 value={srcAnio}
                 onChange={(v) => setSrcAnio(Number(v))}
                 disableClearable
-                sx={{ width: 90 }}
+                sx={{ width: { xs: 116, sm: 96 }, flexShrink: 0 }}
               />
             </Box>
           </Box>
@@ -177,7 +177,7 @@ export default function CopiarMesDialog({ open, filtros, onClose, onCopied }: Pr
                 value={dstAnio}
                 onChange={(v) => setDstAnio(Number(v))}
                 disableClearable
-                sx={{ width: 90 }}
+                sx={{ width: { xs: 116, sm: 96 }, flexShrink: 0 }}
               />
             </Box>
           </Box>

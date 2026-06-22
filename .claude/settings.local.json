@@ -50,7 +50,12 @@
       "Bash(gh --version)",
       "PowerShell($gh = \\(Get-Command gh -ErrorAction SilentlyContinue\\); if \\($gh\\) { \"gh found: $\\($gh.Source\\)\" } else { \"gh NOT found\" })",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; Write-Output \"EXIT: $LASTEXITCODE\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3002/api/casas\" -UseBasicParsing -TimeoutSec 3; \"SERVER UP status=$\\($r.StatusCode\\)\" } catch { \"SERVER DOWN: $\\($_.Exception.Message\\)\" })",
+      "Bash(command -v gh)",
+      "Read(//c/Program Files/GitHub CLI/**)",
+      "Read(//c/Users/GustavoLeguizamon/AppData/Local/**)",
+      "PowerShell(\\(Get-Item docs/claude/gastos-core.md\\).LastWriteTime = Get-Date; \\(Get-Item CLAUDE.md\\).LastWriteTime = Get-Date; Write-Output \"mtime actualizado\")"
     ]
   },
   "hooks": {
