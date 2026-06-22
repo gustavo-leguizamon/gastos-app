@@ -88,6 +88,7 @@ El **monto de sub-items admite valores negativos** (sin `min: 0`, validación s�
 Filtros client-side en `gastos/page.tsx` (lifted state, props):
 - `estadoPago: 'todos' | 'pendiente' | 'saldado'` — default `'pendiente'`. `pendiente` = restante > 0 OR !confirmado. `saldado` = restante ≤ 0 AND confirmado.
 - `busqueda: string` — free-text por `descripcion` y nombres de `categorias`. Renderizado en `FiltrosGastos`.
+- `fecha: string` (YYYY-MM-DD) — filtro por `fecha_vencimiento` exacto. Vacío = sin filtro. Renderizado en `FiltrosGastos` como `AppDateField` con `min`/`max` acotados al mes/año seleccionado y botón de limpiar (icono ✕). Permite ver rápido los gastos que vencen un día puntual. **Se limpia automáticamente al cambiar de mes/año** (flechas ‹ › o popover), porque la fecha quedaría fuera del período cargado.
 
 ### Selector de mes (`FiltrosGastos`)
 

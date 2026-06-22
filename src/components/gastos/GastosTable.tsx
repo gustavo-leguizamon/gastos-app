@@ -54,11 +54,12 @@ interface Props {
   refreshKey: number
   estadoPago: 'todos' | 'pendiente' | 'saldado'
   busqueda: string
+  fecha: string
   onEdit: (gasto: Gasto) => void
   onDeleted: () => void
 }
 
-export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, onEdit, onDeleted }: Props) {
+export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, fecha, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const triggerRefresh = useGastosStore(s => s.triggerRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
@@ -473,6 +474,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
     return g.descripcion.toLowerCase().includes(q) || (g.categorias ?? []).some(c => c.nombre.toLowerCase().includes(q))
+  }).filter(g => {
+    if (!fecha) return true
+    return g.fecha_vencimiento === fecha
   })
 
   // Agrupar por casa
@@ -746,7 +750,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     return (
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 4, textAlign: 'center' }}>
         <Typography color="text.secondary">
-          {busqueda.trim() ? 'No se encontraron gastos para esa búsqueda.' : 'No hay gastos para el período seleccionado.'}
+          {busqueda.trim() || fecha ? 'No se encontraron gastos para esos filtros.' : 'No hay gastos para el período seleccionado.'}
         </Typography>
       </Box>
     )

@@ -8,12 +8,14 @@ import Typography from '@mui/material/Typography'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import ToggleButton from '@mui/material/ToggleButton'
 import TextField from '@/components/shared/AppTextField'
+import AppDateField from '@/components/shared/AppDateField'
 import InputAdornment from '@mui/material/InputAdornment'
 import Popover from '@mui/material/Popover'
 import ButtonBase from '@mui/material/ButtonBase'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import SearchIcon from '@mui/icons-material/Search'
+import ClearIcon from '@mui/icons-material/Clear'
 import type { Casa, FiltrosGastos } from '@/lib/types'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -26,9 +28,11 @@ interface Props {
   setEstadoPago: (v: 'todos' | 'pendiente' | 'saldado') => void
   busqueda: string
   setBusqueda: (v: string) => void
+  fecha: string
+  setFecha: (v: string) => void
 }
 
-export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda }: Props) {
+export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda, fecha, setFecha }: Props) {
   const [casas, setCasas] = useState<Casa[]>([])
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   // Año mostrado dentro del popover (puede diferir del filtro mientras se navega)
@@ -41,11 +45,13 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
   const prevMes = () => {
     if (filtros.mes === 1) setFiltros({ mes: 12, anio: filtros.anio - 1 })
     else setFiltros({ mes: filtros.mes - 1 })
+    setFecha('')
   }
 
   const nextMes = () => {
     if (filtros.mes === 12) setFiltros({ mes: 1, anio: filtros.anio + 1 })
     else setFiltros({ mes: filtros.mes + 1 })
+    setFecha('')
   }
 
   const abrirPicker = (e: React.MouseEvent<HTMLElement>) => {
@@ -55,8 +61,15 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
 
   const seleccionarMes = (mes: number) => {
     setFiltros({ mes, anio: anioPicker })
+    setFecha('')
     setAnchorEl(null)
   }
+
+  // Acotar el picker de fecha al mes/año seleccionado
+  const mm = String(filtros.mes).padStart(2, '0')
+  const ultimoDia = new Date(filtros.anio, filtros.mes, 0).getDate()
+  const fechaMin = `${filtros.anio}-${mm}-01`
+  const fechaMax = `${filtros.anio}-${mm}-${String(ultimoDia).padStart(2, '0')}`
 
   return (
     <Box
@@ -144,6 +157,25 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
               <SearchIcon sx={{ fontSize: 16 }} />
             </InputAdornment>
           ),
+        }}
+      />
+
+      {/* Filtro por fecha de vencimiento */}
+      <AppDateField
+        size="small"
+        label="Fecha"
+        value={fecha}
+        onChange={e => setFecha(e.target.value)}
+        inputProps={{ min: fechaMin, max: fechaMax }}
+        sx={{ width: { xs: '100%', md: 170 }, order: { xs: 1, md: 4 } }}
+        InputProps={{
+          endAdornment: fecha ? (
+            <InputAdornment position="end">
+              <IconButton size="small" onClick={() => setFecha('')} edge="end">
+                <ClearIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
         }}
       />
 
