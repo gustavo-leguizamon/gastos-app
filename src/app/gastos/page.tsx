@@ -26,6 +26,7 @@ export default function GastosPage() {
   const [copiarMesOpen, setCopiarMesOpen] = useState(false)
   const [estadoPago, setEstadoPago] = useState<'todos' | 'pendiente' | 'saldado'>('pendiente')
   const [busqueda, setBusqueda] = useState('')
+  const [fecha, setFecha] = useState('')
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -61,12 +62,13 @@ export default function GastosPage() {
 
       <ResumenCards filtros={filtros} refreshKey={refreshKey} />
       <TarjetasCerradas filtros={filtros} refreshKey={refreshKey} />
-      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} busqueda={busqueda} setBusqueda={setBusqueda} />
+      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} busqueda={busqueda} setBusqueda={setBusqueda} fecha={fecha} setFecha={setFecha} />
       <GastosTable
         filtros={filtros}
         refreshKey={refreshKey}
         estadoPago={estadoPago}
         busqueda={busqueda}
+        fecha={fecha}
         onEdit={(gasto: Gasto) => openDialog(gasto)}
         onDeleted={triggerRefresh}
       />
