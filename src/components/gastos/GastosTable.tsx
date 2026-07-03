@@ -261,16 +261,42 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     {
       field: 'tipo_pago',
       headerName: 'Pago',
-      width: 90,
+      width: 120,
       renderCell: ({ value, row }) => {
         if (row._type === 'item' || row._type === 'items_total') return null
+        const showTarjeta = value === 'C' && row.tarjeta_id != null
+        const tarjetaTitle = row.tarjeta_banco
+          ? `${row.tarjeta_nombre} (${row.tarjeta_banco})`
+          : row.tarjeta_nombre ?? ''
         return (
-          <Chip
-            label={value === 'C' ? 'Crédito' : 'Débito'}
-            size="small"
-            color={value === 'C' ? 'primary' : 'default'}
-            variant="outlined"
-          />
+          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+            <Chip
+              label={value === 'C' ? 'Crédito' : 'Débito'}
+              size="small"
+              color={value === 'C' ? 'primary' : 'default'}
+              variant="outlined"
+            />
+            {showTarjeta && (
+              <Tooltip title={tarjetaTitle}>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: -9,
+                    right: -12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'background.paper',
+                    borderRadius: 0.5,
+                    p: '1px',
+                    boxShadow: 1,
+                  }}
+                >
+                  <BrandLogo marca={row.tarjeta_marca} width={26} height={18} />
+                </Box>
+              </Tooltip>
+            )}
+          </Box>
         )
       },
     },
@@ -566,9 +592,11 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   <WarningAmberIcon sx={{ fontSize: 14, color: '#f59e0b', flexShrink: 0 }} />
                 )}
                 {(g.tarjeta_id || g.es_tarjeta) && (
-                  <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>
-                    <BrandLogo marca={g.tarjeta_marca} width={28} height={20} />
-                  </Box>
+                  <Tooltip title={g.tarjeta_nombre ? (g.tarjeta_banco ? `${g.tarjeta_nombre} (${g.tarjeta_banco})` : g.tarjeta_nombre) : ''}>
+                    <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>
+                      <BrandLogo marca={g.tarjeta_marca} width={28} height={20} />
+                    </Box>
+                  </Tooltip>
                 )}
                 <Typography variant="body2" fontWeight={600} sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {g.descripcion}
