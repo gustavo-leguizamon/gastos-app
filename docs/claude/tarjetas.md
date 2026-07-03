@@ -4,7 +4,9 @@
 
 Cada `Tarjeta` tiene campo opcional `marca` (nullable: `visa | mastercard | amex | diners | discover | jcb | otra`). Se setea en `/configuracion` → Tarjetas → form. Render con `TarjetaLogo` (`src/components/shared/TarjetaLogo.tsx`) usando `react-icons/fa` (`FaCcVisa`, `FaCcMastercard`, `FaCcAmex`, `FaCcDinersClub`, `FaCcDiscover`, `FaCcJcb`) en colores institucionales. Si `otra` o `null`, fallback `CreditCardIcon` MUI. Constante exportada `MARCAS` lista las opciones para selects.
 
-`TarjetaLogo` usado en: configuración de tarjetas, `GastoForm` (dentro de `MenuItem` del select Tarjeta), `GastosTable` (reemplaza `CreditCardIcon` en `es_tarjeta=true`, en Tooltip de fechas). Los gastos response exponen `tarjeta_marca?: TarjetaMarca | null`.
+`TarjetaLogo` usado en: configuración de tarjetas, `GastoForm` (dentro de `MenuItem` del select Tarjeta), `GastosTable` (reemplaza `CreditCardIcon` en `es_tarjeta=true`, en Tooltip de fechas). Los gastos response exponen `tarjeta_marca?: TarjetaMarca | null`, `tarjeta_nombre` y `tarjeta_banco`.
+
+**Badge de marca en el chip "Crédito"** (`GastosTable`, columna `tipo_pago`): cuando `tipo_pago === 'C'` y hay `tarjeta_id`, se superpone un `BrandLogo` (26x18, sobre fondo `background.paper` con `boxShadow`) en la esquina superior derecha del chip, dentro de un `Tooltip` que muestra `Nombre (Banco)` (o solo `Nombre` si no hay banco). En la vista mobile (card), el `BrandLogo` que ya se muestra junto a la descripción lleva el mismo `Tooltip`.
 
 Migración `20260516020000_add_tarjeta_marca` agrega columna `marca TEXT NULL`.
 
