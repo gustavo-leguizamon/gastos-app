@@ -52,11 +52,15 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
         if (montoPago > 0) {
           const nuevo = await res.json()
           try {
-            await fetch(`/api/gastos/${nuevo.id}/pagos`, {
+            const pagoRes = await fetch(`/api/gastos/${nuevo.id}/pagos`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ fecha: data.fecha_vencimiento, monto: montoPago }),
             })
+            if (!pagoRes.ok) {
+              const msg = await pagoRes.json().then(d => d?.error).catch(() => null)
+              toast.error(msg || 'Gasto creado, pero falló la creación del pago inicial')
+            }
           } catch {
             toast.error('Gasto creado, pero falló la creación del pago inicial')
           }

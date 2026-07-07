@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shiftMonth } from './fechas'
+import { shiftMonth, resolvePeriodoTarjeta } from './fechas'
 
 describe('shiftMonth', () => {
   it('avanza dentro del mismo año', () => {
@@ -24,5 +24,31 @@ describe('shiftMonth', () => {
 
   it('salta varios años', () => {
     expect(shiftMonth(6, 2026, 24)).toEqual({ mes: 6, anio: 2028 })
+  })
+})
+
+describe('resolvePeriodoTarjeta', () => {
+  // Tarjeta que cierra el día 2.
+  it('pago con día posterior al cierre → resumen del mes siguiente', () => {
+    // 25-jun (día 25 > 2) → julio
+    expect(resolvePeriodoTarjeta('2026-06-25', 2)).toEqual({ mes: 7, anio: 2026 })
+  })
+
+  it('pago con día anterior al cierre → resumen del propio mes del pago', () => {
+    // 01-jul (día 1 < 2) → julio (el bug que se corrige: antes caía en agosto)
+    expect(resolvePeriodoTarjeta('2026-07-01', 2)).toEqual({ mes: 7, anio: 2026 })
+  })
+
+  it('pago justo el día de cierre → mismo mes (se incluye el día de cierre)', () => {
+    expect(resolvePeriodoTarjeta('2026-07-02', 2)).toEqual({ mes: 7, anio: 2026 })
+  })
+
+  it('hace wraparound de año cuando el pago es posterior al cierre en diciembre', () => {
+    // 20-dic (día 20 > 2) → enero del año siguiente
+    expect(resolvePeriodoTarjeta('2026-12-20', 2)).toEqual({ mes: 1, anio: 2027 })
+  })
+
+  it('no depende del mes fuente: 25-jun y 01-jul con cierre día 2 caen ambos en julio', () => {
+    expect(resolvePeriodoTarjeta('2026-06-25', 2)).toEqual(resolvePeriodoTarjeta('2026-07-01', 2))
   })
 })
