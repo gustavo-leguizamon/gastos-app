@@ -63,7 +63,7 @@ Hay dos capas de tests:
 |---|---|---|
 | `src/lib/gastos-compute.ts` (`toGastoResponse`) | Mapping camelCase→snake_case, `total_ars`/`total_pagado`/`total_restante`, match de cierre de tarjeta por mes/año, mapeo de pagos e items. Importado por `gastos/route.ts` y `gastos/[id]/route.ts`. | `gastos-compute.test.ts` |
 | `src/lib/resumen-compute.ts` (`computeResumen`) | Agregados del resumen (gastos/pagado/restante/tarjetas/préstamos/pasajes/neto), `pagar_hoy`, estimado próximo mes (promedio con meses previos, `missingBehavior`, cuotas vigentes, excluir última cuota). Importado por `resumen/route.ts`. | `resumen-compute.test.ts` |
-| `src/lib/fechas.ts` (`shiftMonth`) | Aritmética de meses con wraparound de año. Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
+| `src/lib/fechas.ts` (`shiftMonth`, `resolvePeriodoTarjeta`) | Aritmética de meses con wraparound de año; resolución del período de resumen de tarjeta a partir de la fecha del pago y el día de cierre (independiente del mes fuente). Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
 | `src/lib/conceptos.ts` (`normalizeNombre`, `resolveConcepto`) | Normalización (trim + colapso de espacios) y find-or-create case-insensitive de `Concepto`. Importado por los write paths de gastos/items/pagos y `/api/conceptos`. | `conceptos.test.ts` |
 
 **2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:

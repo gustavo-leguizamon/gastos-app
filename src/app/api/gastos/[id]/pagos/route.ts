@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { shiftMonth } from '@/lib/fechas'
+import { resolvePeriodoTarjeta } from '@/lib/fechas'
 import { resolveConcepto } from '@/lib/conceptos'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -17,30 +17,37 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   })))
 }
 
+/**
+ * Devuelve el día de cierre (1-31) de la tarjeta, o `null` si no hay ningún
+ * `TarjetaCierre` con `fechaCierre` configurado.
+ *
+ * Se prefiere el cierre del propio mes/año del pago (su `fechaCierre` representa el
+ * cierre DE ese mes). El día de cierre es prácticamente constante mes a mes, así que
+ * si falta ese registro puntual se usa el `fechaCierre` más reciente disponible.
+ */
+async function getDiaCierre(tarjetaId: number, mes: number, anio: number): Promise<number | null> {
+  const propio = await prisma.tarjetaCierre.findUnique({
+    where: { tarjetaId_mes_anio: { tarjetaId, mes, anio } },
+  })
+  const cierre = propio?.fechaCierre
+    ? propio
+    : await prisma.tarjetaCierre.findFirst({
+        where: { tarjetaId, fechaCierre: { not: null } },
+        orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+      })
+  if (!cierre?.fechaCierre) return null
+  const dia = Number(cierre.fechaCierre.split('-')[2])
+  return Number.isFinite(dia) && dia >= 1 && dia <= 31 ? dia : null
+}
+
 async function propagatePagoToTarjeta(opts: {
-  sourceGastoId: number
+  source: any
+  target: { mes: number; anio: number }
   fecha: string
   monto: number
   pagoId: number
 }) {
-  const source = await prisma.gasto.findUnique({ where: { id: opts.sourceGastoId }, include: { categorias: true } })
-  if (!source) return
-  if (source.tipoPago !== 'C') return
-  if (!source.tarjetaId) return
-
-  // Cierre del mes/año del source — define la "fecha próximo cierre" usada para decidir
-  // si el pago se propaga a +1 o +2 meses.
-  const currentCierre = await prisma.tarjetaCierre.findUnique({
-    where: {
-      tarjetaId_mes_anio: { tarjetaId: source.tarjetaId, mes: source.mes, anio: source.anio },
-    },
-  })
-
-  // Si payment.fecha <= fechaProximoCierre → target = source +1 ; else → +2
-  // Si no hay TarjetaCierre o no tiene fechaProximoCierre, default = +1.
-  const proximo = currentCierre?.fechaProximoCierre ?? null
-  const shift = proximo && opts.fecha > proximo ? 2 : 1
-  const target = shiftMonth(source.mes, source.anio, shift)
+  const { source, target } = opts
 
   // Buscar el target CC gasto
   let targetCC = await prisma.gasto.findFirst({
@@ -111,25 +118,50 @@ async function propagatePagoToTarjeta(opts: {
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json()
+  const gastoId = Number(params.id)
+
+  // Si el gasto es de tarjeta de crédito, el pago debe impactar en el resumen de la
+  // tarjeta. El período destino se calcula de forma absoluta a partir de la fecha del
+  // pago y el día de cierre de la tarjeta (no del mes/año en que esté clasificado el
+  // gasto fuente).
+  const source = await prisma.gasto.findUnique({ where: { id: gastoId }, include: { categorias: true } })
+  const esCredito = source?.tipoPago === 'C' && !!source?.tarjetaId
+
+  let target: { mes: number; anio: number } | null = null
+  if (esCredito && source) {
+    const [anio, mes] = body.fecha.split('-').map(Number)
+    const diaCierre = await getDiaCierre(source.tarjetaId!, mes, anio)
+    if (diaCierre == null) {
+      return NextResponse.json(
+        { error: 'No se puede registrar el pago: la tarjeta no tiene fechas de cierre configuradas. Configurá el cierre en Configuración → Tarjetas.' },
+        { status: 400 },
+      )
+    }
+    target = resolvePeriodoTarjeta(body.fecha, diaCierre)
+  }
+
   const pago = await prisma.pago.create({
     data: {
-      gastoId: Number(params.id),
+      gastoId,
       fecha: body.fecha,
       monto: body.monto,
     },
   })
 
   // Propagar a la tarjeta de crédito (si aplica)
-  try {
-    await propagatePagoToTarjeta({
-      sourceGastoId: Number(params.id),
-      fecha: pago.fecha,
-      monto: pago.monto,
-      pagoId: pago.id,
-    })
-  } catch (err) {
-    // No interrumpir el flujo del pago aunque falle la propagación
-    console.error('Propagación de pago a tarjeta falló:', err)
+  if (esCredito && source && target) {
+    try {
+      await propagatePagoToTarjeta({
+        source,
+        target,
+        fecha: pago.fecha,
+        monto: pago.monto,
+        pagoId: pago.id,
+      })
+    } catch (err) {
+      // No interrumpir el flujo del pago aunque falle la propagación
+      console.error('Propagación de pago a tarjeta falló:', err)
+    }
   }
 
   return NextResponse.json({

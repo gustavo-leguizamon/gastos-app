@@ -33,18 +33,19 @@ Las responses de `/api/gastos` incluyen campo opcional **`cierre`** matcheando e
 
 ## Propagación de pagos a la tarjeta
 
-En `POST /api/gastos/[id]/pagos`, función `propagatePagoToTarjeta`:
+En `POST /api/gastos/[id]/pagos`:
 
 1. Solo aplica cuando el **gasto fuente** tiene `tipoPago = 'C'` y `tarjetaId` asignada.
-2. Se busca el `TarjetaCierre` del **mismo mes/año** que el gasto fuente (constraint único `tarjetaId_mes_anio`). Si no existe o falta `fechaProximoCierre`, asume "≤" (target = mes siguiente).
-3. Se determina **mes destino** comparando `pago.fecha` con `currentCierre.fechaProximoCierre`:
-   - `pago.fecha <= fechaProximoCierre` → target = mes fuente **+1**.
-   - `pago.fecha > fechaProximoCierre` → target = mes fuente **+2**.
-   - Helper `shiftMonth(mes, anio, n)` maneja rollover.
-4. Se busca el resumen de tarjeta del mes destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `conceptoId` = `resolveConcepto("Nombre (Banco)")` (la descripción se deriva del nombre de la tarjeta), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento` = `TarjetaCierre.fechaVencimiento` del target si existe, sino `"{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
+2. Se obtiene el **día de cierre** de la tarjeta con `getDiaCierre(tarjetaId, mes, anio)` (mes/anio de la **fecha del pago**): se prefiere el `fechaCierre` del `TarjetaCierre` de ese mismo mes/año (el `fechaCierre` de un registro representa el cierre DE ese mes); si falta ese registro puntual, se usa el `fechaCierre` más reciente disponible (el día de cierre es ~constante). El día = componente `DD` de `fechaCierre`.
+   - **Si la tarjeta no tiene ningún `TarjetaCierre` con `fechaCierre`**, el endpoint responde **`400`** con `{ error }` y **no crea el pago** (mensaje: "…la tarjeta no tiene fechas de cierre configuradas. Configurá el cierre en Configuración → Tarjetas."). Los clientes (`PagoDialog`, pago inicial de `GastoDialog`) muestran ese mensaje.
+3. Se determina el **período destino** de forma **absoluta** con `resolvePeriodoTarjeta(pago.fecha, diaCierre)` (`src/lib/fechas.ts`, pura y testeada) — **independiente** del mes/año en que esté clasificado el gasto fuente:
+   - `día del pago <= día de cierre` → resumen = **mes del pago** (el cierre de ese mes aún no ocurrió, o es justo ese día → se incluye).
+   - `día del pago  > día de cierre` → resumen = **mes del pago + 1** (`shiftMonth` maneja rollover de año).
+   - Ej. tarjeta cierra el día 2: pago 25-jun → julio; pago 1-jul → **julio** (no agosto); pago 5-jul → agosto.
+4. `propagatePagoToTarjeta({ source, target, ... })` busca el resumen de tarjeta del período destino (`esTarjeta = true`, mismo `tarjetaId`, target mes/anio). **Si no existe se crea** con defaults: `conceptoId` = `resolveConcepto("Nombre (Banco)")` (la descripción se deriva del nombre de la tarjeta), `casaId` del fuente, `monedaId = ARS`, `tipoCambio = 1`, `totalMoneda = 0`, `tipoPago = 'D'`, `fechaVencimiento` = `TarjetaCierre.fechaVencimiento` del target si existe, sino `"{anio}-{mes}-01"`, `confirmado = false`, `esTarjeta = true`.
 5. Se crea un `GastoItem` (sub-item) en ese resumen: `conceptoId = gasto fuente.conceptoId` (hereda el concepto del gasto fuente), `fecha = pago.fecha`, `monto = pago.monto`, `incluyeEnTotal = true`, `pagoId = pago.id` (FK al pago), `categoriaId = gasto fuente.categoriaId`, `cuotaActual = gasto fuente.cuotaActual`, `cuotasTotales = gasto fuente.cuotasTotales` (si el gasto se hizo en cuotas, se trasladan al sub-item).
 
-Propagación en try/catch — si falla, el pago original se mantiene. Esta lógica también se dispara desde "Total Pagado en gasto nuevo".
+El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagación (pasos 4-5) va en try/catch — si falla, el pago original se mantiene. Esta lógica también se dispara desde "Total Pagado en gasto nuevo".
 
 **Cascade al eliminar el pago:** `GastoItem.pagoId` referencia `Pago` con `onDelete: Cascade`. Al borrar un pago (vía `DELETE /api/gastos/[id]/pagos/[pagoId]` o cascade del gasto), Postgres borra automáticamente el sub-item propagado.
 

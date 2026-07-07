@@ -92,13 +92,16 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fecha, monto: montoNum }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const msg = await res.json().then(d => d?.error).catch(() => null)
+        throw new Error(msg || 'Error al registrar el pago')
+      }
       toast.success('Pago registrado')
       setMonto('')
       setFecha(localToday())
       onChanged()
-    } catch {
-      toast.error('Error al registrar el pago')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al registrar el pago')
     } finally {
       setSaving(false)
     }
