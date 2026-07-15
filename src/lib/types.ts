@@ -180,3 +180,60 @@ export interface FiltrosGastos {
   casa_id: number | null
   tipo_pago: 'C' | 'D' | null
 }
+
+export interface ReporteCategoria {
+  id: number | null
+  nombre: string
+  total_ars: number
+}
+
+export interface ReporteMes {
+  mes: number
+  anio: number
+  label: string
+  total_ars: number
+}
+
+export interface ReporteConcepto {
+  concepto_id: number
+  nombre: string
+  total_ars: number
+}
+
+export interface ReporteTarjeta {
+  id: number | null
+  nombre: string
+  total_ars: number
+}
+
+export interface ReporteTipoPago {
+  tipo: 'C' | 'D'
+  nombre: string
+  total_ars: number
+}
+
+export interface Reporte {
+  kpis: {
+    total: number
+    promedio_mensual: number
+    cantidad_gastos: number
+    meses: number
+  }
+  por_categoria: ReporteCategoria[]
+  por_mes: ReporteMes[]
+  top_conceptos: ReporteConcepto[]
+  por_tarjeta: ReporteTarjeta[]
+  por_tipo_pago: ReporteTipoPago[]
+}
+
+export interface FiltrosReporte {
+  mes_desde: number
+  anio_desde: number
+  mes_hasta: number
+  anio_hasta: number
+  casa_id: number | null
+  tipo_pago: 'C' | 'D' | null
+  categoria_ids: number[]
+  tarjeta_ids: number[]
+  concepto_ids: number[]
+}

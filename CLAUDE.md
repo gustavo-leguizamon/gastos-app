@@ -20,6 +20,7 @@ Leé el archivo correspondiente cuando trabajes en esa área — no se cargan au
 |---|---|
 | `docs/claude/auth-pwa.md` | NextAuth + Google OAuth + whitelist, PWA/service worker, responsive/mobile UI |
 | `docs/claude/gastos-core.md` | Computed fields, resumen, estimado próximo mes, pagos, sub-items, state management, GastoForm/GastoDialog, conceptos (descripciones normalizadas + admin), vencimientos hoy, copy dialogs, evolución mensual (gráfico) |
+| `docs/claude/reportes.md` | Sección Reportes (`/reportes`): endpoint `/api/reportes`, compute puro (`reportes-compute.ts`), filtros (categorías/tarjetas/conceptos/casa/tipo pago/período), charts (categoría/mensual/conceptos), paleta de viz |
 | `docs/claude/tarjetas.md` | Logos de marca, `es_tarjeta`, `TarjetaCierre`, propagación de pagos a tarjeta (incluye cascade y sync bidireccional), tarjetas cerradas dashboard |
 | `docs/claude/api-surface.md` | Tabla completa de routes `/api/*` |
 | `docs/claude/inversiones-shared.md` | Sección Inversiones + componentes compartidos (`AppDataGrid`, `AppTextField`, `AppDateField`, `AppToggle`, `AppSelect`, `AppMultiSelect`) |
@@ -65,6 +66,7 @@ Hay dos capas de tests:
 | `src/lib/resumen-compute.ts` (`computeResumen`) | Agregados del resumen (gastos/pagado/restante/tarjetas/préstamos/pasajes/neto), `pagar_hoy`, estimado próximo mes (promedio con meses previos, `missingBehavior`, cuotas vigentes, excluir última cuota). Importado por `resumen/route.ts`. | `resumen-compute.test.ts` |
 | `src/lib/fechas.ts` (`shiftMonth`, `resolvePeriodoTarjeta`) | Aritmética de meses con wraparound de año; resolución del período de resumen de tarjeta a partir de la fecha del pago y el día de cierre (independiente del mes fuente). Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
 | `src/lib/conceptos.ts` (`normalizeNombre`, `resolveConcepto`) | Normalización (trim + colapso de espacios) y find-or-create case-insensitive de `Concepto`. Importado por los write paths de gastos/items/pagos y `/api/conceptos`. | `conceptos.test.ts` |
+| `src/lib/reportes-compute.ts` (`enumerateMonths`, `computeReportes`) | Ventana de meses del rango (wraparound, cap 60) y agregación de reportes (KPIs, por categoría con atribución completa + "Sin categoría", por mes, top conceptos). Importado por `reportes/route.ts`. | `reportes-compute.test.ts` |
 
 **2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:
 
@@ -74,6 +76,7 @@ Hay dos capas de tests:
 | `gastos/[id]/route.ts` | GET 404/mapeo; PUT mapping + sync de descripción a items propagados; DELETE. | `gastos/[id]/route.test.ts` |
 | `gastos/[id]/items/route.ts` | POST mapping y defaults de flags. | `gastos/[id]/items/route.test.ts` |
 | `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: shift +1/+2 según próximo cierre, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |
+| `reportes/route.ts` | GET arma el `where` (OR de meses, `esTarjeta:false`, filtros snake→camel) y delega en `computeReportes`. | `reportes/route.test.ts` |
 
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.

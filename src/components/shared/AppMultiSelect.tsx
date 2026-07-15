@@ -16,6 +16,8 @@ export type AppMultiSelectValue = string | number
 export interface AppMultiSelectOption {
   value: AppMultiSelectValue
   label: string
+  /** Render opcional para mostrar contenido rico (íconos, logos) dentro del item del dropdown. */
+  render?: () => React.ReactNode
 }
 
 interface AppMultiSelectProps {
@@ -53,6 +55,14 @@ export default function AppMultiSelect({
       onChange={(_, newValue) => onChange(newValue.map(o => o.value))}
       getOptionLabel={(option) => option.label}
       isOptionEqualToValue={(option, val) => option.value === val.value}
+      renderOption={(props, option) => {
+        const { key, ...rest } = props as any
+        return (
+          <li key={option.value} {...rest}>
+            {option.render ? option.render() : option.label}
+          </li>
+        )
+      }}
       renderTags={(tags, getTagProps) =>
         tags.map((option, index) => {
           const { key, ...rest } = getTagProps({ index }) as any

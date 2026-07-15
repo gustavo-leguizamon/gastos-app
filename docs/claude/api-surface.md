@@ -11,6 +11,7 @@
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
 | `PUT/PATCH/DELETE /api/gastos/[id]/items/[itemId]` | Full edit / partial toggle / remove a sub-item |
 | `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
+| `GET /api/reportes` | Métricas agregadas para la sección Reportes. Params: rango `mes_desde`/`anio_desde`/`mes_hasta`/`anio_hasta` (obligatorio, 400 si falta), `casa_id`, `tipo_pago`, `categoria_ids`/`tarjeta_ids`/`concepto_ids` (listas `1,2,3`), `incluir_tarjetas` (default excluye `esTarjeta`), `top` (límite conceptos). Devuelve `{ kpis, por_categoria, por_mes, top_conceptos, por_tarjeta, por_tipo_pago }`. Ver `docs/claude/reportes.md`. |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD (incluye `marca` opcional). El GET incluye array `cierres: TarjetaCierre[]` para señalizar tarjetas sin cierre completo del mes actual. |
