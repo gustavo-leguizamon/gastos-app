@@ -55,7 +55,19 @@
       "Bash(command -v gh)",
       "Read(//c/Program Files/GitHub CLI/**)",
       "Read(//c/Users/GustavoLeguizamon/AppData/Local/**)",
-      "PowerShell(\\(Get-Item docs/claude/gastos-core.md\\).LastWriteTime = Get-Date; \\(Get-Item CLAUDE.md\\).LastWriteTime = Get-Date; Write-Output \"mtime actualizado\")"
+      "PowerShell(\\(Get-Item docs/claude/gastos-core.md\\).LastWriteTime = Get-Date; \\(Get-Item CLAUDE.md\\).LastWriteTime = Get-Date; Write-Output \"mtime actualizado\")",
+      "Bash(node \"C:/Users/GUSTAV~1/AppData/Local/Temp/claude/C--Users-GustavoLeguizamon-Desktop-app-gapp-gastos-app/2a1eb9f2-723e-444a-a646-85e24658cd4a/scratchpad/diag.js\")",
+      "Bash(node -e 'const {PrismaClient}=require\\('\\\\''@prisma/client'\\\\''\\);const p=new PrismaClient\\(\\);p.gasto.count\\(\\).then\\(c=>{console.log\\('\\\\''gastos:'\\\\'',c\\)}\\).catch\\(e=>console.error\\('\\\\''ERR'\\\\'',e.message\\)\\).finally\\(\\(\\)=>p.$disconnect\\(\\)\\)')",
+      "Bash(node -e \"console.log\\('hello'\\); console.error\\('err-hello'\\)\")",
+      "PowerShell(gh pr *)",
+      "PowerShell(gh auth *)",
+      "Skill(dataviz)",
+      "Bash(node scripts/validate_palette.js \"#2a78d6,#1baf7a,#eda100,#008300,#4a3aa7,#e34948,#e87ba4,#eb6834\" --mode light)",
+      "Bash(node \"C:/Users/GUSTAV~1/AppData/Local/Temp/claude/bundled-skills/2.1.209/acc770ddfb6f7cb8bcdfd8f3b4abede6/dataviz/scripts/validate_palette.js\" \"#2a78d6,#1baf7a,#eda100,#008300,#4a3aa7,#e34948,#e87ba4,#eb6834\" --mode light)",
+      "Bash(node *)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; Write-Output \"TSC_EXIT: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30; Write-Output \"TSC_EXIT: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 20; Write-Output \"TSC_EXIT: $LASTEXITCODE\"; Write-Output \"diag existe: $\\(Test-Path diag-tmp.js\\)\")"
     ]
   },
   "hooks": {

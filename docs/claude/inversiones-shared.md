@@ -66,11 +66,11 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `
 
 `src/components/shared/AppMultiSelect.tsx` — multi-select — wrapper de MUI `Autocomplete` con `multiple`. Selección de varias opciones mostradas como chips, con typeahead. API:
 - `label: string`
-- `options: { value, label }[]` — `value` es `string | number`.
+- `options: { value, label, render? }[]` — `value` es `string | number`. `render?: () => ReactNode` opcional para mostrar contenido rico (íconos, logos) en el item del dropdown (igual que `AppSelect`); los chips seleccionados siguen usando `label`.
 - `value: (string | number)[]` + `onChange(values)` — controlado.
 - `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
 
-Usado para relaciones M2M: `GastoForm` (Categorías) y `GastoItemDialog` (Categorías alta + edición).
+Usado para relaciones M2M: `GastoForm` (Categorías) y `GastoItemDialog` (Categorías alta + edición). También en `ReportesFiltros` (Categorías, Tarjetas con `render` para `BrandLogo`, Conceptos).
 
 ## CategoriasCell
 
