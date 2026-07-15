@@ -67,7 +67,10 @@
       "Bash(node *)",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40; Write-Output \"TSC_EXIT: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30; Write-Output \"TSC_EXIT: $LASTEXITCODE\")",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 20; Write-Output \"TSC_EXIT: $LASTEXITCODE\"; Write-Output \"diag existe: $\\(Test-Path diag-tmp.js\\)\")"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 20; Write-Output \"TSC_EXIT: $LASTEXITCODE\"; Write-Output \"diag existe: $\\(Test-Path diag-tmp.js\\)\")",
+      "Bash(npx vitest *)",
+      "PowerShell(npx vitest run src/lib/gastos-batch.test.ts \"src/app/api/gastos/categorias/route.test.ts\" 2>&1 | Select-Object -Last 30)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 20; Write-Output \"TSC_EXIT: $LASTEXITCODE\")"
     ]
   },
   "hooks": {

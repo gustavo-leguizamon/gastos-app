@@ -5,6 +5,7 @@
 | `GET/POST /api/gastos` | List (with filters) / create gastos |
 | `GET /api/gastos/evolucion` | Serie mensual de `total_ars` de un gasto a través de los meses. Params: `concepto_id` (match por id), `mes`, `anio` (mes actual / fin de ventana), `meses` (cantidad de meses a mostrar, default 6, acotado 2–24), `casa_id` (opcional). Devuelve `{ mes, anio, label, total_ars }[]` ordenado cronológicamente, con 0 en meses sin match. Suma todos los gastos que matchean por mes; usa la suma de sub-items `incluye_en_total` cuando el gasto no está confirmado. |
 | `POST /api/gastos/copiar` | Copia un gasto (`{ source_id, mes, anio }`) con merge: si ya existe (conceptoId+mes+año+casa) agrega sólo sub-items faltantes (por conceptoId); si no, crea el gasto. Filtra sub-items por cuotas pendientes si `esTarjeta` e incrementa `cuotaActual` +1 para cuotas no finalizadas. |
+| `PATCH /api/gastos/categorias` | Edición masiva de categorías. Body `{ gasto_ids: number[], categoria_id: number, action: 'add' \| 'remove' }`. Agrega/quita una misma categoría a varios gastos vía `connect`/`disconnect` en una transacción (connect idempotente, disconnect no-op si no estaba). Valida con `parseCategoriaBatch` (`src/lib/gastos-batch.ts`), 400 si el body es inválido. Devuelve `{ ok: true, updated }`. |
 | `GET/PUT/DELETE /api/gastos/[id]` | Single gasto CRUD |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |
 | `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |

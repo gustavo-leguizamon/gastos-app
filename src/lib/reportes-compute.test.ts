@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { enumerateMonths, computeReportes } from './reportes-compute'
+import { enumerateMonths, computeReportes, computeReporteSubitems } from './reportes-compute'
 
 function gasto(overrides: Record<string, any> = {}) {
   return {
@@ -163,5 +163,59 @@ describe('computeReportes', () => {
       months,
     )
     expect(r.kpis.total).toBe(150)
+  })
+})
+
+describe('computeReporteSubitems', () => {
+  const months = enumerateMonths(6, 2026, 6, 2026)
+
+  it('desglosa por la categoría y monto de cada sub-item incluido en total', () => {
+    const r = computeReporteSubitems(
+      [gasto({
+        totalMoneda: 9999, // se ignora: se usan los sub-items
+        categorias: [{ id: 9, nombre: 'Genérica' }],
+        items: [
+          { monto: 60, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categorias: [{ id: 1, nombre: 'Super' }] },
+          { monto: 40, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categorias: [{ id: 2, nombre: 'Hogar' }] },
+          { monto: 999, incluyeEnTotal: false, conceptoId: 13, concepto: { id: 13, nombre: 'X' }, categorias: [] },
+        ],
+      })],
+      months,
+    )
+    expect(r.kpis.total).toBe(100)
+    expect(r.por_categoria.find((c) => c.id === 1)?.total_ars).toBe(60)
+    expect(r.por_categoria.find((c) => c.id === 2)?.total_ars).toBe(40)
+    // la categoría del gasto padre NO se usa cuando hay sub-items
+    expect(r.por_categoria.find((c) => c.id === 9)).toBeUndefined()
+    expect(r.top_conceptos.map((c) => c.nombre).sort()).toEqual(['Comida', 'Limpieza'])
+  })
+
+  it('cae al nivel gasto cuando no hay sub-items incluidos en total', () => {
+    const r = computeReporteSubitems(
+      [gasto({ totalMoneda: 500, categorias: [{ id: 5, nombre: 'Auto' }], items: [] })],
+      months,
+    )
+    expect(r.kpis.total).toBe(500)
+    expect(r.por_categoria.find((c) => c.id === 5)?.total_ars).toBe(500)
+  })
+
+  it('sub-item sin categoría cae en "Sin categoría"', () => {
+    const r = computeReporteSubitems(
+      [gasto({ items: [{ monto: 80, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categorias: [] }] })],
+      months,
+    )
+    expect(r.por_categoria.find((c) => c.id === null)?.total_ars).toBe(80)
+  })
+
+  it('cantidad_gastos cuenta filas de gasto, no unidades', () => {
+    const r = computeReporteSubitems(
+      [gasto({ items: [
+        { monto: 10, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categorias: [] },
+        { monto: 20, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'B' }, categorias: [] },
+      ] })],
+      months,
+    )
+    expect(r.kpis.cantidad_gastos).toBe(1)
+    expect(r.kpis.total).toBe(30)
   })
 })

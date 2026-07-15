@@ -6,12 +6,20 @@
 // si el gasto no está confirmado y tiene sub-items, usa la suma de los items
 // `incluyeEnTotal`; en caso contrario `totalMoneda × tipoCambio`.
 //
-// Atribución por categoría: un gasto con N categorías suma su total COMPLETO a cada
-// una (decisión de producto — "cuánto tocó la categoría X"). Por eso la suma de
-// categorías puede superar el total. Gastos sin categorías caen en "Sin categoría".
+// La agregación trabaja sobre "unidades" (`Unit`): cada unidad tiene un monto y las
+// dimensiones (categorías, concepto, tarjeta, tipo de pago, mes). Hay dos formas de
+// generar unidades a partir de los gastos:
+//   - `gastosToUnits`      → una unidad por gasto (nivel gasto).
+//   - `gastosToSubitemUnits`→ una unidad por sub-item `incluyeEnTotal`; si el gasto no
+//                             tiene sub-items elegibles, cae al nivel gasto. Da la
+//                             distribución real por categoría/monto de cada sub-item.
 //
-// Los gastos `esTarjeta` (resúmenes contenedores de tarjeta) se excluyen en la route
-// para no doble-contar los consumos, que ya viven como gastos individuales.
+// Atribución por categoría: una unidad con N categorías suma su monto COMPLETO a cada
+// una ("cuánto tocó la categoría X"). Registrar 1 categoría por unidad evita duplicar.
+// Unidades sin categorías caen en "Sin categoría".
+//
+// Los gastos `esTarjeta` (resúmenes contenedores) se excluyen en la route por defecto
+// para no doble-contar los consumos, que ya existen como gastos individuales.
 
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -94,14 +102,85 @@ function gastoTotalArs(g: any): number {
   return g.totalMoneda * g.tipoCambio
 }
 
+interface Unit {
+  monto: number
+  categorias: { id: number; nombre: string }[]
+  conceptoId: number
+  conceptoNombre: string
+  mes: number
+  anio: number
+  tarjetaId: number | null
+  tarjetaNombre: string | null
+  tipoPago: 'C' | 'D' | null
+}
+
+function normTipo(t: any): 'C' | 'D' | null {
+  return t === 'C' || t === 'D' ? t : null
+}
+
+// Una unidad por gasto (nivel gasto).
+export function gastosToUnits(gastos: any[]): Unit[] {
+  return gastos.map((g) => ({
+    monto: gastoTotalArs(g),
+    categorias: g.categorias ?? [],
+    conceptoId: g.conceptoId,
+    conceptoNombre: g.concepto?.nombre ?? '—',
+    mes: g.mes,
+    anio: g.anio,
+    tarjetaId: g.tarjetaId ?? null,
+    tarjetaNombre: g.tarjeta?.nombre ?? null,
+    tipoPago: normTipo(g.tipoPago),
+  }))
+}
+
+// Una unidad por sub-item `incluyeEnTotal`; si el gasto no tiene sub-items elegibles,
+// cae al nivel gasto. Las dimensiones de tarjeta/tipo de pago/mes son las del gasto padre.
+export function gastosToSubitemUnits(gastos: any[]): Unit[] {
+  const out: Unit[] = []
+  for (const g of gastos) {
+    const itemsIncl = (g.items ?? []).filter((i: any) => i.incluyeEnTotal)
+    if (itemsIncl.length > 0) {
+      for (const it of itemsIncl) {
+        out.push({
+          monto: it.monto,
+          categorias: it.categorias ?? [],
+          conceptoId: it.conceptoId,
+          conceptoNombre: it.concepto?.nombre ?? '—',
+          mes: g.mes,
+          anio: g.anio,
+          tarjetaId: g.tarjetaId ?? null,
+          tarjetaNombre: g.tarjeta?.nombre ?? null,
+          tipoPago: normTipo(g.tipoPago),
+        })
+      }
+    } else {
+      out.push({
+        monto: gastoTotalArs(g),
+        categorias: g.categorias ?? [],
+        conceptoId: g.conceptoId,
+        conceptoNombre: g.concepto?.nombre ?? '—',
+        mes: g.mes,
+        anio: g.anio,
+        tarjetaId: g.tarjetaId ?? null,
+        tarjetaNombre: g.tarjeta?.nombre ?? null,
+        tipoPago: normTipo(g.tipoPago),
+      })
+    }
+  }
+  return out
+}
+
 /**
- * Agrega los gastos ya filtrados en las tres dimensiones del reporte + KPIs.
- * `months` es la ventana cronológica (de `enumerateMonths`); los meses sin gastos
- * quedan con total 0. `opts.topConceptos` acota el ranking de conceptos (default 12).
+ * Agrega un conjunto de unidades en las dimensiones del reporte + KPIs.
+ * `months` es la ventana cronológica (de `enumerateMonths`); los meses sin unidades
+ * quedan con total 0. `cantidadGastos` es la cantidad de filas de gasto (para el KPI,
+ * independiente de cuántas unidades genere cada gasto). `opts.topConceptos` acota el
+ * ranking de conceptos (default 12).
  */
-export function computeReportes(
-  gastos: any[],
+function aggregateUnits(
+  units: Unit[],
   months: { mes: number; anio: number }[],
+  cantidadGastos: number,
   opts: { topConceptos?: number } = {},
 ): ReporteResult {
   const topN = opts.topConceptos ?? 12
@@ -122,45 +201,39 @@ export function computeReportes(
   const tarjMap = new Map<string, TarjetaBucket>()
   const tipoMap = new Map<'C' | 'D', TipoPagoBucket>()
   let total = 0
-  let cantidad = 0
 
-  for (const g of gastos) {
-    const monto = gastoTotalArs(g)
-    total += monto
-    cantidad++
+  for (const u of units) {
+    total += u.monto
 
-    const mb = mesMap.get(`${g.anio}-${g.mes}`)
-    if (mb) mb.total_ars += monto
+    const mb = mesMap.get(`${u.anio}-${u.mes}`)
+    if (mb) mb.total_ars += u.monto
 
-    const cats: any[] = g.categorias ?? []
-    if (cats.length === 0) {
+    if (u.categorias.length === 0) {
       const ex = catMap.get('null') ?? { id: null, nombre: 'Sin categoría', total_ars: 0 }
-      ex.total_ars += monto
+      ex.total_ars += u.monto
       catMap.set('null', ex)
     } else {
-      for (const c of cats) {
+      for (const c of u.categorias) {
         const key = String(c.id)
         const ex = catMap.get(key) ?? { id: c.id, nombre: c.nombre, total_ars: 0 }
-        ex.total_ars += monto
+        ex.total_ars += u.monto
         catMap.set(key, ex)
       }
     }
 
-    const cid = g.conceptoId
-    const ce = conMap.get(cid) ?? { concepto_id: cid, nombre: g.concepto?.nombre ?? '—', total_ars: 0 }
-    ce.total_ars += monto
-    conMap.set(cid, ce)
+    const ce = conMap.get(u.conceptoId) ?? { concepto_id: u.conceptoId, nombre: u.conceptoNombre, total_ars: 0 }
+    ce.total_ars += u.monto
+    conMap.set(u.conceptoId, ce)
 
-    const tkey = g.tarjetaId == null ? 'null' : String(g.tarjetaId)
-    const te = tarjMap.get(tkey) ?? { id: g.tarjetaId ?? null, nombre: g.tarjeta?.nombre ?? 'Sin tarjeta', total_ars: 0 }
-    te.total_ars += monto
+    const tkey = u.tarjetaId == null ? 'null' : String(u.tarjetaId)
+    const te = tarjMap.get(tkey) ?? { id: u.tarjetaId, nombre: u.tarjetaNombre ?? 'Sin tarjeta', total_ars: 0 }
+    te.total_ars += u.monto
     tarjMap.set(tkey, te)
 
-    if (g.tipoPago === 'C' || g.tipoPago === 'D') {
-      const tp = g.tipoPago as 'C' | 'D'
-      const pe = tipoMap.get(tp) ?? { tipo: tp, nombre: TIPO_PAGO_NOMBRE[tp], total_ars: 0 }
-      pe.total_ars += monto
-      tipoMap.set(tp, pe)
+    if (u.tipoPago) {
+      const pe = tipoMap.get(u.tipoPago) ?? { tipo: u.tipoPago, nombre: TIPO_PAGO_NOMBRE[u.tipoPago], total_ars: 0 }
+      pe.total_ars += u.monto
+      tipoMap.set(u.tipoPago, pe)
     }
   }
 
@@ -187,7 +260,7 @@ export function computeReportes(
     kpis: {
       total: r(total),
       promedio_mensual: r(meses ? total / meses : 0),
-      cantidad_gastos: cantidad,
+      cantidad_gastos: cantidadGastos,
       meses,
     },
     por_categoria,
@@ -196,4 +269,22 @@ export function computeReportes(
     por_tarjeta,
     por_tipo_pago,
   }
+}
+
+/** Reporte a nivel gasto (cada gasto cuenta una vez con su total). */
+export function computeReportes(
+  gastos: any[],
+  months: { mes: number; anio: number }[],
+  opts: { topConceptos?: number } = {},
+): ReporteResult {
+  return aggregateUnits(gastosToUnits(gastos), months, gastos.length, opts)
+}
+
+/** Reporte desglosado por sub-item (con fallback al nivel gasto si no hay sub-items). */
+export function computeReporteSubitems(
+  gastos: any[],
+  months: { mes: number; anio: number }[],
+  opts: { topConceptos?: number } = {},
+): ReporteResult {
+  return aggregateUnits(gastosToSubitemUnits(gastos), months, gastos.length, opts)
 }

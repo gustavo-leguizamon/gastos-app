@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { computeReportes, enumerateMonths } from '@/lib/reportes-compute'
+import { computeReportes, computeReporteSubitems, enumerateMonths } from '@/lib/reportes-compute'
 
 // Parsea una lista de ids "1,2,3" a number[] (descarta no numéricos y vacíos).
 function parseIds(raw: string | null): number[] {
@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
   const conceptoIds = parseIds(searchParams.get('concepto_ids'))
   const topParam = Number(searchParams.get('top'))
   const incluirTarjetas = searchParams.get('incluir_tarjetas') === 'true'
+  const porSubitem = searchParams.get('agrupar') === 'subitem'
 
   const months = enumerateMonths(mesDesde, anioDesde, mesHasta, anioHasta)
 
@@ -44,12 +45,20 @@ export async function GET(req: NextRequest) {
   if (tarjetaIds.length) where.tarjetaId = { in: tarjetaIds }
   if (conceptoIds.length) where.conceptoId = { in: conceptoIds }
 
+  // Para el desglose por sub-item necesitamos las categorías/concepto de cada item.
   const gastos = await prisma.gasto.findMany({
     where,
-    include: { categorias: true, concepto: true, items: true, tarjeta: true },
+    include: {
+      categorias: true,
+      concepto: true,
+      tarjeta: true,
+      items: porSubitem ? { include: { categorias: true, concepto: true } } : true,
+    },
   })
 
   const topConceptos = Number.isFinite(topParam) && topParam > 0 ? Math.min(50, Math.round(topParam)) : 12
-  const result = computeReportes(gastos, months, { topConceptos })
+  const result = porSubitem
+    ? computeReporteSubitems(gastos, months, { topConceptos })
+    : computeReportes(gastos, months, { topConceptos })
   return NextResponse.json(result)
 }

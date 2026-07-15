@@ -152,6 +152,18 @@ Ambos llaman `triggerRefresh()` al terminar.
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
 
+## Edición masiva de categorías
+
+Permite agregar o quitar **una misma categoría** a varios gastos a la vez desde la grilla.
+
+- **UI** (`GastosTable`): botón "Categorizar varios" (arriba a la derecha de la tabla) activa el **modo selección**. En ese modo aparece:
+  - una columna de checkbox al inicio de la grilla (desktop) / un checkbox en el header de cada card (mobile) — sólo seleccionables las filas `_type === 'gasto'`;
+  - `BulkCategoriasBar` (`src/components/gastos/BulkCategoriasBar.tsx`), barra sticky con: checkbox "Todos" (con estado indeterminate), contador "N de M seleccionados", `AppSelect` de categoría, y botones **Agregar** / **Quitar** + cerrar (✕).
+  - "Todos" selecciona/deselecciona **los gastos filtrados** (respeta estado de pago, búsqueda y fecha).
+  - El modo selección se resetea automáticamente al cambiar de mes/año o ante un refresh global (`filtros`/`refreshKey`).
+- **Aplicar**: `PATCH /api/gastos/categorias` con `{ gasto_ids, categoria_id, action }`. Al terminar recarga la grilla (`loadGastos`) manteniendo la selección para encadenar más acciones. Toast de éxito/error.
+- **Backend**: `connect`/`disconnect` de la relación m2m por gasto dentro de una transacción. `connect` es idempotente (no duplica si ya estaba) y `disconnect` es no-op si el gasto no tenía la categoría. Validación de entrada en `parseCategoriaBatch` (`src/lib/gastos-batch.ts`). Sólo aplica a **gastos** (no a sub-items).
+
 ## Evolución del gasto (gráfico mensual)
 
 `EvolucionGastoDialog` (`src/components/gastos/EvolucionGastoDialog.tsx`) muestra la evolución del **Total ARS** de un gasto a través de los meses, como un `LineChart` de `@mui/x-charts` (curva `monotoneX`, tooltip al pasar el mouse que muestra el valor del mes).

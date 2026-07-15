@@ -10,6 +10,7 @@ Params (todos snake_case):
 - `tipo_pago` — `'C'` / `'D'` (opcional).
 - `categoria_ids`, `tarjeta_ids`, `concepto_ids` — listas `"1,2,3"` (opcionales).
 - `incluir_tarjetas` — `"true"` para **no** excluir los gastos `esTarjeta` (ver abajo). Default: se excluyen.
+- `agrupar` — `"subitem"` para desglosar por sub-item (`computeReporteSubitems`); trae `items` con sus `categorias`+`concepto`. Cualquier otro valor → nivel gasto (`computeReportes`).
 - `top` — límite del ranking de conceptos (default 12, acotado 1–50).
 
 El `where` se arma: `OR` de los `{mes,anio}` de la ventana (`enumerateMonths`), `esTarjeta: false` (salvo `incluir_tarjetas`), + filtros mapeados a camelCase (`casaId`, `tipoPago`, `categorias: { some: { id: { in } } }`, `tarjetaId: { in }`, `conceptoId: { in }`). Include: `categorias`, `concepto`, `items`, `tarjeta`.
@@ -29,7 +30,10 @@ Response (`Reporte` en `types.ts`):
 Sin imports de Prisma/Next (testeable). Importado por la route. Test: `reportes-compute.test.ts`.
 
 - **`enumerateMonths(mesDesde, anioDesde, mesHasta, anioHasta)`** — lista cronológica inclusive de `{mes,anio}`. Endereza rangos invertidos y acota a **60 meses** (recorta desde el inicio).
-- **`computeReportes(gastos, months, { topConceptos })`** — agrega las dimensiones (categoría, mes, conceptos, tarjeta, tipo de pago) + KPIs.
+- **`computeReportes(gastos, months, { topConceptos })`** — reporte a nivel gasto: cada gasto es una unidad con su `total_ars`.
+- **`computeReporteSubitems(gastos, months, { topConceptos })`** — reporte desglosado: cada sub-item `incluyeEnTotal` es una unidad (con su `monto`, `categorias` y `concepto` propios); si el gasto no tiene sub-items elegibles, cae al nivel gasto. Las dimensiones tarjeta/tipo-pago/mes son las del gasto padre.
+
+Ambas delegan en un agregador común `aggregateUnits(units, months, cantidadGastos, opts)` sobre "unidades" (`Unit`), que produce las dimensiones (categoría, mes, conceptos, tarjeta, tipo de pago) + KPIs. `cantidad_gastos` cuenta **filas de gasto** (no unidades), así que en el reporte por sub-items un gasto con N sub-items sigue contando como 1.
 
 **Métrica `total_ars` por gasto:** misma definición que `/api/gastos/evolucion` — si `!confirmado` y hay sub-items, suma de items `incluyeEnTotal`; si no, `totalMoneda × tipoCambio`. Admite negativos (devoluciones).
 
@@ -42,11 +46,12 @@ Sin imports de Prisma/Next (testeable). Importado por la route. Test: `reportes-
 
 Carga las opciones de filtros una vez (`/api/casas`, `/api/categorias`, `/api/tarjetas`, `/api/conceptos`) y re-consulta `/api/reportes` en cada cambio de filtros **o de vista** (con `AbortController` para descartar respuestas viejas). Default: preset "Últimos 6".
 
-**Vistas (submenú, `Tabs`)** — array `VISTAS` en la page (extensible: agregar una entrada suma un tab). Cada vista define `incluirTarjetas`, que se pasa como `incluir_tarjetas` al endpoint:
-- **"Gastos individuales"** (`incluirTarjetas: false`, default) — excluye los resúmenes de tarjeta (evita doble-conteo). Mejor detalle por categoría/concepto. Total ≈ gastos individuales.
-- **"Total con tarjetas"** (`incluirTarjetas: true`) — incluye los resúmenes de tarjeta; el total coincide con el "Total Gastos" de la pantalla de Gastos. El consumo de tarjeta (resúmenes sin categoría) puede caer en "Sin categoría" y sus conceptos son los nombres de tarjeta.
+**Vistas (submenú, `Tabs`)** — array `VISTAS` en la page (extensible: agregar una entrada suma un tab). Cada vista define flags que se traducen a params del endpoint (`incluirTarjetas` → `incluir_tarjetas`, `porSubitems` → `agrupar=subitem`, `mesUnico` → selector de un solo mes):
+- **"Gastos individuales"** (default) — excluye los resúmenes de tarjeta (evita doble-conteo). Mejor detalle por categoría/concepto. Total ≈ gastos individuales.
+- **"Total con tarjetas"** (`incluirTarjetas`) — incluye los resúmenes de tarjeta; el total coincide con el "Total Gastos" de la pantalla de Gastos. El consumo de tarjeta (resúmenes sin categoría) puede caer en "Sin categoría" y sus conceptos son los nombres de tarjeta.
+- **"Detalle por sub-ítems"** (`porSubitems` + `mesUnico`) — **un solo mes**; desglosa por sub-item (`computeReporteSubitems`), así los montos no se duplican y la distribución por categoría es la real. Excluye resúmenes de tarjeta. Al entrar a esta vista, `handleVista` colapsa el rango al mes de fin; `ReportesFiltros` recibe `mesUnico` y muestra un único selector de mes/año (setea `mes_desde=mes_hasta`). Como es un solo mes, **no** se renderiza el gráfico de evolución mensual (en su lugar va el de tipo de pago).
 
-Debajo de los tabs se muestra un caption explicando la vista activa. Los filtros y los charts son los mismos para ambas vistas; sólo cambia el universo de gastos.
+Debajo de los tabs se muestra un caption explicando la vista activa. Los filtros de dimensión (categorías/tarjetas/conceptos/casa/tipo pago) y el resto de los charts son comunes; sólo cambian el universo de gastos y el nivel de agregación.
 
 - **`ReportesFiltros`** — presets de período (`ToggleButtonGroup`: Este mes / Últimos 3 / 6 / 12 / Este año / Personalizado). `presetRange(preset)` calcula el rango relativo al mes actual **local**. "Personalizado" muestra pickers mes+año desde/hasta (`AppSelect`). Debajo: `AppMultiSelect` de Categorías / Tarjetas / Conceptos, `AppSelect` Casa (emptyLabel "Todas"), `ToggleButtonGroup` Tipo de pago.
 - **`ReporteKpis`** — 4 stat tiles (Total gastado, Promedio mensual, Cantidad de gastos, Meses analizados).
@@ -63,5 +68,5 @@ Debajo de los tabs se muestra un caption explicando la vista activa. Los filtros
 
 ## Tests
 
-- `reportes-compute.test.ts` — `enumerateMonths` (rango, wraparound, invertido, cap 60) y `computeReportes` (total/promedio, tipoCambio, atribución completa por categoría, "Sin categoría", agregación por mes con ceros, ranking de conceptos + límite, por tarjeta con "Sin tarjeta", por tipo de pago, no-confirmado con items).
-- `src/app/api/reportes/route.test.ts` — 400 sin rango, armado del `where` (OR meses, `esTarjeta:false`), mapeo de filtros snake→camel, `incluir_tarjetas`, y forma del response agregado (mock de Prisma).
+- `reportes-compute.test.ts` — `enumerateMonths` (rango, wraparound, invertido, cap 60); `computeReportes` (total/promedio, tipoCambio, atribución completa por categoría, "Sin categoría", agregación por mes con ceros, ranking de conceptos + límite, por tarjeta con "Sin tarjeta", por tipo de pago, no-confirmado con items); `computeReporteSubitems` (desglose por categoría/monto/concepto de cada sub-item, fallback a nivel gasto sin sub-items, "Sin categoría", `cantidad_gastos` cuenta filas de gasto no unidades).
+- `src/app/api/reportes/route.test.ts` — 400 sin rango, armado del `where` (OR meses, `esTarjeta:false`), mapeo de filtros snake→camel, `incluir_tarjetas`, `agrupar=subitem` (include anidado de items + desglose), y forma del response agregado (mock de Prisma).

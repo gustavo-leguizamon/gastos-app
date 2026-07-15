@@ -22,6 +22,8 @@ interface Props {
   categorias: Categoria[]
   tarjetas: Tarjeta[]
   conceptos: Concepto[]
+  /** Modo mes único: oculta presets/rango y muestra un solo selector de mes/año. */
+  mesUnico?: boolean
 }
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -39,7 +41,7 @@ export function presetRange(p: Exclude<Preset, 'custom'>): Pick<FiltrosReporte, 
   return { mes_desde: d.mes, anio_desde: d.anio, ...hasta }
 }
 
-export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset, casas, categorias, tarjetas, conceptos }: Props) {
+export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset, casas, categorias, tarjetas, conceptos, mesUnico }: Props) {
   const now = new Date()
   const years = Array.from({ length: 8 }, (_, i) => now.getFullYear() + 1 - i)
   const mesOpts = MESES.map((m, i) => ({ value: i + 1, label: m }))
@@ -56,35 +58,52 @@ export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset
     setFiltros({ ...filtros, ...patch })
   }
 
+  // En mes único, mover mes/año setea desde y hasta al mismo valor.
+  const setMesUnico = (patch: { mes?: number; anio?: number }) => {
+    const mes = patch.mes ?? filtros.mes_hasta
+    const anio = patch.anio ?? filtros.anio_hasta
+    setFiltros({ ...filtros, mes_desde: mes, mes_hasta: mes, anio_desde: anio, anio_hasta: anio })
+  }
+
   return (
     <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-          Período
-        </Typography>
-        <ToggleButtonGroup value={preset} exclusive onChange={handlePreset} size="small" sx={{ flexWrap: 'wrap' }}>
-          <ToggleButton value="mes">Este mes</ToggleButton>
-          <ToggleButton value="3">Últimos 3</ToggleButton>
-          <ToggleButton value="6">Últimos 6</ToggleButton>
-          <ToggleButton value="12">Últimos 12</ToggleButton>
-          <ToggleButton value="anio">Este año</ToggleButton>
-          <ToggleButton value="custom">Personalizado</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {preset === 'custom' && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Desde</Typography>
-            <AppSelect label="Mes" options={mesOpts} value={filtros.mes_desde} onChange={(v) => setCustom({ mes_desde: Number(v) })} disableClearable sx={{ width: 140 }} />
-            <AppSelect label="Año" options={yearOpts} value={filtros.anio_desde} onChange={(v) => setCustom({ anio_desde: Number(v) })} disableClearable sx={{ width: 100 }} />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Hasta</Typography>
-            <AppSelect label="Mes" options={mesOpts} value={filtros.mes_hasta} onChange={(v) => setCustom({ mes_hasta: Number(v) })} disableClearable sx={{ width: 140 }} />
-            <AppSelect label="Año" options={yearOpts} value={filtros.anio_hasta} onChange={(v) => setCustom({ anio_hasta: Number(v) })} disableClearable sx={{ width: 100 }} />
-          </Box>
+      {mesUnico ? (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>Mes</Typography>
+          <AppSelect label="Mes" options={mesOpts} value={filtros.mes_hasta} onChange={(v) => setMesUnico({ mes: Number(v) })} disableClearable sx={{ width: 150 }} />
+          <AppSelect label="Año" options={yearOpts} value={filtros.anio_hasta} onChange={(v) => setMesUnico({ anio: Number(v) })} disableClearable sx={{ width: 110 }} />
         </Box>
+      ) : (
+        <>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+              Período
+            </Typography>
+            <ToggleButtonGroup value={preset} exclusive onChange={handlePreset} size="small" sx={{ flexWrap: 'wrap' }}>
+              <ToggleButton value="mes">Este mes</ToggleButton>
+              <ToggleButton value="3">Últimos 3</ToggleButton>
+              <ToggleButton value="6">Últimos 6</ToggleButton>
+              <ToggleButton value="12">Últimos 12</ToggleButton>
+              <ToggleButton value="anio">Este año</ToggleButton>
+              <ToggleButton value="custom">Personalizado</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          {preset === 'custom' && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Desde</Typography>
+                <AppSelect label="Mes" options={mesOpts} value={filtros.mes_desde} onChange={(v) => setCustom({ mes_desde: Number(v) })} disableClearable sx={{ width: 140 }} />
+                <AppSelect label="Año" options={yearOpts} value={filtros.anio_desde} onChange={(v) => setCustom({ anio_desde: Number(v) })} disableClearable sx={{ width: 100 }} />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Hasta</Typography>
+                <AppSelect label="Mes" options={mesOpts} value={filtros.mes_hasta} onChange={(v) => setCustom({ mes_hasta: Number(v) })} disableClearable sx={{ width: 140 }} />
+                <AppSelect label="Año" options={yearOpts} value={filtros.anio_hasta} onChange={(v) => setCustom({ anio_hasta: Number(v) })} disableClearable sx={{ width: 100 }} />
+              </Box>
+            </Box>
+          )}
+        </>
       )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>

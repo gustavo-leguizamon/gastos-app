@@ -65,6 +65,26 @@ describe('GET /api/reportes', () => {
     expect(where.conceptoId).toEqual({ in: [4, 5] })
   })
 
+  it('agrupar=subitem incluye las categorías/concepto de los items y desglosa por sub-item', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([
+      rawGasto({
+        mes: 6,
+        totalMoneda: 9999,
+        items: [
+          { monto: 70, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categorias: [{ id: 1, nombre: 'Super' }] },
+          { monto: 30, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categorias: [{ id: 2, nombre: 'Hogar' }] },
+        ],
+      }),
+    ])
+    const res = await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&agrupar=subitem'))
+    const body = await res.json()
+    const items = mockPrisma.gasto.findMany.mock.calls[0][0].include.items
+    expect(items).toMatchObject({ include: { categorias: true, concepto: true } })
+    expect(body.kpis.total).toBe(100)
+    expect(body.por_categoria.find((c: any) => c.id === 1)?.total_ars).toBe(70)
+    expect(body.por_categoria.find((c: any) => c.id === 2)?.total_ars).toBe(30)
+  })
+
   it('incluir_tarjetas=true no fuerza esTarjeta=false', async () => {
     await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&incluir_tarjetas=true'))
     const where = mockPrisma.gasto.findMany.mock.calls[0][0].where

@@ -20,8 +20,8 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 
 // Vistas del reporte (submenú). Extensible: agregar acá una nueva entrada suma un tab.
 // `incluirTarjetas` decide si se cuentan los "resúmenes de tarjeta" (esTarjeta).
-type VistaKey = 'individuales' | 'total'
-const VISTAS: { key: VistaKey; label: string; caption: string; incluirTarjetas: boolean }[] = [
+type VistaKey = 'individuales' | 'total' | 'subitems'
+const VISTAS: { key: VistaKey; label: string; caption: string; incluirTarjetas: boolean; porSubitems?: boolean; mesUnico?: boolean }[] = [
   {
     key: 'individuales',
     label: 'Gastos individuales',
@@ -33,6 +33,14 @@ const VISTAS: { key: VistaKey; label: string; caption: string; incluirTarjetas: 
     label: 'Total con tarjetas',
     caption: 'Incluye los resúmenes de tarjeta — coincide con el “Total Gastos” de la pantalla de Gastos. El consumo de tarjeta puede aparecer como “Sin categoría”.',
     incluirTarjetas: true,
+  },
+  {
+    key: 'subitems',
+    label: 'Detalle por sub-ítems',
+    caption: 'Un mes. Desglosa cada gasto por sus sub-ítems (categoría y monto reales); los gastos sin sub-ítems cuentan por su propia categoría. Sin duplicar montos.',
+    incluirTarjetas: false,
+    porSubitems: true,
+    mesUnico: true,
   },
 ]
 
@@ -47,7 +55,7 @@ function initialFiltros(): FiltrosReporte {
   }
 }
 
-function buildParams(f: FiltrosReporte, incluirTarjetas: boolean): string {
+function buildParams(f: FiltrosReporte, incluirTarjetas: boolean, porSubitems: boolean): string {
   const p = new URLSearchParams({
     mes_desde: String(f.mes_desde),
     anio_desde: String(f.anio_desde),
@@ -60,6 +68,7 @@ function buildParams(f: FiltrosReporte, incluirTarjetas: boolean): string {
   if (f.tarjeta_ids.length) p.set('tarjeta_ids', f.tarjeta_ids.join(','))
   if (f.concepto_ids.length) p.set('concepto_ids', f.concepto_ids.join(','))
   if (incluirTarjetas) p.set('incluir_tarjetas', 'true')
+  if (porSubitems) p.set('agrupar', 'subitem')
   return p.toString()
 }
 
@@ -95,13 +104,23 @@ export default function ReportesPage() {
   useEffect(() => {
     setLoading(true)
     const ctrl = new AbortController()
-    fetch(`/api/reportes?${buildParams(filtros, vistaActual.incluirTarjetas)}`, { signal: ctrl.signal })
+    fetch(`/api/reportes?${buildParams(filtros, vistaActual.incluirTarjetas, !!vistaActual.porSubitems)}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d: Reporte) => setReporte(d))
       .catch((e) => { if (e.name !== 'AbortError') setReporte(null) })
       .finally(() => setLoading(false))
     return () => ctrl.abort()
-  }, [filtros, vistaActual.incluirTarjetas])
+  }, [filtros, vistaActual.incluirTarjetas, vistaActual.porSubitems])
+
+  // Al entrar a una vista de mes único, colapsar el rango al mes de fin.
+  const handleVista = (v: VistaKey) => {
+    setVista(v)
+    const meta = VISTAS.find((x) => x.key === v)!
+    if (meta.mesUnico) {
+      setPreset('custom')
+      setFiltros((f) => ({ ...f, mes_desde: f.mes_hasta, anio_desde: f.anio_hasta }))
+    }
+  }
 
   const rangoLabel = useMemo(() => {
     const desde = `${MESES[filtros.mes_desde - 1]} ${filtros.anio_desde}`
@@ -120,7 +139,7 @@ export default function ReportesPage() {
 
       <Tabs
         value={vista}
-        onChange={(_, v) => setVista(v as VistaKey)}
+        onChange={(_, v) => handleVista(v as VistaKey)}
         variant="scrollable"
         scrollButtons="auto"
         sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 40, mb: 1 }}
@@ -142,6 +161,7 @@ export default function ReportesPage() {
         categorias={categorias}
         tarjetas={tarjetas}
         conceptos={conceptos}
+        mesUnico={vistaActual.mesUnico}
       />
 
       {loading && !reporte ? (
@@ -162,9 +182,14 @@ export default function ReportesPage() {
           ) : (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 2, sm: 3 } }}>
               <ReporteCategoriaChart data={reporte.por_categoria} />
-              <ReporteMensualChart data={reporte.por_mes} />
+              {/* En "Detalle por sub-ítems" es un solo mes: no tiene sentido la evolución mensual. */}
+              {vistaActual.mesUnico ? (
+                <ReporteTipoPagoChart data={reporte.por_tipo_pago} />
+              ) : (
+                <ReporteMensualChart data={reporte.por_mes} />
+              )}
               <ReporteTarjetaChart data={reporte.por_tarjeta} />
-              <ReporteTipoPagoChart data={reporte.por_tipo_pago} />
+              {!vistaActual.mesUnico && <ReporteTipoPagoChart data={reporte.por_tipo_pago} />}
               <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
                 <ReporteConceptosChart data={reporte.top_conceptos} />
               </Box>

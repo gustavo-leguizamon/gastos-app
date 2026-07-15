@@ -15,6 +15,8 @@ import MenuItem from '@mui/material/MenuItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import Switch from '@mui/material/Switch'
+import Checkbox from '@mui/material/Checkbox'
+import Button from '@mui/material/Button'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import EditIcon from '@mui/icons-material/Edit'
@@ -29,8 +31,10 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
+import ChecklistIcon from '@mui/icons-material/Checklist'
 import BrandLogo from '@/components/shared/BrandLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
+import BulkCategoriasBar from './BulkCategoriasBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -72,6 +76,8 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [evolucionGasto, setEvolucionGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
   const [sortModel, setSortModel] = useState<GridSortModel>([])
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const sortGastos = (rows: Gasto[]) => {
     if (sortModel.length === 0) return rows
@@ -108,6 +114,34 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }
 
   useEffect(() => { loadGastos() }, [filtros, refreshKey])
+
+  // Salir del modo selección al cambiar de período o ante un refresh global.
+  useEffect(() => { setSelectionMode(false); setSelectedIds(new Set()) }, [filtros, refreshKey])
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const applyBulkCategoria = async (categoriaId: number, action: 'add' | 'remove') => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    try {
+      const res = await fetch('/api/gastos/categorias', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasto_ids: ids, categoria_id: categoriaId, action }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(action === 'add' ? 'Categoría agregada' : 'Categoría quitada')
+      loadGastos()
+    } catch {
+      toast.error('Error al actualizar categorías')
+    }
+  }
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -158,6 +192,25 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   const d = new Date()
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const selectColumn: GridColDef = {
+    field: '_select',
+    headerName: '',
+    width: 50,
+    sortable: false,
+    disableColumnMenu: true,
+    renderCell: ({ row }) => {
+      if (row._type !== 'gasto') return null
+      return (
+        <Checkbox
+          size="small"
+          checked={selectedIds.has(row.id)}
+          onChange={() => toggleSelect(row.id)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )
+    },
+  }
 
   const columns: GridColDef[] = [
     {
@@ -505,6 +558,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     return g.fecha_vencimiento === fecha
   })
 
+  const filteredIds = gastosFiltrados.map(g => g.id)
+  const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
+  const toggleAll = (checked: boolean) => setSelectedIds(checked ? new Set(filteredIds) : new Set())
+
   // Agrupar por casa
   const groups = gastosFiltrados.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
     const key = String(g.casa_id ?? 'sin-casa')
@@ -586,6 +643,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
           {/* Header: descripción + menu */}
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+            {selectionMode && (
+              <Checkbox
+                size="small"
+                sx={{ p: 0.5, mt: -0.25 }}
+                checked={selectedIds.has(g.id)}
+                onChange={() => toggleSelect(g.id)}
+              />
+            )}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
                 {g.confirmado === false && (
@@ -786,6 +851,27 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   return (
     <>
+      {selectionMode ? (
+        <BulkCategoriasBar
+          count={selectedIds.size}
+          totalFiltrados={filteredIds.length}
+          allSelected={allSelected}
+          onToggleAll={toggleAll}
+          onApply={applyBulkCategoria}
+          onCancel={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
+        />
+      ) : (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+          <Button
+            size="small"
+            startIcon={<ChecklistIcon />}
+            onClick={() => setSelectionMode(true)}
+          >
+            Categorizar varios
+          </Button>
+        </Box>
+      )}
+
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 } }}>
         {groupEntries.map(({ nombre, rows }) => {
           const totalARS = rows.reduce((s, r) => s + r.total_ars, 0)
@@ -824,7 +910,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
               ) : (
                 <AppDataGrid
                   rows={buildFlatRows(sortGastos(rows))}
-                  columns={columns}
+                  columns={selectionMode ? [selectColumn, ...columns] : columns}
                   autoHeight
                   hideFooter
                   sortingMode="server"
