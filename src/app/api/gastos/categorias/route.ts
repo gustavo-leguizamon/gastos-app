@@ -20,8 +20,13 @@ export async function PATCH(req: NextRequest) {
   const { gasto_ids, categoria_id, action } = input
   const data = action === 'add' ? { categoriaId: categoria_id } : { categoriaId: null }
 
+  // Setea la categoría de cada gasto y, si tiene sub-items propagados de tarjeta
+  // (linkeados por un pago del gasto), también la de esos sub-items.
   await prisma.$transaction(
-    gasto_ids.map(id => prisma.gasto.update({ where: { id }, data })),
+    gasto_ids.flatMap(id => [
+      prisma.gasto.update({ where: { id }, data }),
+      prisma.gastoItem.updateMany({ where: { pago: { gastoId: id } }, data }),
+    ]),
   )
 
   return NextResponse.json({ ok: true, updated: gasto_ids.length })

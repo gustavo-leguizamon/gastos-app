@@ -52,17 +52,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include: INCLUDE,
   })
 
-  // Sync del concepto a los sub-items propagados de tarjeta: el sub-item se generó con el
-  // `conceptoId` del gasto fuente. Si el gasto pasó a apuntar a otro concepto, reflejarlo en
-  // todos los items cuyo pago pertenece a este gasto. (Renombrar el concepto en sí no necesita
-  // esto: la `descripcion` derivada se actualiza sola.)
+  // Sync a los sub-items propagados de tarjeta (los generados por pagos de este gasto): heredan
+  // `concepto` + `categoría` + `etiquetas` del gasto fuente, así el resumen de la tarjeta refleja
+  // la clasificación actual. Se hace por item porque `etiquetas` (M2M) no soporta `updateMany`.
   try {
-    await prisma.gastoItem.updateMany({
+    const propagados = await prisma.gastoItem.findMany({
       where: { pago: { gastoId: gasto.id } },
-      data: { conceptoId },
+      select: { id: true },
     })
+    const etiquetaSet = (body.etiqueta_ids ?? []).map((id: number) => ({ id }))
+    await Promise.all(propagados.map(it =>
+      prisma.gastoItem.update({
+        where: { id: it.id },
+        data: { conceptoId, categoriaId: body.categoria_id ?? null, etiquetas: { set: etiquetaSet } },
+      }),
+    ))
   } catch (err) {
-    console.error('Sync concepto gasto→items propagados falló:', err)
+    console.error('Sync gasto→items propagados falló:', err)
   }
 
   return NextResponse.json(toGastoResponse(gasto))

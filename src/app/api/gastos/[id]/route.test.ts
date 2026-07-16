@@ -8,7 +8,8 @@ vi.mock('@/lib/db', () => ({
       delete: vi.fn(),
     },
     gastoItem: {
-      updateMany: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
     },
     concepto: {
       findFirst: vi.fn(),
@@ -22,7 +23,7 @@ import { prisma } from '@/lib/db'
 
 const mockPrisma = prisma as unknown as {
   gasto: { findUnique: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> }
-  gastoItem: { updateMany: ReturnType<typeof vi.fn> }
+  gastoItem: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> }
   concepto: { findFirst: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
 }
 
@@ -62,33 +63,36 @@ describe('GET /api/gastos/[id]', () => {
 })
 
 describe('PUT /api/gastos/[id]', () => {
-  it('resuelve el concepto, mapea data camelCase y propaga el conceptoId a items propagados', async () => {
+  it('resuelve el concepto, mapea data camelCase y propaga concepto+categoría+etiquetas a items propagados', async () => {
     mockPrisma.gasto.update.mockResolvedValue(rawGasto({ id: 5, conceptoId: 50, concepto: { id: 50, nombre: 'Nuevo nombre' } }))
-    mockPrisma.gastoItem.updateMany.mockResolvedValue({ count: 2 })
+    mockPrisma.gastoItem.findMany.mockResolvedValue([{ id: 100 }, { id: 101 }])
+    mockPrisma.gastoItem.update.mockResolvedValue({})
 
     const body = {
       casa_id: 1, descripcion: 'Nuevo nombre', fecha_vencimiento: '2026-06-15', tipo_pago: 'D',
-      moneda_id: 2, total_moneda: 1200, mes: 6, anio: 2026,
+      moneda_id: 2, total_moneda: 1200, mes: 6, anio: 2026, categoria_id: 8, etiqueta_ids: [3, 4],
     }
     const res = await PUT({ json: async () => body } as any, { params: { id: '5' } })
 
     expect(mockPrisma.concepto.create).toHaveBeenCalledWith(expect.objectContaining({ data: { nombre: 'Nuevo nombre' } }))
     expect(mockPrisma.gasto.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 5 },
-      data: expect.objectContaining({ conceptoId: 50, totalMoneda: 1200, casaId: 1 }),
+      data: expect.objectContaining({ conceptoId: 50, totalMoneda: 1200, casaId: 1, categoriaId: 8 }),
     }))
     expect(mockPrisma.gasto.update.mock.calls[0][0].data).not.toHaveProperty('descripcion')
-    // Propaga el concepto a los sub-items propagados de tarjeta
-    expect(mockPrisma.gastoItem.updateMany).toHaveBeenCalledWith({
-      where: { pago: { gastoId: 5 } },
-      data: { conceptoId: 50 },
+    // Propaga concepto + categoría + etiquetas a cada sub-item propagado de tarjeta
+    expect(mockPrisma.gastoItem.findMany).toHaveBeenCalledWith({ where: { pago: { gastoId: 5 } }, select: { id: true } })
+    expect(mockPrisma.gastoItem.update).toHaveBeenCalledWith({
+      where: { id: 100 },
+      data: { conceptoId: 50, categoriaId: 8, etiquetas: { set: [{ id: 3 }, { id: 4 }] } },
     })
+    expect(mockPrisma.gastoItem.update).toHaveBeenCalledTimes(2)
     expect((await res.json()).descripcion).toBe('Nuevo nombre')
   })
 
   it('no rompe el flujo si la propagación de items falla', async () => {
     mockPrisma.gasto.update.mockResolvedValue(rawGasto({ id: 5 }))
-    mockPrisma.gastoItem.updateMany.mockRejectedValue(new Error('db down'))
+    mockPrisma.gastoItem.findMany.mockRejectedValue(new Error('db down'))
     const res = await PUT({ json: async () => ({ descripcion: 'X', mes: 6, anio: 2026 }) } as any, { params: { id: '5' } })
     expect(res.status).toBe(200)
   })

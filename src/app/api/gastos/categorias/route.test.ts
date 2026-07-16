@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db', () => ({
   prisma: {
     gasto: { update: vi.fn((args: any) => args) },
+    gastoItem: { updateMany: vi.fn((args: any) => args) },
     $transaction: vi.fn(async (ops: any[]) => ops),
   },
 }))
@@ -12,6 +13,7 @@ import { prisma } from '@/lib/db'
 
 const mockPrisma = prisma as unknown as {
   gasto: { update: ReturnType<typeof vi.fn> }
+  gastoItem: { updateMany: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -32,6 +34,11 @@ describe('PATCH /api/gastos/categorias', () => {
       where: { id: 2 },
       data: { categoriaId: 7 },
     })
+    // También propaga la categoría a los sub-items de tarjeta de cada gasto.
+    expect(mockPrisma.gastoItem.updateMany).toHaveBeenCalledWith({
+      where: { pago: { gastoId: 1 } },
+      data: { categoriaId: 7 },
+    })
     expect(await res.json()).toEqual({ ok: true, updated: 2 })
   })
 
@@ -40,6 +47,10 @@ describe('PATCH /api/gastos/categorias', () => {
     await PATCH({ json: async () => body } as any)
     expect(mockPrisma.gasto.update).toHaveBeenCalledWith({
       where: { id: 3 },
+      data: { categoriaId: null },
+    })
+    expect(mockPrisma.gastoItem.updateMany).toHaveBeenCalledWith({
+      where: { pago: { gastoId: 3 } },
       data: { categoriaId: null },
     })
   })

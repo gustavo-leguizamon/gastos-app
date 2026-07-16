@@ -74,11 +74,11 @@ Hay dos capas de tests:
 | Route | Qué cubre | Test |
 |---|---|---|
 | `gastos/route.ts` | GET arma `where` desde query params; POST mapea body y aplica defaults. | `gastos/route.test.ts` |
-| `gastos/[id]/route.ts` | GET 404/mapeo; PUT mapping + sync de descripción a items propagados; DELETE. | `gastos/[id]/route.test.ts` |
+| `gastos/[id]/route.ts` | GET 404/mapeo; PUT mapping + sync de concepto+categoría+etiquetas a items propagados de tarjeta; DELETE. | `gastos/[id]/route.test.ts` |
 | `gastos/[id]/items/route.ts` | POST mapping y defaults de flags. | `gastos/[id]/items/route.test.ts` |
 | `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: shift +1/+2 según próximo cierre, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |
 | `reportes/route.ts` | GET arma el `where` (OR de meses, `esTarjeta:false`, filtros snake→camel) y delega en `computeReportes`. | `reportes/route.test.ts` |
-| `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción que **setea/limpia `categoriaId`** (categoría única) por gasto; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
+| `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción que **setea/limpia `categoriaId`** (categoría única) por gasto **y en sus sub-items propagados de tarjeta**; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
 
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.
