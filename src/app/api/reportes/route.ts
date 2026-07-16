@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   const casa_id = searchParams.get('casa_id')
   const tipo_pago = searchParams.get('tipo_pago')
   const categoriaIds = parseIds(searchParams.get('categoria_ids'))
+  const etiquetaIds = parseIds(searchParams.get('etiqueta_ids'))
   const tarjetaIds = parseIds(searchParams.get('tarjeta_ids'))
   const conceptoIds = parseIds(searchParams.get('concepto_ids'))
   const topParam = Number(searchParams.get('top'))
@@ -41,7 +42,8 @@ export async function GET(req: NextRequest) {
   if (!incluirTarjetas) where.esTarjeta = false
   if (casa_id) where.casaId = Number(casa_id)
   if (tipo_pago === 'C' || tipo_pago === 'D') where.tipoPago = tipo_pago
-  if (categoriaIds.length) where.categorias = { some: { id: { in: categoriaIds } } }
+  if (categoriaIds.length) where.categoriaId = { in: categoriaIds }
+  if (etiquetaIds.length) where.etiquetas = { some: { id: { in: etiquetaIds } } }
   if (tarjetaIds.length) where.tarjetaId = { in: tarjetaIds }
   if (conceptoIds.length) where.conceptoId = { in: conceptoIds }
 
@@ -49,10 +51,11 @@ export async function GET(req: NextRequest) {
   const gastos = await prisma.gasto.findMany({
     where,
     include: {
-      categorias: true,
+      categoria: true,
+      etiquetas: true,
       concepto: true,
       tarjeta: true,
-      items: porSubitem ? { include: { categorias: true, concepto: true } } : true,
+      items: porSubitem ? { include: { categoria: true, etiquetas: true, concepto: true } } : true,
     },
   })
 

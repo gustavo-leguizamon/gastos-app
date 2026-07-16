@@ -15,6 +15,7 @@ import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
+import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import Accordion from '@mui/material/Accordion'
@@ -32,7 +33,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
-import type { Gasto, GastoItem, Categoria } from '@/lib/types'
+import type { Gasto, GastoItem, Categoria, Etiqueta } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -48,7 +49,8 @@ type EditState = {
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
   verificado: boolean
-  categoria_ids: number[]
+  categoria_id: number | null
+  etiqueta_ids: number[]
 }
 
 interface Props {
@@ -66,8 +68,10 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [cuotasTotales, setCuotasTotales] = useState('')
   const [incluyeEnTotal, setIncluyeEnTotal] = useState(true)
   const [incluyeEnVencimiento, setIncluyeEnVencimiento] = useState(false)
-  const [categoriaIds, setCategoriaIds] = useState<number[]>([])
+  const [categoriaId, setCategoriaId] = useState<number | null>(null)
+  const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -79,6 +83,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
 
   useEffect(() => {
     fetch('/api/categorias').then(r => r.json()).then(setCategorias)
+    fetch('/api/etiquetas').then(r => r.json()).then(d => setEtiquetas(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -89,6 +94,26 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
       .then(d => setDescripciones(Array.isArray(d) ? d : []))
       .catch(() => setDescripciones([]))
   }, [gasto?.descripcion])
+
+  const byNombre = (a: { nombre: string }, b: { nombre: string }) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+  const crearCategoria = async (nombre: string) => {
+    try {
+      const res = await fetch('/api/categorias', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) })
+      if (!res.ok) throw new Error()
+      const c = await res.json()
+      setCategorias(prev => [...prev, c].sort(byNombre))
+      return { value: c.id, label: c.nombre }
+    } catch { toast.error('Error al crear categoría'); return null }
+  }
+  const crearEtiqueta = async (nombre: string) => {
+    try {
+      const res = await fetch('/api/etiquetas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) })
+      if (!res.ok) throw new Error()
+      const e = await res.json()
+      setEtiquetas(prev => [...prev, e].sort(byNombre))
+      return { value: e.id, label: e.nombre }
+    } catch { toast.error('Error al crear etiqueta'); return null }
+  }
 
   if (!gasto) return null
 
@@ -105,7 +130,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     incluye_en_total: item.incluye_en_total,
     incluye_en_vencimiento: item.incluye_en_vencimiento,
     verificado: item.verificado,
-    categoria_ids: item.categoria_ids ?? [],
+    categoria_id: item.categoria_id ?? null,
+    etiqueta_ids: item.etiqueta_ids ?? [],
   })
 
   const handleSaveEdit = async () => {
@@ -126,7 +152,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           incluye_en_total: editing.incluye_en_total,
           incluye_en_vencimiento: editing.incluye_en_vencimiento,
           verificado: editing.verificado,
-          categoria_ids: editing.categoria_ids,
+          categoria_id: editing.categoria_id,
+          etiqueta_ids: editing.etiqueta_ids,
         }),
       })
       if (!res.ok) throw new Error()
@@ -158,13 +185,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
           cuotas_totales: cuotasTotales ? Number(cuotasTotales) : null,
           incluye_en_total: incluyeEnTotal,
           incluye_en_vencimiento: incluyeEnVencimiento,
-          categoria_ids: categoriaIds,
+          categoria_id: categoriaId,
+          etiqueta_ids: etiquetaIds,
         }),
       })
       if (!res.ok) throw new Error()
       toast.success('Item agregado')
       setDescripcion(''); setMonto(''); setFecha(''); setCuotaActual(''); setCuotasTotales('')
-      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setCategoriaIds([])
+      setIncluyeEnTotal(true); setIncluyeEnVencimiento(false); setCategoriaId(null); setEtiquetaIds([])
       onChanged()
     } catch {
       toast.error('Error al agregar item')
@@ -205,7 +233,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     .filter(i => {
       if (!filtroItems.trim()) return true
       const q = filtroItems.toLowerCase()
-      return i.descripcion.toLowerCase().includes(q) || (i.categorias ?? []).some(c => c.nombre.toLowerCase().includes(q))
+      return i.descripcion.toLowerCase().includes(q)
+        || (i.categoria?.nombre.toLowerCase().includes(q) ?? false)
+        || (i.etiquetas ?? []).some(c => c.nombre.toLowerCase().includes(q))
     })
     .sort((a, b) => {
       if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
@@ -264,13 +294,23 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         />
         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>(opcional)</Typography>
       </Box>
-      <AppMultiSelect
-        label="Categorías (opcional)"
-        options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-        value={categoriaIds}
-        onChange={(v) => setCategoriaIds(v.map(Number))}
+      <AppSelect
+        label="Categoría"
+        options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+        value={categoriaId}
+        onChange={(v) => setCategoriaId(v == null ? null : Number(v))}
         fullWidth
-        placeholder="Sin especificar"
+        emptyLabel="Sin categoría"
+        onCreate={crearCategoria}
+      />
+      <AppMultiSelect
+        label="Etiquetas (opcional)"
+        options={etiquetas.map(e => ({ value: e.id, label: e.nombre }))}
+        value={etiquetaIds}
+        onChange={(v) => setEtiquetaIds(v.map(Number))}
+        fullWidth
+        placeholder="Sin etiquetas"
+        onCreate={crearEtiqueta}
       />
       <Box sx={{ display: 'flex', gap: 2 }}>
         <AppToggle
@@ -415,13 +455,23 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                         inputProps={{ min: 1, step: 1 }}
                       />
                     </Box>
-                    <AppMultiSelect
-                      label="Categorías (opcional)"
-                      options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
-                      value={editing.categoria_ids ?? []}
-                      onChange={(v) => setEditing(p => p ? { ...p, categoria_ids: v.map(Number) } : p)}
+                    <AppSelect
+                      label="Categoría"
+                      options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+                      value={editing.categoria_id ?? null}
+                      onChange={(v) => setEditing(p => p ? { ...p, categoria_id: v == null ? null : Number(v) } : p)}
                       fullWidth
-                      placeholder="Sin especificar"
+                      emptyLabel="Sin categoría"
+                      onCreate={crearCategoria}
+                    />
+                    <AppMultiSelect
+                      label="Etiquetas (opcional)"
+                      options={etiquetas.map(e => ({ value: e.id, label: e.nombre }))}
+                      value={editing.etiqueta_ids ?? []}
+                      onChange={(v) => setEditing(p => p ? { ...p, etiqueta_ids: v.map(Number) } : p)}
+                      fullWidth
+                      placeholder="Sin etiquetas"
+                      onCreate={crearEtiqueta}
                     />
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <AppToggle
@@ -467,7 +517,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                             Cuota {item.cuota_actual}{item.cuotas_totales != null ? `/${item.cuotas_totales}` : ''}
                           </Typography>
                         )}
-                        <CategoriasCell categorias={item.categorias} prefix="📍 " />
+                        {item.categoria && <CategoriasCell categorias={[item.categoria]} prefix="📁 " typographyProps={{ color: 'primary.main' }} />}
+                        <CategoriasCell categorias={item.etiquetas} prefix="🏷️ " />
                       </Box>
                     </Box>
                     <Typography variant="body2" fontWeight={600} sx={{ flexShrink: 0 }}>

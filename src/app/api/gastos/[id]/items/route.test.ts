@@ -25,7 +25,7 @@ function rawItem(overrides: Record<string, any> = {}) {
   return {
     id: 1, gastoId: 3, conceptoId: 1, concepto: { id: 1, nombre: 'Nafta' }, monto: 250, fecha: '2026-06-03',
     cuotaActual: null, cuotasTotales: null, incluyeEnTotal: true, incluyeEnVencimiento: false,
-    verificado: false, categorias: [],
+    verificado: false, etiquetas: [],
     createdAt: new Date('2026-06-03T00:00:00Z'),
     ...overrides,
   }
@@ -39,18 +39,18 @@ beforeEach(() => {
 
 describe('GET /api/gastos/[id]/items', () => {
   it('filtra por gastoId y mapea a snake_case', async () => {
-    mockPrisma.gastoItem.findMany.mockResolvedValue([rawItem({ categorias: [{ id: 9, nombre: 'Auto' }] })])
+    mockPrisma.gastoItem.findMany.mockResolvedValue([rawItem({ etiquetas: [{ id: 9, nombre: 'Auto' }] })])
     const res = await GET({} as any, { params: { id: '3' } })
     const body = await res.json()
     expect(mockPrisma.gastoItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { gastoId: 3 } }))
-    expect(body[0]).toMatchObject({ gasto_id: 3, categoria_ids: [9], incluye_en_total: true })
-    expect(body[0].categorias).toEqual([{ id: 9, nombre: 'Auto' }])
+    expect(body[0]).toMatchObject({ gasto_id: 3, etiqueta_ids: [9], incluye_en_total: true })
+    expect(body[0].etiquetas).toEqual([{ id: 9, nombre: 'Auto' }])
   })
 })
 
 describe('POST /api/gastos/[id]/items', () => {
   it('mapea body y aplica defaults de los flags', async () => {
-    mockPrisma.gastoItem.create.mockImplementation(async ({ data }: any) => rawItem({ ...data, id: 50, categorias: [] }))
+    mockPrisma.gastoItem.create.mockImplementation(async ({ data }: any) => rawItem({ ...data, id: 50, etiquetas: [] }))
     const res = await POST({ json: async () => ({ descripcion: 'Carne', monto: 100 }) } as any, { params: { id: '3' } })
 
     expect(res.status).toBe(201)
@@ -61,13 +61,13 @@ describe('POST /api/gastos/[id]/items', () => {
       incluyeEnTotal: true, incluyeEnVencimiento: false,
     })
     expect(data).not.toHaveProperty('descripcion')
-    expect(data.categorias).toEqual({ connect: [] })
+    expect(data.etiquetas).toEqual({ connect: [] })
   })
 
   it('respeta los flags explícitos del body y conecta categorías', async () => {
-    mockPrisma.gastoItem.create.mockImplementation(async ({ data }: any) => rawItem({ ...data, id: 51, categorias: [] }))
+    mockPrisma.gastoItem.create.mockImplementation(async ({ data }: any) => rawItem({ ...data, id: 51, etiquetas: [] }))
     await POST({
-      json: async () => ({ descripcion: 'TV', monto: 200, fecha: '2026-06-10', incluye_en_total: false, incluye_en_vencimiento: true, categoria_ids: [4, 7], cuota_actual: 1, cuotas_totales: 12 }),
+      json: async () => ({ descripcion: 'TV', monto: 200, fecha: '2026-06-10', incluye_en_total: false, incluye_en_vencimiento: true, etiqueta_ids: [4, 7], cuota_actual: 1, cuotas_totales: 12 }),
     } as any, { params: { id: '3' } })
 
     const data = mockPrisma.gastoItem.create.mock.calls[0][0].data
@@ -75,6 +75,6 @@ describe('POST /api/gastos/[id]/items', () => {
       fecha: '2026-06-10', incluyeEnTotal: false, incluyeEnVencimiento: true,
       cuotaActual: 1, cuotasTotales: 12,
     })
-    expect(data.categorias).toEqual({ connect: [{ id: 4 }, { id: 7 }] })
+    expect(data.etiquetas).toEqual({ connect: [{ id: 4 }, { id: 7 }] })
   })
 })

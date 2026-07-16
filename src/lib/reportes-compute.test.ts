@@ -8,7 +8,9 @@ function gasto(overrides: Record<string, any> = {}) {
     totalMoneda: 1000,
     tipoCambio: 1,
     confirmado: true,
-    categorias: [],
+    categoriaId: null,
+    categoria: null,
+    etiquetas: [],
     items: [],
     mes: 6,
     anio: 2026,
@@ -74,24 +76,44 @@ describe('computeReportes', () => {
     expect(r.kpis.total).toBe(150000)
   })
 
-  it('atribuye el monto COMPLETO a cada categoría del gasto (overlap)', () => {
+  it('por_categoria es partición: cada gasto cuenta una vez en su categoría única (suma = total)', () => {
     const r = computeReportes(
-      [gasto({ totalMoneda: 1000, categorias: [{ id: 1, nombre: 'Auto' }, { id: 2, nombre: 'Super' }] })],
+      [
+        gasto({ totalMoneda: 100, categoriaId: 1, categoria: { id: 1, nombre: 'Auto' } }),
+        gasto({ totalMoneda: 300, categoriaId: 2, categoria: { id: 2, nombre: 'Super' } }),
+        gasto({ totalMoneda: 200, categoriaId: 1, categoria: { id: 1, nombre: 'Auto' } }),
+      ],
       months,
     )
-    const auto = r.por_categoria.find((c) => c.id === 1)
-    const super_ = r.por_categoria.find((c) => c.id === 2)
-    expect(auto?.total_ars).toBe(1000)
-    expect(super_?.total_ars).toBe(1000)
-    // el total del KPI cuenta el gasto una sola vez
-    expect(r.kpis.total).toBe(1000)
+    expect(r.por_categoria.find((c) => c.id === 1)?.total_ars).toBe(300)
+    expect(r.por_categoria.find((c) => c.id === 2)?.total_ars).toBe(300)
+    const sumaCategorias = r.por_categoria.reduce((s, c) => s + c.total_ars, 0)
+    expect(sumaCategorias).toBe(r.kpis.total)
   })
 
-  it('agrupa los gastos sin categoría en "Sin categoría" (id null)', () => {
-    const r = computeReportes([gasto({ totalMoneda: 500, categorias: [] })], months)
+  it('gastos sin categoría van a "Sin categoría" (id null)', () => {
+    const r = computeReportes([gasto({ totalMoneda: 500 })], months)
     const sin = r.por_categoria.find((c) => c.id === null)
     expect(sin?.nombre).toBe('Sin categoría')
     expect(sin?.total_ars).toBe(500)
+  })
+
+  it('por_etiqueta es cobertura: monto completo a cada etiqueta (puede superar el total)', () => {
+    const r = computeReportes(
+      [gasto({ totalMoneda: 1000, etiquetas: [{ id: 1, nombre: 'Viaje' }, { id: 2, nombre: 'Deducible' }] })],
+      months,
+    )
+    expect(r.por_etiqueta.find((e) => e.id === 1)?.total_ars).toBe(1000)
+    expect(r.por_etiqueta.find((e) => e.id === 2)?.total_ars).toBe(1000)
+    // el KPI cuenta el gasto una sola vez, aunque las etiquetas se solapen
+    expect(r.kpis.total).toBe(1000)
+  })
+
+  it('gastos sin etiqueta van a "Sin etiqueta" (id null)', () => {
+    const r = computeReportes([gasto({ totalMoneda: 400, etiquetas: [] })], months)
+    const sin = r.por_etiqueta.find((e) => e.id === null)
+    expect(sin?.nombre).toBe('Sin etiqueta')
+    expect(sin?.total_ars).toBe(400)
   })
 
   it('agrega por mes y deja en 0 los meses sin gastos', () => {
@@ -169,15 +191,16 @@ describe('computeReportes', () => {
 describe('computeReporteSubitems', () => {
   const months = enumerateMonths(6, 2026, 6, 2026)
 
-  it('desglosa por la categoría y monto de cada sub-item incluido en total', () => {
+  it('desglosa por la categoría (única) y monto de cada sub-item incluido en total', () => {
     const r = computeReporteSubitems(
       [gasto({
         totalMoneda: 9999, // se ignora: se usan los sub-items
-        categorias: [{ id: 9, nombre: 'Genérica' }],
+        categoriaId: 9,
+        categoria: { id: 9, nombre: 'Genérica' },
         items: [
-          { monto: 60, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categorias: [{ id: 1, nombre: 'Super' }] },
-          { monto: 40, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categorias: [{ id: 2, nombre: 'Hogar' }] },
-          { monto: 999, incluyeEnTotal: false, conceptoId: 13, concepto: { id: 13, nombre: 'X' }, categorias: [] },
+          { monto: 60, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categoriaId: 1, categoria: { id: 1, nombre: 'Super' }, etiquetas: [] },
+          { monto: 40, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categoriaId: 2, categoria: { id: 2, nombre: 'Hogar' }, etiquetas: [] },
+          { monto: 999, incluyeEnTotal: false, conceptoId: 13, concepto: { id: 13, nombre: 'X' }, categoriaId: null, categoria: null, etiquetas: [] },
         ],
       })],
       months,
@@ -190,9 +213,22 @@ describe('computeReporteSubitems', () => {
     expect(r.top_conceptos.map((c) => c.nombre).sort()).toEqual(['Comida', 'Limpieza'])
   })
 
+  it('desglosa las etiquetas de cada sub-item (cobertura)', () => {
+    const r = computeReporteSubitems(
+      [gasto({
+        items: [
+          { monto: 60, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categoriaId: null, categoria: null, etiquetas: [{ id: 7, nombre: 'Viaje' }] },
+          { monto: 40, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'B' }, categoriaId: null, categoria: null, etiquetas: [{ id: 7, nombre: 'Viaje' }] },
+        ],
+      })],
+      months,
+    )
+    expect(r.por_etiqueta.find((e) => e.id === 7)?.total_ars).toBe(100)
+  })
+
   it('cae al nivel gasto cuando no hay sub-items incluidos en total', () => {
     const r = computeReporteSubitems(
-      [gasto({ totalMoneda: 500, categorias: [{ id: 5, nombre: 'Auto' }], items: [] })],
+      [gasto({ totalMoneda: 500, categoriaId: 5, categoria: { id: 5, nombre: 'Auto' }, items: [] })],
       months,
     )
     expect(r.kpis.total).toBe(500)
@@ -201,7 +237,7 @@ describe('computeReporteSubitems', () => {
 
   it('sub-item sin categoría cae en "Sin categoría"', () => {
     const r = computeReporteSubitems(
-      [gasto({ items: [{ monto: 80, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categorias: [] }] })],
+      [gasto({ items: [{ monto: 80, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categoriaId: null, categoria: null, etiquetas: [] }] })],
       months,
     )
     expect(r.por_categoria.find((c) => c.id === null)?.total_ars).toBe(80)
@@ -210,8 +246,8 @@ describe('computeReporteSubitems', () => {
   it('cantidad_gastos cuenta filas de gasto, no unidades', () => {
     const r = computeReporteSubitems(
       [gasto({ items: [
-        { monto: 10, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categorias: [] },
-        { monto: 20, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'B' }, categorias: [] },
+        { monto: 10, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categoriaId: null, categoria: null, etiquetas: [] },
+        { monto: 20, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'B' }, categoriaId: null, categoria: null, etiquetas: [] },
       ] })],
       months,
     )

@@ -56,9 +56,10 @@ El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccio
 - `value: string | number | null` + `onChange(v)` — controlado.
 - `emptyLabel?: string` — agrega opción al inicio (ej. "Todas") cuyo onChange reporta `null`.
 - `disableClearable?: boolean`.
+- `onCreate?: (nombre) => Promise<{value,label} | null>` — si se provee, habilita **crear** una opción tipeando (freeSolo + item "Agregar «X»"); debe persistirla y devolver la nueva opción (o null si falla). Cuando no se pasa, el comportamiento es idéntico al anterior (sin freeSolo ni filtro custom).
 - `size`, `fullWidth`, `sx`, `error`, `helperText`, `placeholder` — passthrough.
 
-Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `BrandLogo`, Moneda), `CopiarGastoDialog` (Mes/Año destino), `CopiarMesDialog` (Mes/Año origen + destino).
+Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `BrandLogo`, Moneda, **Categoría con `onCreate`**), `GastoItemDialog` (Categoría con `onCreate`), `CopiarGastoDialog`/`CopiarMesDialog` (Mes/Año).
 
 **Excepción:** `configuracion/page.tsx` → `estim_missing_behavior` (2 opciones) sigue con `Select` clásico.
 
@@ -68,9 +69,10 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Casa, Tarjeta con `render` para `
 - `label: string`
 - `options: { value, label, render? }[]` — `value` es `string | number`. `render?: () => ReactNode` opcional para mostrar contenido rico (íconos, logos) en el item del dropdown (igual que `AppSelect`); los chips seleccionados siguen usando `label`.
 - `value: (string | number)[]` + `onChange(values)` — controlado.
+- `onCreate?: (nombre) => Promise<{value,label} | null>` — igual que en `AppSelect`: habilita crear tipeando ("Agregar «X»"). Sin `onCreate`, comportamiento idéntico al anterior.
 - `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
 
-Usado para relaciones M2M: `GastoForm` (Categorías) y `GastoItemDialog` (Categorías alta + edición). También en `ReportesFiltros` (Categorías, Tarjetas con `render` para `BrandLogo`, Conceptos).
+Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas con `onCreate`), `GastoItemDialog` (Etiquetas con `onCreate`), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos).
 
 ## CategoriasCell
 

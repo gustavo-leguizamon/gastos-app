@@ -18,7 +18,7 @@ const mockPrisma = prisma as unknown as {
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('PATCH /api/gastos/categorias', () => {
-  it('agrega (connect) una categoría a varios gastos en una transacción', async () => {
+  it('asigna (set) la categoría única a varios gastos en una transacción', async () => {
     const body = { gasto_ids: [1, 2], categoria_id: 7, action: 'add' }
     const res = await PATCH({ json: async () => body } as any)
 
@@ -26,21 +26,21 @@ describe('PATCH /api/gastos/categorias', () => {
     expect(mockPrisma.gasto.update).toHaveBeenCalledTimes(2)
     expect(mockPrisma.gasto.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { categorias: { connect: { id: 7 } } },
+      data: { categoriaId: 7 },
     })
     expect(mockPrisma.gasto.update).toHaveBeenCalledWith({
       where: { id: 2 },
-      data: { categorias: { connect: { id: 7 } } },
+      data: { categoriaId: 7 },
     })
     expect(await res.json()).toEqual({ ok: true, updated: 2 })
   })
 
-  it('quita (disconnect) una categoría', async () => {
+  it('quita (clear) la categoría única', async () => {
     const body = { gasto_ids: [3], categoria_id: 4, action: 'remove' }
     await PATCH({ json: async () => body } as any)
     expect(mockPrisma.gasto.update).toHaveBeenCalledWith({
       where: { id: 3 },
-      data: { categorias: { disconnect: { id: 4 } } },
+      data: { categoriaId: null },
     })
   })
 

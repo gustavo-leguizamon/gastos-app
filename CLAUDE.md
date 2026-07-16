@@ -78,7 +78,7 @@ Hay dos capas de tests:
 | `gastos/[id]/items/route.ts` | POST mapping y defaults de flags. | `gastos/[id]/items/route.test.ts` |
 | `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: shift +1/+2 según próximo cierre, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |
 | `reportes/route.ts` | GET arma el `where` (OR de meses, `esTarjeta:false`, filtros snake→camel) y delega en `computeReportes`. | `reportes/route.test.ts` |
-| `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción de `connect`/`disconnect` por gasto; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
+| `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción que **setea/limpia `categoriaId`** (categoría única) por gasto; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
 
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.
@@ -113,7 +113,7 @@ El Prisma schema usa **camelCase** (`casaId`, `tipoPago`, `totalMoneda`, etc.), 
 | `tipo_cambio` | Exchange rate to ARS; always 1 when `moneda.codigo === 'ARS'` |
 | `mes` / `anio` | Explicit month/year stored on each expense (not derived from `fechaVencimiento`) |
 | `confirmado` | Si el monto está confirmado. Default `true` en alta; siempre `false` al copiar. Filas no confirmadas se renderizan con fondo naranja e icono warning. "Total ARS" muestra suma de sub-items (en naranja) en vez de `totalMoneda × tipoCambio` cuando no confirmado y hay items. |
-| `categoria_ids` / `categorias` | Relación **muchos-a-muchos** con `Categoria` (ej: Auto, Supermercado, Mascotas) en `Gasto` y `GastoItem`. API expone `categoria_ids: number[]` (body) y `categorias: {id,nombre}[]` (display). UI usa `AppMultiSelect`. Ver `docs/claude/gastos-core.md`. |
+| `categoria_id` / `categoria` · `etiqueta_ids` / `etiquetas` | Dos ejes en `Gasto`/`GastoItem`: **categoría** = FK **único** (`categoria_id` body / `categoria` display) = partición para el reporte (una por gasto); **etiquetas** = **M2M** (`etiqueta_ids` body / `etiquetas` display) = corte transversal (varias, se solapan). CRUD en `/api/categorias` y `/api/etiquetas`. Ver `docs/claude/gastos-core.md`. |
 | `concepto_id` / `descripcion` | El "qué" de un gasto/sub-item es la entidad **`Concepto`** (relación 1-a-muchos), no texto libre — la columna `descripcion` **no existe** en la DB. `Gasto`/`GastoItem` tienen `conceptoId` (FK obligatoria). La API expone `descripcion` derivada de `concepto.nombre` + `concepto_id`. Los write paths reciben texto y resuelven con `resolveConcepto()` (find-or-create case-insensitive). El match de analytics (evolución, estimado, copiar) es por `conceptoId`. Ver `docs/claude/gastos-core.md` → Conceptos. |
 
 ## Dates and timezones (IMPORTANT)

@@ -46,11 +46,22 @@ model TarjetaCierre {
   @@unique([tarjetaId, mes, anio])
 }
 
+// Categoría: partición (una por gasto/item) — responde "¿en qué rubro se fue la plata?".
+// Es la dimensión canónica del reporte por categoría (suma 100%, sin duplicar).
 model Categoria {
   id     Int         @id @default(autoincrement())
   nombre String
-  gastos Gasto[]     @relation("GastoCategorias")
-  items  GastoItem[] @relation("GastoItemCategorias")
+  gastos Gasto[]
+  items  GastoItem[]
+}
+
+// Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito
+// (ej. "Viaje", "Deducible", "Compartido"). Migradas desde el viejo M2M de Categoria.
+model Etiqueta {
+  id     Int         @id @default(autoincrement())
+  nombre String
+  gastos Gasto[]     @relation("GastoEtiquetas")
+  items  GastoItem[] @relation("GastoItemEtiquetas")
 }
 
 // Concepto: entidad canónica del "qué" de un gasto/sub-item (ej: Netflix, Luz, Expensas).
@@ -88,11 +99,14 @@ model Gasto {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
+  categoriaId          Int?
+
   casa    Casa     @relation(fields: [casaId], references: [id])
   moneda  Moneda   @relation(fields: [monedaId], references: [id])
   tarjeta   Tarjeta?   @relation(fields: [tarjetaId], references: [id])
   concepto  Concepto   @relation(fields: [conceptoId], references: [id])
-  categorias Categoria[] @relation("GastoCategorias")
+  categoria  Categoria? @relation(fields: [categoriaId], references: [id])
+  etiquetas Etiqueta[] @relation("GastoEtiquetas")
   pagos     Pago[]
   items     GastoItem[]
 }
@@ -109,11 +123,13 @@ model GastoItem {
   incluyeEnVencimiento Boolean  @default(false)
   verificado           Boolean  @default(false)
   pagoId               Int?
+  categoriaId          Int?
   createdAt            DateTime @default(now())
 
   gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
   concepto  Concepto   @relation(fields: [conceptoId], references: [id])
-  categorias Categoria[] @relation("GastoItemCategorias")
+  categoria  Categoria? @relation(fields: [categoriaId], references: [id])
+  etiquetas Etiqueta[] @relation("GastoItemEtiquetas")
   pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
 }
 

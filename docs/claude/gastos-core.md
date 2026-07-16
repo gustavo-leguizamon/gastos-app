@@ -69,7 +69,18 @@ Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en venci
 
 **Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y `sortModel` controlado. Al click en header el sort aplica solo a filas de gasto (vía `sortGastos()`), y `buildFlatRows` arma flat rows desde los gastos ya ordenados. Sub-items y fila de totales quedan pegados al padre. Comparador soporta `number` y strings (`localeCompare`); nulos al final.
 
-Ambos `Gasto` y `GastoItem` tienen una relación **muchos-a-muchos** con `Categoria` (`categorias`), no un FK único. Implementada como relaciones implícitas de Prisma con nombres `GastoCategorias` (join table `_GastoCategorias`) y `GastoItemCategorias` (join table `_GastoItemCategorias`). En la API se exponen como `categoria_ids: number[]` (para el body de alta/edición) y `categorias: {id, nombre}[]` (para display). En el form/dialog se usa el componente `AppMultiSelect` (chips). El POST conecta con `{ connect: ids.map(id => ({ id })) }`; el PUT reemplaza con `{ set: ids.map(...) }`. Migración desde el FK único `categoriaId` (anteriormente single, renombrado de `Lugar`): se hizo por etapas con `prisma db push` + SQL de copia a las join tables, preservando las asignaciones existentes.
+## Categorías y etiquetas
+
+`Gasto` y `GastoItem` se clasifican en **dos ejes distintos**:
+
+- **Categoría** — **FK único** (`categoriaId` nullable → `categoria`). Es la *partición* ("¿en qué rubro se fue la plata?"): una por gasto/ítem, de modo que el reporte por categoría suma 100% sin duplicar. En la API: `categoria_id: number | null` (body) + `categoria: {id,nombre} | null` (display). Modelo Prisma `Categoria` (relación 1-a-muchos). CRUD en `/api/categorias` (`GET/POST` + `PUT/DELETE [id]`).
+- **Etiquetas** — relación **muchos-a-muchos** (`Etiqueta`, relaciones implícitas `GastoEtiquetas`/`GastoItemEtiquetas`). Es el *corte transversal* ("¿qué gastos son del viaje / deducibles?"): varias por gasto/ítem, se solapan a propósito. En la API: `etiqueta_ids: number[]` (body) + `etiquetas: {id,nombre}[]` (display). CRUD en `/api/etiquetas`. Write paths: POST conecta con `{ connect }`, PUT reemplaza con `{ set }`.
+
+**UI:** `GastoForm` y `GastoItemDialog` usan `AppSelect` (categoría única, emptyLabel "Sin categoría") + `AppMultiSelect` (etiquetas), ambos con `onCreate` para alta inline. `GastosTable` muestra categoría (color primary) + etiquetas (🏷️) en grilla/cards/sub-ítems; la búsqueda incluye ambas. La **edición masiva** (`PATCH /api/gastos/categorias` + `BulkCategoriasBar`) **asigna/limpia la categoría única** (backfill). ABM de ambas en `/configuracion`.
+
+**Reportes:** `por_categoria` (partición) usa la categoría única; `por_etiqueta` (cobertura) usa las etiquetas. Ver [reportes](reportes.md).
+
+**Origen:** venían de un único M2M `Categoria` (antes FK único `categoriaId`, renombrado de `Lugar`). La migración a este modelo (categoría única + etiquetas) se hizo con `scripts/migrate-categorias-etiquetas.sql` (archival): copió el M2M viejo a `Etiqueta` y reusó `Categoria` como la lista de categorías únicas, con `categoriaId` arrancando vacío.
 
 `GastoItemDialog` layout 2-col (`maxWidth="md"`, height 90vh): izq (340px) resumen + add form; der lista scrollable. Overflow independiente. La columna derecha tiene un buscador (`filtroItems`) arriba de la lista que filtra los sub-items por descripción y categoría (case-insensitive); el resumen de la izquierda sigue calculándose sobre todos los items, no sobre los filtrados.
 

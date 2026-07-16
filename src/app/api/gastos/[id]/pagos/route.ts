@@ -109,7 +109,8 @@ async function propagatePagoToTarjeta(opts: {
       incluyeEnTotal: true,
       incluyeEnVencimiento: false,
       pagoId: opts.pagoId,
-      categorias: { connect: (source.categorias ?? []).map((c: any) => ({ id: c.id })) },
+      categoriaId: source.categoriaId ?? null,
+      etiquetas: { connect: (source.etiquetas ?? []).map((c: any) => ({ id: c.id })) },
       cuotaActual: source.cuotaActual ?? null,
       cuotasTotales: source.cuotasTotales ?? null,
     },
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // tarjeta. El período destino se calcula de forma absoluta a partir de la fecha del
   // pago y el día de cierre de la tarjeta (no del mes/año en que esté clasificado el
   // gasto fuente).
-  const source = await prisma.gasto.findUnique({ where: { id: gastoId }, include: { categorias: true } })
+  const source = await prisma.gasto.findUnique({ where: { id: gastoId }, include: { etiquetas: true } })
   const esCredito = source?.tipoPago === 'C' && !!source?.tarjetaId
 
   let target: { mes: number; anio: number } | null = null

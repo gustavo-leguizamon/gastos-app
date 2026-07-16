@@ -7,16 +7,17 @@
 // `incluyeEnTotal`; en caso contrario `totalMoneda × tipoCambio`.
 //
 // La agregación trabaja sobre "unidades" (`Unit`): cada unidad tiene un monto y las
-// dimensiones (categorías, concepto, tarjeta, tipo de pago, mes). Hay dos formas de
-// generar unidades a partir de los gastos:
+// dimensiones. Hay dos formas de generar unidades a partir de los gastos:
 //   - `gastosToUnits`      → una unidad por gasto (nivel gasto).
 //   - `gastosToSubitemUnits`→ una unidad por sub-item `incluyeEnTotal`; si el gasto no
-//                             tiene sub-items elegibles, cae al nivel gasto. Da la
-//                             distribución real por categoría/monto de cada sub-item.
+//                             tiene sub-items elegibles, cae al nivel gasto.
 //
-// Atribución por categoría: una unidad con N categorías suma su monto COMPLETO a cada
-// una ("cuánto tocó la categoría X"). Registrar 1 categoría por unidad evita duplicar.
-// Unidades sin categorías caen en "Sin categoría".
+// Dimensiones de categorización (modelo nuevo):
+//   - **categoría** (única por unidad) → PARTICIÓN: `por_categoria` suma 100% del total,
+//     sin duplicar. Unidades sin categoría caen en "Sin categoría".
+//   - **etiquetas** (varias por unidad) → COBERTURA: `por_etiqueta` suma el monto COMPLETO
+//     a cada etiqueta (se solapan a propósito, puede superar el total). Sin etiquetas →
+//     "Sin etiqueta".
 //
 // Los gastos `esTarjeta` (resúmenes contenedores) se excluyen en la route por defecto
 // para no doble-contar los consumos, que ya existen como gastos individuales.
@@ -62,6 +63,7 @@ export interface ReporteResult {
     meses: number
   }
   por_categoria: CategoriaBucket[]
+  por_etiqueta: CategoriaBucket[]
   por_mes: MesBucket[]
   top_conceptos: ConceptoBucket[]
   por_tarjeta: TarjetaBucket[]
@@ -104,7 +106,9 @@ function gastoTotalArs(g: any): number {
 
 interface Unit {
   monto: number
-  categorias: { id: number; nombre: string }[]
+  categoriaId: number | null
+  categoriaNombre: string | null
+  etiquetas: { id: number; nombre: string }[]
   conceptoId: number
   conceptoNombre: string
   mes: number
@@ -122,7 +126,9 @@ function normTipo(t: any): 'C' | 'D' | null {
 export function gastosToUnits(gastos: any[]): Unit[] {
   return gastos.map((g) => ({
     monto: gastoTotalArs(g),
-    categorias: g.categorias ?? [],
+    categoriaId: g.categoriaId ?? null,
+    categoriaNombre: g.categoria?.nombre ?? null,
+    etiquetas: g.etiquetas ?? [],
     conceptoId: g.conceptoId,
     conceptoNombre: g.concepto?.nombre ?? '—',
     mes: g.mes,
@@ -134,7 +140,8 @@ export function gastosToUnits(gastos: any[]): Unit[] {
 }
 
 // Una unidad por sub-item `incluyeEnTotal`; si el gasto no tiene sub-items elegibles,
-// cae al nivel gasto. Las dimensiones de tarjeta/tipo de pago/mes son las del gasto padre.
+// cae al nivel gasto. Las dimensiones de tarjeta/tipo de pago/mes son las del gasto padre;
+// la categoría/etiquetas son las del sub-item (o del gasto en el fallback).
 export function gastosToSubitemUnits(gastos: any[]): Unit[] {
   const out: Unit[] = []
   for (const g of gastos) {
@@ -143,7 +150,9 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
       for (const it of itemsIncl) {
         out.push({
           monto: it.monto,
-          categorias: it.categorias ?? [],
+          categoriaId: it.categoriaId ?? null,
+          categoriaNombre: it.categoria?.nombre ?? null,
+          etiquetas: it.etiquetas ?? [],
           conceptoId: it.conceptoId,
           conceptoNombre: it.concepto?.nombre ?? '—',
           mes: g.mes,
@@ -156,7 +165,9 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
     } else {
       out.push({
         monto: gastoTotalArs(g),
-        categorias: g.categorias ?? [],
+        categoriaId: g.categoriaId ?? null,
+        categoriaNombre: g.categoria?.nombre ?? null,
+        etiquetas: g.etiquetas ?? [],
         conceptoId: g.conceptoId,
         conceptoNombre: g.concepto?.nombre ?? '—',
         mes: g.mes,
@@ -197,6 +208,7 @@ function aggregateUnits(
   }
 
   const catMap = new Map<string, CategoriaBucket>()
+  const etiqMap = new Map<string, CategoriaBucket>()
   const conMap = new Map<number, ConceptoBucket>()
   const tarjMap = new Map<string, TarjetaBucket>()
   const tipoMap = new Map<'C' | 'D', TipoPagoBucket>()
@@ -208,22 +220,29 @@ function aggregateUnits(
     const mb = mesMap.get(`${u.anio}-${u.mes}`)
     if (mb) mb.total_ars += u.monto
 
-    if (u.categorias.length === 0) {
-      const ex = catMap.get('null') ?? { id: null, nombre: 'Sin categoría', total_ars: 0 }
+    // Categoría: partición (una por unidad).
+    const ckey = u.categoriaId == null ? 'null' : String(u.categoriaId)
+    const ce = catMap.get(ckey) ?? { id: u.categoriaId, nombre: u.categoriaNombre ?? 'Sin categoría', total_ars: 0 }
+    ce.total_ars += u.monto
+    catMap.set(ckey, ce)
+
+    // Etiquetas: cobertura (monto completo a cada una; sin etiquetas → "Sin etiqueta").
+    if (u.etiquetas.length === 0) {
+      const ex = etiqMap.get('null') ?? { id: null, nombre: 'Sin etiqueta', total_ars: 0 }
       ex.total_ars += u.monto
-      catMap.set('null', ex)
+      etiqMap.set('null', ex)
     } else {
-      for (const c of u.categorias) {
-        const key = String(c.id)
-        const ex = catMap.get(key) ?? { id: c.id, nombre: c.nombre, total_ars: 0 }
+      for (const e of u.etiquetas) {
+        const key = String(e.id)
+        const ex = etiqMap.get(key) ?? { id: e.id, nombre: e.nombre, total_ars: 0 }
         ex.total_ars += u.monto
-        catMap.set(key, ex)
+        etiqMap.set(key, ex)
       }
     }
 
-    const ce = conMap.get(u.conceptoId) ?? { concepto_id: u.conceptoId, nombre: u.conceptoNombre, total_ars: 0 }
-    ce.total_ars += u.monto
-    conMap.set(u.conceptoId, ce)
+    const cce = conMap.get(u.conceptoId) ?? { concepto_id: u.conceptoId, nombre: u.conceptoNombre, total_ars: 0 }
+    cce.total_ars += u.monto
+    conMap.set(u.conceptoId, cce)
 
     const tkey = u.tarjetaId == null ? 'null' : String(u.tarjetaId)
     const te = tarjMap.get(tkey) ?? { id: u.tarjetaId, nombre: u.tarjetaNombre ?? 'Sin tarjeta', total_ars: 0 }
@@ -241,9 +260,10 @@ function aggregateUnits(
     const b = mesMap.get(`${anio}-${mes}`)!
     return { ...b, total_ars: r(b.total_ars) }
   })
-  const por_categoria = Array.from(catMap.values())
-    .map((c) => ({ ...c, total_ars: r(c.total_ars) }))
-    .sort((a, b) => b.total_ars - a.total_ars)
+  const sortByTotalDesc = (m: Map<string, CategoriaBucket>) =>
+    Array.from(m.values()).map((c) => ({ ...c, total_ars: r(c.total_ars) })).sort((a, b) => b.total_ars - a.total_ars)
+  const por_categoria = sortByTotalDesc(catMap)
+  const por_etiqueta = sortByTotalDesc(etiqMap)
   const top_conceptos = Array.from(conMap.values())
     .map((c) => ({ ...c, total_ars: r(c.total_ars) }))
     .sort((a, b) => b.total_ars - a.total_ars)
@@ -264,6 +284,7 @@ function aggregateUnits(
       meses,
     },
     por_categoria,
+    por_etiqueta,
     por_mes,
     top_conceptos,
     por_tarjeta,

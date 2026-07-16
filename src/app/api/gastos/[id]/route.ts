@@ -8,9 +8,10 @@ const INCLUDE = {
   moneda: true,
   tarjeta: { include: { cierres: true } },
   concepto: true,
-  categorias: true,
+  categoria: true,
+  etiquetas: true,
   pagos: { orderBy: { createdAt: 'asc' as const } },
-  items: { orderBy: { createdAt: 'asc' as const }, include: { concepto: true, categorias: true } },
+  items: { orderBy: { createdAt: 'asc' as const }, include: { concepto: true, categoria: true, etiquetas: true } },
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -44,7 +45,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       anio: body.anio,
       notas: body.notas || null,
       confirmado: body.confirmado ?? true,
-      categorias: { set: (body.categoria_ids ?? []).map((id: number) => ({ id })) },
+      categoriaId: body.categoria_id ?? null,
+      etiquetas: { set: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
       esTarjeta: body.es_tarjeta ?? false,
     },
     include: INCLUDE,
