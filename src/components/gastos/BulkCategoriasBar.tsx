@@ -105,7 +105,7 @@ export default function BulkCategoriasBar({ count, totalFiltrados, allSelected, 
         disabled={disabled}
         onClick={() => apply('add')}
       >
-        Agregar
+        Asignar
       </Button>
       <Button
         variant="outlined"
@@ -115,7 +115,7 @@ export default function BulkCategoriasBar({ count, totalFiltrados, allSelected, 
         disabled={disabled}
         onClick={() => apply('remove')}
       >
-        Quitar
+        Quitar categoría
       </Button>
 
       <IconButton size="small" onClick={onCancel} aria-label="Cerrar selección">

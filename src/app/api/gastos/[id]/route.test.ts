@@ -30,7 +30,7 @@ function rawGasto(overrides: Record<string, any> = {}) {
   return {
     id: 1, casaId: 10, conceptoId: 1, concepto: { id: 1, nombre: 'Internet' }, fechaVencimiento: '2026-06-10',
     tipoPago: 'D', monedaId: 2, tipoCambio: 1, totalMoneda: 1000,
-    pasajeMesSiguiente: 0, prestamo_a_otro: 0, tarjetaId: null, categorias: [],
+    pasajeMesSiguiente: 0, prestamo_a_otro: 0, tarjetaId: null, etiquetas: [],
     cuotaActual: null, cuotasTotales: null, mes: 6, anio: 2026, notas: null,
     confirmado: true, esTarjeta: false,
     createdAt: new Date('2026-06-01T00:00:00Z'), updatedAt: new Date('2026-06-02T00:00:00Z'),

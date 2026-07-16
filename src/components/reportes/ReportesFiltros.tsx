@@ -9,7 +9,7 @@ import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import BrandLogo from '@/components/shared/BrandLogo'
 import { shiftMonth } from '@/lib/fechas'
-import type { FiltrosReporte, Casa, Categoria, Tarjeta, Concepto } from '@/lib/types'
+import type { FiltrosReporte, Casa, Categoria, Etiqueta, Tarjeta, Concepto } from '@/lib/types'
 
 export type Preset = 'mes' | '3' | '6' | '12' | 'anio' | 'custom'
 
@@ -20,6 +20,7 @@ interface Props {
   setPreset: (p: Preset) => void
   casas: Casa[]
   categorias: Categoria[]
+  etiquetas: Etiqueta[]
   tarjetas: Tarjeta[]
   conceptos: Concepto[]
   /** Modo mes único: oculta presets/rango y muestra un solo selector de mes/año. */
@@ -41,7 +42,7 @@ export function presetRange(p: Exclude<Preset, 'custom'>): Pick<FiltrosReporte, 
   return { mes_desde: d.mes, anio_desde: d.anio, ...hasta }
 }
 
-export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset, casas, categorias, tarjetas, conceptos, mesUnico }: Props) {
+export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset, casas, categorias, etiquetas, tarjetas, conceptos, mesUnico }: Props) {
   const now = new Date()
   const years = Array.from({ length: 8 }, (_, i) => now.getFullYear() + 1 - i)
   const mesOpts = MESES.map((m, i) => ({ value: i + 1, label: m }))
@@ -112,6 +113,14 @@ export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset
           options={categorias.map((c) => ({ value: c.id, label: c.nombre }))}
           value={filtros.categoria_ids}
           onChange={(v) => setFiltros({ ...filtros, categoria_ids: v.map(Number) })}
+          placeholder="Todas"
+          fullWidth
+        />
+        <AppMultiSelect
+          label="Etiquetas"
+          options={etiquetas.map((e) => ({ value: e.id, label: e.nombre }))}
+          value={filtros.etiqueta_ids}
+          onChange={(v) => setFiltros({ ...filtros, etiqueta_ids: v.map(Number) })}
           placeholder="Todas"
           fullWidth
         />

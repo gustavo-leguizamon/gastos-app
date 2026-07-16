@@ -20,7 +20,9 @@ function rawGasto(overrides: Record<string, any> = {}) {
     totalMoneda: 1000,
     tipoCambio: 1,
     confirmado: true,
-    categorias: [],
+    categoriaId: null,
+    categoria: null,
+    etiquetas: [],
     items: [],
     mes: 6,
     anio: 2026,
@@ -52,15 +54,16 @@ describe('GET /api/reportes', () => {
       { mes: 6, anio: 2026 },
       { mes: 7, anio: 2026 },
     ])
-    expect(arg.include).toMatchObject({ categorias: true, concepto: true, items: true, tarjeta: true })
+    expect(arg.include).toMatchObject({ categoria: true, etiquetas: true, concepto: true, items: true, tarjeta: true })
   })
 
-  it('mapea filtros snake_case → camelCase (casa, tipo pago, categorías, tarjetas, conceptos)', async () => {
-    await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&casa_id=3&tipo_pago=C&categoria_ids=1,2&tarjeta_ids=9&concepto_ids=4,5'))
+  it('mapea filtros snake_case → camelCase (casa, tipo pago, categoría única, etiquetas, tarjetas, conceptos)', async () => {
+    await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&casa_id=3&tipo_pago=C&categoria_ids=1,2&etiqueta_ids=8&tarjeta_ids=9&concepto_ids=4,5'))
     const where = mockPrisma.gasto.findMany.mock.calls[0][0].where
     expect(where.casaId).toBe(3)
     expect(where.tipoPago).toBe('C')
-    expect(where.categorias).toEqual({ some: { id: { in: [1, 2] } } })
+    expect(where.categoriaId).toEqual({ in: [1, 2] })
+    expect(where.etiquetas).toEqual({ some: { id: { in: [8] } } })
     expect(where.tarjetaId).toEqual({ in: [9] })
     expect(where.conceptoId).toEqual({ in: [4, 5] })
   })
@@ -71,15 +74,15 @@ describe('GET /api/reportes', () => {
         mes: 6,
         totalMoneda: 9999,
         items: [
-          { monto: 70, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categorias: [{ id: 1, nombre: 'Super' }] },
-          { monto: 30, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categorias: [{ id: 2, nombre: 'Hogar' }] },
+          { monto: 70, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'Comida' }, categoriaId: 1, categoria: { id: 1, nombre: 'Super' }, etiquetas: [] },
+          { monto: 30, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Limpieza' }, categoriaId: 2, categoria: { id: 2, nombre: 'Hogar' }, etiquetas: [] },
         ],
       }),
     ])
     const res = await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&agrupar=subitem'))
     const body = await res.json()
     const items = mockPrisma.gasto.findMany.mock.calls[0][0].include.items
-    expect(items).toMatchObject({ include: { categorias: true, concepto: true } })
+    expect(items).toMatchObject({ include: { categoria: true, etiquetas: true, concepto: true } })
     expect(body.kpis.total).toBe(100)
     expect(body.por_categoria.find((c: any) => c.id === 1)?.total_ars).toBe(70)
     expect(body.por_categoria.find((c: any) => c.id === 2)?.total_ars).toBe(30)
@@ -93,7 +96,7 @@ describe('GET /api/reportes', () => {
 
   it('devuelve el reporte agregado', async () => {
     mockPrisma.gasto.findMany.mockResolvedValue([
-      rawGasto({ mes: 6, totalMoneda: 100, tipoPago: 'C', tarjetaId: 1, tarjeta: { id: 1, nombre: 'Visa' }, categorias: [{ id: 1, nombre: 'Auto' }] }),
+      rawGasto({ mes: 6, totalMoneda: 100, tipoPago: 'C', tarjetaId: 1, tarjeta: { id: 1, nombre: 'Visa' }, categoriaId: 1, categoria: { id: 1, nombre: 'Auto' } }),
       rawGasto({ mes: 6, totalMoneda: 200, tipoPago: 'D', conceptoId: 2, concepto: { id: 2, nombre: 'Luz' } }),
     ])
     const res = await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026'))

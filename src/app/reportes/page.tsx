@@ -14,7 +14,8 @@ import ReporteMensualChart from '@/components/reportes/ReporteMensualChart'
 import ReporteConceptosChart from '@/components/reportes/ReporteConceptosChart'
 import ReporteTarjetaChart from '@/components/reportes/ReporteTarjetaChart'
 import ReporteTipoPagoChart from '@/components/reportes/ReporteTipoPagoChart'
-import type { FiltrosReporte, Reporte, Casa, Categoria, Tarjeta, Concepto } from '@/lib/types'
+import ReporteEtiquetaChart from '@/components/reportes/ReporteEtiquetaChart'
+import type { FiltrosReporte, Reporte, Casa, Categoria, Etiqueta, Tarjeta, Concepto } from '@/lib/types'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -50,6 +51,7 @@ function initialFiltros(): FiltrosReporte {
     casa_id: null,
     tipo_pago: null,
     categoria_ids: [],
+    etiqueta_ids: [],
     tarjeta_ids: [],
     concepto_ids: [],
   }
@@ -65,6 +67,7 @@ function buildParams(f: FiltrosReporte, incluirTarjetas: boolean, porSubitems: b
   if (f.casa_id != null) p.set('casa_id', String(f.casa_id))
   if (f.tipo_pago) p.set('tipo_pago', f.tipo_pago)
   if (f.categoria_ids.length) p.set('categoria_ids', f.categoria_ids.join(','))
+  if (f.etiqueta_ids.length) p.set('etiqueta_ids', f.etiqueta_ids.join(','))
   if (f.tarjeta_ids.length) p.set('tarjeta_ids', f.tarjeta_ids.join(','))
   if (f.concepto_ids.length) p.set('concepto_ids', f.concepto_ids.join(','))
   if (incluirTarjetas) p.set('incluir_tarjetas', 'true')
@@ -78,6 +81,7 @@ export default function ReportesPage() {
   const [vista, setVista] = useState<VistaKey>('individuales')
   const [casas, setCasas] = useState<Casa[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [conceptos, setConceptos] = useState<Concepto[]>([])
   const [reporte, setReporte] = useState<Reporte | null>(null)
@@ -90,11 +94,13 @@ export default function ReportesPage() {
     Promise.all([
       fetch('/api/casas').then((r) => r.json()).catch(() => []),
       fetch('/api/categorias').then((r) => r.json()).catch(() => []),
+      fetch('/api/etiquetas').then((r) => r.json()).catch(() => []),
       fetch('/api/tarjetas').then((r) => r.json()).catch(() => []),
       fetch('/api/conceptos').then((r) => r.json()).catch(() => []),
-    ]).then(([cs, cats, ts, cons]) => {
+    ]).then(([cs, cats, ets, ts, cons]) => {
       setCasas(Array.isArray(cs) ? cs : [])
       setCategorias(Array.isArray(cats) ? cats : [])
+      setEtiquetas(Array.isArray(ets) ? ets : [])
       setTarjetas(Array.isArray(ts) ? ts : [])
       setConceptos(Array.isArray(cons) ? cons : [])
     })
@@ -159,6 +165,7 @@ export default function ReportesPage() {
         setPreset={setPreset}
         casas={casas}
         categorias={categorias}
+        etiquetas={etiquetas}
         tarjetas={tarjetas}
         conceptos={conceptos}
         mesUnico={vistaActual.mesUnico}
@@ -190,6 +197,9 @@ export default function ReportesPage() {
               )}
               <ReporteTarjetaChart data={reporte.por_tarjeta} />
               {!vistaActual.mesUnico && <ReporteTipoPagoChart data={reporte.por_tipo_pago} />}
+              <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
+                <ReporteEtiquetaChart data={reporte.por_etiqueta} />
+              </Box>
               <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
                 <ReporteConceptosChart data={reporte.top_conceptos} />
               </Box>

@@ -36,7 +36,7 @@ import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
 import BrandLogo from '@/components/shared/BrandLogo'
-import type { Casa, Categoria, Moneda, Tarjeta, TarjetaMarca } from '@/lib/types'
+import type { Casa, Categoria, Etiqueta, Moneda, Tarjeta, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -84,6 +84,23 @@ export default function ConfiguracionPage() {
   const { items: categorias, add: addCategoria, update: updateCategoria, remove: removeCategoria } = useSimpleCrud<Categoria>('/api/categorias')
   const [nuevoCategoria, setNuevoCategoria] = useState('')
   const [editingCategoria, setEditingCategoria] = useState<{ id: number; nombre: string } | null>(null)
+
+  // Etiquetas
+  const { items: etiquetas, add: addEtiqueta, update: updateEtiqueta, remove: removeEtiqueta } = useSimpleCrud<Etiqueta>('/api/etiquetas')
+  const [nuevoEtiqueta, setNuevoEtiqueta] = useState('')
+  const [editingEtiqueta, setEditingEtiqueta] = useState<{ id: number; nombre: string } | null>(null)
+
+  const handleAddEtiqueta = async () => {
+    if (!nuevoEtiqueta.trim()) return
+    try { await addEtiqueta({ nombre: nuevoEtiqueta.trim() }); setNuevoEtiqueta(''); toast.success('Etiqueta agregada') }
+    catch { toast.error('Error al agregar etiqueta') }
+  }
+
+  const handleSaveEtiqueta = async () => {
+    if (!editingEtiqueta || !editingEtiqueta.nombre.trim()) return
+    try { await updateEtiqueta(editingEtiqueta.id, { nombre: editingEtiqueta.nombre.trim() }); setEditingEtiqueta(null); toast.success('Etiqueta actualizada') }
+    catch { toast.error('Error al actualizar etiqueta') }
+  }
 
   const handleAddCasa = async () => {
     if (!nuevaCasa.trim()) return
@@ -308,6 +325,62 @@ export default function ConfiguracionPage() {
                         value={editingCategoria.nombre}
                         onChange={e => setEditingCategoria(p => p ? { ...p, nombre: e.target.value } : p)}
                         onKeyDown={e => { if (e.key === 'Enter') handleSaveCategoria(); if (e.key === 'Escape') setEditingCategoria(null) }}
+                        sx={{ mr: 9 }}
+                      />
+                    ) : (
+                      <ListItemText primary={l.nombre} sx={{ pr: 9 }} />
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+
+        {/* Etiquetas */}
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Etiquetas</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Cortes transversales (un gasto puede tener varias). Ej: Viaje, Deducible, Compartido, Extraordinario.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <TextField
+                  size="small" fullWidth
+                  label="Ej: Viaje, Deducible, Compartido"
+                  value={nuevoEtiqueta}
+                  onChange={e => setNuevoEtiqueta(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddEtiqueta()}
+                />
+                <IconButton onClick={handleAddEtiqueta} color="primary"><AddIcon /></IconButton>
+              </Box>
+              <Divider sx={{ mb: 1 }} />
+              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                {etiquetas.map(l => (
+                  <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
+                    secondaryAction={
+                      editingEtiqueta?.id === l.id ? (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" color="primary" onClick={handleSaveEtiqueta}><CheckIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setEditingEtiqueta(null)}><CloseIcon fontSize="small" /></IconButton>
+                        </Box>
+                      ) : (
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" onClick={() => setEditingEtiqueta({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => { removeEtiqueta(l.id); toast.success('Etiqueta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                        </Box>
+                      )
+                    }
+                  >
+                    {editingEtiqueta?.id === l.id ? (
+                      <TextField
+                        size="small" fullWidth autoFocus
+                        value={editingEtiqueta.nombre}
+                        onChange={e => setEditingEtiqueta(p => p ? { ...p, nombre: e.target.value } : p)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEtiqueta(); if (e.key === 'Escape') setEditingEtiqueta(null) }}
                         sx={{ mr: 9 }}
                       />
                     ) : (

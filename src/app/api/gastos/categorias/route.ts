@@ -3,11 +3,11 @@ import { prisma } from '@/lib/db'
 import { parseCategoriaBatch } from '@/lib/gastos-batch'
 
 /**
- * PATCH /api/gastos/categorias — edición masiva de categorías.
+ * PATCH /api/gastos/categorias — asignación masiva de la CATEGORÍA ÚNICA (partición).
  * Body: { gasto_ids: number[], categoria_id: number, action: 'add' | 'remove' }.
- * Agrega o quita una misma categoría a todos los gastos indicados (relación m2m
- * vía connect/disconnect). connect es idempotente; disconnect de algo no asignado
- * es no-op. Se ejecuta en una transacción (todo o nada).
+ * `add` setea `categoriaId` en todos los gastos indicados; `remove` la limpia (null).
+ * Pensado para backfillear la categoría única (que arranca vacía tras la migración).
+ * Se ejecuta en una transacción (todo o nada).
  */
 export async function PATCH(req: NextRequest) {
   let input
@@ -18,18 +18,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { gasto_ids, categoria_id, action } = input
-  const relation =
-    action === 'add'
-      ? { connect: { id: categoria_id } }
-      : { disconnect: { id: categoria_id } }
+  const data = action === 'add' ? { categoriaId: categoria_id } : { categoriaId: null }
 
   await prisma.$transaction(
-    gasto_ids.map(id =>
-      prisma.gasto.update({
-        where: { id },
-        data: { categorias: relation },
-      }),
-    ),
+    gasto_ids.map(id => prisma.gasto.update({ where: { id }, data })),
   )
 
   return NextResponse.json({ ok: true, updated: gasto_ids.length })

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { toItemResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
 
-const ITEM_INCLUDE = { concepto: true, categorias: true }
+const ITEM_INCLUDE = { concepto: true, categoria: true, etiquetas: true }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string; itemId: string } }) {
   const body = await req.json()
@@ -19,7 +19,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
       incluyeEnTotal: body.incluye_en_total ?? true,
       incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
       verificado: body.verificado ?? false,
-      categorias: { set: (body.categoria_ids ?? []).map((id: number) => ({ id })) },
+      categoriaId: body.categoria_id ?? null,
+      etiquetas: { set: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
     },
     include: ITEM_INCLUDE,
   })

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const source = await prisma.gasto.findUnique({
     where: { id: sourceId },
-    include: { items: { include: { categorias: true } }, categorias: true },
+    include: { items: { include: { etiquetas: true } }, etiquetas: true },
   })
   if (!source) return NextResponse.json({ error: 'Gasto origen no encontrado' }, { status: 404 })
 
@@ -59,7 +59,8 @@ export async function POST(req: NextRequest) {
     cuotasTotales: item.cuotasTotales,
     incluyeEnTotal: item.incluyeEnTotal,
     incluyeEnVencimiento: item.incluyeEnVencimiento,
-    categorias: { connect: (item.categorias ?? []).map((c: any) => ({ id: c.id })) },
+    categoriaId: item.categoriaId,
+    etiquetas: { connect: (item.etiquetas ?? []).map((c: any) => ({ id: c.id })) },
   })
 
   if (existente) {
@@ -90,7 +91,8 @@ export async function POST(req: NextRequest) {
       anio,
       notas: source.notas,
       confirmado: false,
-      categorias: { connect: (source.categorias ?? []).map((c: any) => ({ id: c.id })) },
+      categoriaId: source.categoriaId,
+      etiquetas: { connect: (source.etiquetas ?? []).map((c: any) => ({ id: c.id })) },
       esTarjeta: source.esTarjeta,
     },
   })

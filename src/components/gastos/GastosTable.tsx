@@ -136,7 +136,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         body: JSON.stringify({ gasto_ids: ids, categoria_id: categoriaId, action }),
       })
       if (!res.ok) throw new Error()
-      toast.success(action === 'add' ? 'Categoría agregada' : 'Categoría quitada')
+      toast.success(action === 'add' ? 'Categoría asignada' : 'Categoría quitada')
       loadGastos()
     } catch {
       toast.error('Error al actualizar categorías')
@@ -443,19 +443,29 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       },
     },
     {
-      field: 'categorias',
-      headerName: 'Categorías',
-      width: 150,
+      field: 'categoria',
+      headerName: 'Categoría / Etiquetas',
+      width: 190,
       sortable: false,
       renderCell: ({ row }) => {
         if (row._type === 'items_total') return null
-        const cats: { id: number; nombre: string }[] = row._type === 'item' ? (row._categorias ?? []) : (row.categorias ?? [])
+        const isItem = row._type === 'item'
+        const categoria: { id: number; nombre: string } | null = isItem ? row._categoria : row.categoria
+        const etiquetas: { id: number; nombre: string }[] = isItem ? (row._etiquetas ?? []) : (row.etiquetas ?? [])
+        if (!categoria && etiquetas.length === 0) {
+          return isItem ? null : <span style={{ color: '#6b7280', paddingLeft: 0 }}>-</span>
+        }
         return (
-          <CategoriasCell
-            categorias={cats}
-            empty={row._type === 'item' ? null : '-'}
-            typographyProps={{ sx: { pl: row._type === 'item' ? 1 : 0 } }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, width: '100%', pl: isItem ? 1 : 0 }}>
+            {categoria && (
+              <Typography variant="caption" color="primary.main" fontWeight={600} noWrap sx={{ flexShrink: 0, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {categoria.nombre}
+              </Typography>
+            )}
+            {etiquetas.length > 0 && (
+              <CategoriasCell categorias={etiquetas} prefix="🏷️ " typographyProps={{ sx: { color: 'text.disabled' } }} />
+            )}
+          </Box>
         )
       },
     },
@@ -552,7 +562,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }).filter(g => {
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
-    return g.descripcion.toLowerCase().includes(q) || (g.categorias ?? []).some(c => c.nombre.toLowerCase().includes(q))
+    return g.descripcion.toLowerCase().includes(q)
+      || (g.categoria?.nombre.toLowerCase().includes(q) ?? false)
+      || (g.etiquetas ?? []).some(c => c.nombre.toLowerCase().includes(q))
   }).filter(g => {
     if (!fecha) return true
     return g.fecha_vencimiento === fecha
@@ -612,7 +624,8 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             _cuotas_totales: item.cuotas_totales,
             _incluye_en_total: item.incluye_en_total,
             _incluye_en_vencimiento: item.incluye_en_vencimiento,
-            _categorias: item.categorias ?? [],
+            _categoria: item.categoria ?? null,
+            _etiquetas: item.etiquetas ?? [],
           })
         }
       }
@@ -683,7 +696,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                     Cuota {g.cuota_actual ?? '?'}/{g.cuotas_totales ?? '?'}
                   </Typography>
                 )}
-                <CategoriasCell categorias={g.categorias} prefix="📍 " />
+                {g.categoria && (
+                  <Typography variant="caption" color="primary.main" fontWeight={600}>{g.categoria.nombre}</Typography>
+                )}
+                <CategoriasCell categorias={g.etiquetas} prefix="🏷️ " />
               </Box>
             </Box>
             <IconButton
@@ -804,7 +820,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   {item.cuota_actual ?? '?'}/{item.cuotas_totales ?? '?'}
                 </Typography>
               )}
-              <CategoriasCell categorias={item.categorias} prefix="📍 " typographyProps={{ color: 'text.disabled' }} />
+              {item.categoria && (
+                <Typography variant="caption" color="primary.main">{item.categoria.nombre}</Typography>
+              )}
+              <CategoriasCell categorias={item.etiquetas} prefix="🏷️ " typographyProps={{ color: 'text.disabled' }} />
               <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Tooltip title="Incluido en total">
                   <Switch

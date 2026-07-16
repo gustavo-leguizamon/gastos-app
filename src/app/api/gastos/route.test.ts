@@ -26,7 +26,7 @@ function rawGasto(overrides: Record<string, any> = {}) {
   return {
     id: 1, casaId: 10, conceptoId: 1, concepto: { id: 1, nombre: 'Internet' }, fechaVencimiento: '2026-06-10',
     tipoPago: 'D', monedaId: 2, tipoCambio: 1, totalMoneda: 1000,
-    pasajeMesSiguiente: 0, prestamo_a_otro: 0, tarjetaId: null, categorias: [],
+    pasajeMesSiguiente: 0, prestamo_a_otro: 0, tarjetaId: null, etiquetas: [],
     cuotaActual: null, cuotasTotales: null, mes: 6, anio: 2026, notas: null,
     confirmado: true, esTarjeta: false,
     createdAt: new Date('2026-06-01T00:00:00Z'), updatedAt: new Date('2026-06-02T00:00:00Z'),
@@ -65,13 +65,13 @@ describe('GET /api/gastos', () => {
 
 describe('POST /api/gastos', () => {
   it('mapea el body snake_case → data camelCase y responde 201', async () => {
-    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, categorias: [] }))
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, etiquetas: [] }))
 
     const body = {
       casa_id: 5, descripcion: 'Luz', fecha_vencimiento: '2026-07-01', tipo_pago: 'C',
       moneda_id: 1, tipo_cambio: 2, total_moneda: 500, pasaje_mes_siguiente: 10,
       prestamo_a_otro: 20, tarjeta_id: 7, mes: 7, anio: 2026, confirmado: false,
-      categoria_ids: [3, 8], es_tarjeta: false,
+      etiqueta_ids: [3, 8], es_tarjeta: false,
     }
     const res = await POST({ json: async () => body } as any)
 
@@ -87,11 +87,11 @@ describe('POST /api/gastos', () => {
     }))
     // descripcion ya no es columna: no debe ir en data
     expect(mockPrisma.gasto.create.mock.calls[0][0].data).not.toHaveProperty('descripcion')
-    expect(mockPrisma.gasto.create.mock.calls[0][0].data.categorias).toEqual({ connect: [{ id: 3 }, { id: 8 }] })
+    expect(mockPrisma.gasto.create.mock.calls[0][0].data.etiquetas).toEqual({ connect: [{ id: 3 }, { id: 8 }] })
   })
 
   it('usa concepto_id del body si viene, sin resolver por texto', async () => {
-    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 101, categorias: [] }))
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 101, etiquetas: [] }))
     await POST({ json: async () => ({ casa_id: 1, concepto_id: 7, total_moneda: 100, mes: 6, anio: 2026 }) } as any)
     expect(mockPrisma.concepto.findFirst).not.toHaveBeenCalled()
     expect(mockPrisma.concepto.create).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe('POST /api/gastos', () => {
   })
 
   it('aplica defaults cuando faltan campos opcionales', async () => {
-    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 100, categorias: [] }))
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 100, etiquetas: [] }))
     await POST({ json: async () => ({ casa_id: 1, descripcion: 'X', total_moneda: 100, mes: 6, anio: 2026 }) } as any)
 
     const data = mockPrisma.gasto.create.mock.calls[0][0].data

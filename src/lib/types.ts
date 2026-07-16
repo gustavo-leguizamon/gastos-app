@@ -37,6 +37,12 @@ export interface Categoria {
   nombre: string
 }
 
+// Etiqueta: corte transversal (M2M). Misma forma que Categoria.
+export interface Etiqueta {
+  id: number
+  nombre: string
+}
+
 export interface Concepto {
   id: number
   nombre: string
@@ -56,8 +62,11 @@ export interface GastoItem {
   incluye_en_total: boolean
   incluye_en_vencimiento: boolean
   verificado: boolean
-  categoria_ids: number[]
-  categorias: Categoria[]
+  // Categoría única (partición) + etiquetas (corte transversal).
+  categoria_id: number | null
+  categoria: Categoria | null
+  etiqueta_ids: number[]
+  etiquetas: Etiqueta[]
   created_at: string
 }
 
@@ -91,8 +100,11 @@ export interface Gasto {
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
   tarjeta_marca?: TarjetaMarca | null
-  categoria_ids: number[]
-  categorias: Categoria[]
+  // Categoría única (partición) + etiquetas (corte transversal).
+  categoria_id: number | null
+  categoria: Categoria | null
+  etiqueta_ids: number[]
+  etiquetas: Etiqueta[]
   cuota_actual: number | null
   cuotas_totales: number | null
   mes: number
@@ -129,7 +141,8 @@ export interface GastoFormData {
   anio: number
   notas: string
   confirmado: boolean
-  categoria_ids: number[]
+  categoria_id: number | null
+  etiqueta_ids: number[]
   es_tarjeta: boolean
   pagado_completo?: boolean
 }
@@ -220,6 +233,7 @@ export interface Reporte {
     meses: number
   }
   por_categoria: ReporteCategoria[]
+  por_etiqueta: ReporteCategoria[]
   por_mes: ReporteMes[]
   top_conceptos: ReporteConcepto[]
   por_tarjeta: ReporteTarjeta[]
@@ -234,6 +248,7 @@ export interface FiltrosReporte {
   casa_id: number | null
   tipo_pago: 'C' | 'D' | null
   categoria_ids: number[]
+  etiqueta_ids: number[]
   tarjeta_ids: number[]
   concepto_ids: number[]
 }

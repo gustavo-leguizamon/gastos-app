@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { toItemResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
 
-const ITEM_INCLUDE = { concepto: true, categorias: true }
+const ITEM_INCLUDE = { concepto: true, categoria: true, etiquetas: true }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const items = await prisma.gastoItem.findMany({
@@ -27,7 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       cuotasTotales: body.cuotas_totales ?? null,
       incluyeEnTotal: body.incluye_en_total ?? true,
       incluyeEnVencimiento: body.incluye_en_vencimiento ?? false,
-      categorias: { connect: (body.categoria_ids ?? []).map((id: number) => ({ id })) },
+      categoriaId: body.categoria_id ?? null,
+      etiquetas: { connect: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
     },
     include: ITEM_INCLUDE,
   })

@@ -16,7 +16,10 @@ import Box from '@mui/material/Box'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
-import type { Casa, Moneda, Tarjeta, Categoria, Gasto, GastoFormData } from '@/lib/types'
+import toast from 'react-hot-toast'
+import type { Casa, Moneda, Tarjeta, Categoria, Etiqueta, Gasto, GastoFormData } from '@/lib/types'
+
+const byNombre = (a: { nombre: string }, b: { nombre: string }) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
 
 const schema = yup.object({
   fecha_vencimiento: yup.string().required('Requerido'),
@@ -43,7 +46,8 @@ const schema = yup.object({
   anio: yup.number().required(),
   notas: yup.string().optional().default(''),
   confirmado: yup.boolean().required().default(true),
-  categoria_ids: yup.array().of(yup.number()).default([]),
+  categoria_id: yup.number().nullable().default(null),
+  etiqueta_ids: yup.array().of(yup.number()).default([]),
   es_tarjeta: yup.boolean().required().default(false),
   pagado_completo: yup.boolean().required().default(false),
 })
@@ -61,6 +65,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [monedas, setMonedas] = useState<Moneda[]>([])
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [usaCuotas, setUsaCuotas] = useState<boolean>(!!(gasto?.cuota_actual ?? gasto?.cuotas_totales))
   const now = new Date()
@@ -85,7 +90,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       anio: gasto?.anio ?? defaultAnio,
       notas: gasto?.notas ?? '',
       confirmado: gasto?.confirmado ?? true,
-      categoria_ids: gasto?.categoria_ids ?? [],
+      categoria_id: gasto?.categoria_id ?? null,
+      etiqueta_ids: gasto?.etiqueta_ids ?? [],
       es_tarjeta: gasto?.es_tarjeta ?? false,
       pagado_completo: true,
     },
@@ -97,12 +103,14 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       fetch('/api/monedas').then(r => r.json()),
       fetch('/api/tarjetas').then(r => r.json()),
       fetch('/api/categorias').then(r => r.json()),
+      fetch('/api/etiquetas').then(r => r.json()).catch(() => []),
       fetch('/api/gastos/descripciones').then(r => r.json()).catch(() => []),
-    ]).then(([c, m, t, l, d]) => {
+    ]).then(([c, m, t, l, e, d]) => {
       setCasas(c)
       setMonedas(m)
       setTarjetas(t)
       setCategorias(l)
+      setEtiquetas(Array.isArray(e) ? e : [])
       setDescripciones(Array.isArray(d) ? d : [])
       if (!gasto) {
         if (c.length === 1) setValue('casa_id', c[0].id)
@@ -132,6 +140,26 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       if (t) setValue('descripcion', t.banco ? `${t.nombre} (${t.banco})` : t.nombre)
     }
   }, [esTarjeta, tarjetaId, tarjetas, setValue])
+
+  // Alta inline de categoría/etiqueta desde el propio form.
+  const crearCategoria = async (nombre: string) => {
+    try {
+      const res = await fetch('/api/categorias', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) })
+      if (!res.ok) throw new Error()
+      const c = await res.json()
+      setCategorias(prev => [...prev, c].sort(byNombre))
+      return { value: c.id, label: c.nombre }
+    } catch { toast.error('Error al crear categoría'); return null }
+  }
+  const crearEtiqueta = async (nombre: string) => {
+    try {
+      const res = await fetch('/api/etiquetas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) })
+      if (!res.ok) throw new Error()
+      const e = await res.json()
+      setEtiquetas(prev => [...prev, e].sort(byNombre))
+      return { value: e.id, label: e.nombre }
+    } catch { toast.error('Error al crear etiqueta'); return null }
+  }
 
   return (
     <Box component="form" id={formId} onSubmit={handleSubmit(onSubmit)}>
@@ -524,19 +552,39 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           />
         </Grid>
 
-        {/* Categorias */}
+        {/* Categoría (única — partición) */}
         <Grid item xs={12} sm={6}>
           <Controller
-            name="categoria_ids"
+            name="categoria_id"
+            control={control}
+            render={({ field }) => (
+              <AppSelect
+                label="Categoría"
+                options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+                value={field.value ?? null}
+                onChange={(v) => field.onChange(v == null ? null : Number(v))}
+                fullWidth
+                emptyLabel="Sin categoría"
+                onCreate={crearCategoria}
+              />
+            )}
+          />
+        </Grid>
+
+        {/* Etiquetas (varias — corte transversal) */}
+        <Grid item xs={12} sm={6}>
+          <Controller
+            name="etiqueta_ids"
             control={control}
             render={({ field }) => (
               <AppMultiSelect
-                label="Categorías (opcional)"
-                options={categorias.map(l => ({ value: l.id, label: l.nombre }))}
+                label="Etiquetas (opcional)"
+                options={etiquetas.map(e => ({ value: e.id, label: e.nombre }))}
                 value={field.value ?? []}
                 onChange={(v) => field.onChange(v.map(Number))}
                 fullWidth
-                placeholder="Sin especificar"
+                placeholder="Sin etiquetas"
+                onCreate={crearEtiqueta}
               />
             )}
           />
