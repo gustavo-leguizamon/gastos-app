@@ -142,9 +142,22 @@ export function gastosToUnits(gastos: any[]): Unit[] {
 // Una unidad por sub-item `incluyeEnTotal`; si el gasto no tiene sub-items elegibles,
 // cae al nivel gasto. Las dimensiones de tarjeta/tipo de pago/mes son las del gasto padre;
 // la categoría/etiquetas son las del sub-item (o del gasto en el fallback).
+//
+// Los resúmenes de tarjeta (`esTarjeta`) son contenedores de crédito: cada sub-item es un
+// consumo facturado en ese mes. Aunque el gasto contenedor tenga `tipoPago = 'D'` (default al
+// crearse), sus sub-items se cuentan como **crédito** (`'C'`) — así el reporte por tipo de pago
+// refleja que ese monto es consumo de tarjeta. Incluyendo los resúmenes (`incluir_tarjetas`),
+// el total del mes coincide con el que muestra la pantalla de Gastos.
+//
+// El monto es el del sub-item **tal cual** (sin escalar al total del gasto): si la suma de
+// sub-items de un gasto confirmado difiere de su `totalMoneda × tipoCambio` es un error de carga
+// del dato, y el reporte debe exponerlo (no enmascararlo) — al corregir los sub-items, los montos
+// coinciden con la pantalla.
 export function gastosToSubitemUnits(gastos: any[]): Unit[] {
   const out: Unit[] = []
   for (const g of gastos) {
+    // Un sub-item de un resumen de tarjeta es, por definición, un consumo de crédito.
+    const tipoPago: 'C' | 'D' | null = g.esTarjeta ? 'C' : normTipo(g.tipoPago)
     const itemsIncl = (g.items ?? []).filter((i: any) => i.incluyeEnTotal)
     if (itemsIncl.length > 0) {
       for (const it of itemsIncl) {
@@ -159,7 +172,7 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
           anio: g.anio,
           tarjetaId: g.tarjetaId ?? null,
           tarjetaNombre: g.tarjeta?.nombre ?? null,
-          tipoPago: normTipo(g.tipoPago),
+          tipoPago,
         })
       }
     } else {
@@ -174,7 +187,7 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
         anio: g.anio,
         tarjetaId: g.tarjetaId ?? null,
         tarjetaNombre: g.tarjeta?.nombre ?? null,
-        tipoPago: normTipo(g.tipoPago),
+        tipoPago,
       })
     }
   }

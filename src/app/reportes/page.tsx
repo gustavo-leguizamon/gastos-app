@@ -38,8 +38,8 @@ const VISTAS: { key: VistaKey; label: string; caption: string; incluirTarjetas: 
   {
     key: 'subitems',
     label: 'Detalle por sub-ítems',
-    caption: 'Un mes. Desglosa cada gasto por sus sub-ítems (categoría y monto reales); los gastos sin sub-ítems cuentan por su propia categoría. Sin duplicar montos.',
-    incluirTarjetas: false,
+    caption: 'Un mes. Desglosa cada gasto por sus sub-ítems (categoría y monto reales), incluidos los resúmenes de tarjeta: cada consumo se cuenta como crédito. El total coincide con el de la pantalla de Gastos para el mes.',
+    incluirTarjetas: true,
     porSubitems: true,
     mesUnico: true,
   },

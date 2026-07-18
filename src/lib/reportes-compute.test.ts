@@ -254,4 +254,57 @@ describe('computeReporteSubitems', () => {
     expect(r.kpis.cantidad_gastos).toBe(1)
     expect(r.kpis.total).toBe(30)
   })
+
+  it('los sub-items de un resumen de tarjeta (esTarjeta) se cuentan como crédito', () => {
+    const r = computeReporteSubitems(
+      [gasto({
+        esTarjeta: true,
+        tipoPago: 'D', // el contenedor arranca como débito por default; se ignora para sus sub-items
+        tarjetaId: 3,
+        tarjeta: { id: 3, nombre: 'Visa' },
+        items: [
+          { monto: 700, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'Super' }, categoriaId: 1, categoria: { id: 1, nombre: 'Comida' }, etiquetas: [] },
+          { monto: 300, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'Nafta' }, categoriaId: 2, categoria: { id: 2, nombre: 'Auto' }, etiquetas: [] },
+        ],
+      })],
+      months,
+    )
+    // Todo el consumo de la tarjeta cae en crédito, no en débito.
+    expect(r.por_tipo_pago).toEqual([{ tipo: 'C', nombre: 'Crédito', total_ars: 1000 }])
+    // Y bajo la tarjeta correcta, desglosado por la categoría de cada sub-item.
+    expect(r.por_tarjeta).toEqual([{ id: 3, nombre: 'Visa', total_ars: 1000 }])
+    expect(r.por_categoria.find((c) => c.id === 1)?.total_ars).toBe(700)
+    expect(r.por_categoria.find((c) => c.id === 2)?.total_ars).toBe(300)
+  })
+
+  it('un gasto individual de crédito (no esTarjeta) mantiene su tipo de pago', () => {
+    const r = computeReporteSubitems(
+      [gasto({ tipoPago: 'C', totalMoneda: 500, items: [] })],
+      months,
+    )
+    expect(r.por_tipo_pago).toEqual([{ tipo: 'C', nombre: 'Crédito', total_ars: 500 }])
+  })
+
+  it('usa el monto del sub-item tal cual, sin escalar al total del gasto confirmado', () => {
+    const r = computeReporteSubitems(
+      [gasto({
+        esTarjeta: true,
+        confirmado: true,
+        totalMoneda: 1000, // difiere de la suma de sub-items (1200): posible error de carga, NO se enmascara
+        tipoCambio: 1,
+        tarjetaId: 3,
+        tarjeta: { id: 3, nombre: 'Visa' },
+        items: [
+          { monto: 800, incluyeEnTotal: true, conceptoId: 1, concepto: { id: 1, nombre: 'A' }, categoriaId: 1, categoria: { id: 1, nombre: 'Comida' }, etiquetas: [] },
+          { monto: 400, incluyeEnTotal: true, conceptoId: 2, concepto: { id: 2, nombre: 'B' }, categoriaId: 2, categoria: { id: 2, nombre: 'Auto' }, etiquetas: [] },
+        ],
+      })],
+      months,
+    )
+    // El total es la suma cruda de sub-items (1200), no el totalMoneda (1000).
+    expect(r.kpis.total).toBe(1200)
+    expect(r.por_categoria.find((c) => c.id === 1)?.total_ars).toBe(800)
+    expect(r.por_categoria.find((c) => c.id === 2)?.total_ars).toBe(400)
+    expect(r.por_tipo_pago).toEqual([{ tipo: 'C', nombre: 'Crédito', total_ars: 1200 }])
+  })
 })
