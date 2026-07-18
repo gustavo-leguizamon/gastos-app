@@ -76,7 +76,7 @@ Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en venci
 - **Categoría** — **FK único** (`categoriaId` nullable → `categoria`). Es la *partición* ("¿en qué rubro se fue la plata?"): una por gasto/ítem, de modo que el reporte por categoría suma 100% sin duplicar. En la API: `categoria_id: number | null` (body) + `categoria: {id,nombre} | null` (display). Modelo Prisma `Categoria` (relación 1-a-muchos). CRUD en `/api/categorias` (`GET/POST` + `PUT/DELETE [id]`).
 - **Etiquetas** — relación **muchos-a-muchos** (`Etiqueta`, relaciones implícitas `GastoEtiquetas`/`GastoItemEtiquetas`). Es el *corte transversal* ("¿qué gastos son del viaje / deducibles?"): varias por gasto/ítem, se solapan a propósito. En la API: `etiqueta_ids: number[]` (body) + `etiquetas: {id,nombre}[]` (display). CRUD en `/api/etiquetas`. Write paths: POST conecta con `{ connect }`, PUT reemplaza con `{ set }`.
 
-**UI:** `GastoForm` y `GastoItemDialog` usan `AppSelect` (categoría única, emptyLabel "Sin categoría") + `AppMultiSelect` (etiquetas), ambos con `onCreate` para alta inline. `GastosTable` muestra categoría (color primary) + etiquetas (🏷️) en grilla/cards/sub-ítems; la búsqueda incluye ambas. La **edición masiva** (`PATCH /api/gastos/categorias` + `BulkCategoriasBar`) **asigna/limpia la categoría única** (backfill). ABM de ambas en `/configuracion`.
+**UI:** `GastoForm` y `GastoItemDialog` usan `AppSelect` (categoría única, emptyLabel "Sin categoría") + `AppMultiSelect` (etiquetas), ambos con `onCreate` para alta inline. `GastosTable` muestra categoría (color primary) + etiquetas (🏷️) en grilla/cards/sub-ítems; la búsqueda incluye ambas. La **edición masiva** (`BulkClasificacionBar` + `PATCH /api/gastos/categorias` y `/api/gastos/etiquetas`) permite asignar/limpiar la categoría única y agregar/quitar una etiqueta a varios gastos a la vez (ver [Edición masiva de clasificación](#edición-masiva-de-clasificación-categoría--etiquetas)). ABM de ambas en `/configuracion`.
 
 **Reportes:** `por_categoria` (partición) usa la categoría única; `por_etiqueta` (cobertura) usa las etiquetas. Ver [reportes](reportes.md).
 
@@ -163,17 +163,22 @@ Ambos llaman `triggerRefresh()` al terminar.
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
 
-## Edición masiva de categorías
+## Edición masiva de clasificación (categoría + etiquetas)
 
-Permite agregar o quitar **una misma categoría** a varios gastos a la vez desde la grilla.
+Permite, desde la grilla, seleccionar varios gastos a la vez y **asignar/quitar la categoría única** o **agregar/quitar una etiqueta** a todos ellos.
 
-- **UI** (`GastosTable`): botón "Categorizar varios" (arriba a la derecha de la tabla) activa el **modo selección**. En ese modo aparece:
+- **UI** (`GastosTable`): botón "Clasificar varios" (arriba a la derecha de la tabla) activa el **modo selección**. En ese modo aparece:
   - una columna de checkbox al inicio de la grilla (desktop) / un checkbox en el header de cada card (mobile) — sólo seleccionables las filas `_type === 'gasto'`;
-  - `BulkCategoriasBar` (`src/components/gastos/BulkCategoriasBar.tsx`), barra sticky con: checkbox "Todos" (con estado indeterminate), contador "N de M seleccionados", `AppSelect` de categoría, y botones **Agregar** / **Quitar** + cerrar (✕).
+  - `BulkClasificacionBar` (`src/components/gastos/BulkClasificacionBar.tsx`), barra sticky con: checkbox "Todos" (con estado indeterminate) + contador "N de M seleccionados" + cerrar (✕), y **dos filas de acción**:
+    - **Categoría** (`AppSelect` de `/api/categorias`): **Asignar** / **Quitar categoría**.
+    - **Etiqueta** (`AppSelect` de `/api/etiquetas`): **Agregar etiqueta** / **Quitar etiqueta**.
   - "Todos" selecciona/deselecciona **los gastos filtrados** (respeta estado de pago, búsqueda y fecha).
   - El modo selección se resetea automáticamente al cambiar de mes/año o ante un refresh global (`filtros`/`refreshKey`).
-- **Aplicar**: `PATCH /api/gastos/categorias` con `{ gasto_ids, categoria_id, action }`. Al terminar recarga la grilla (`loadGastos`) manteniendo la selección para encadenar más acciones. Toast de éxito/error.
-- **Backend**: `connect`/`disconnect` de la relación m2m por gasto dentro de una transacción. `connect` es idempotente (no duplica si ya estaba) y `disconnect` es no-op si el gasto no tenía la categoría. Validación de entrada en `parseCategoriaBatch` (`src/lib/gastos-batch.ts`). Sólo aplica a **gastos** (no a sub-items).
+- **Aplicar**: helper `applyBulk` en `GastosTable` hace `PATCH /api/gastos/categorias` o `/api/gastos/etiquetas` con `{ gasto_ids, action, ... }`. Al terminar recarga la grilla (`loadGastos`) manteniendo la selección para encadenar más acciones. Toast de éxito/error.
+- **Backend**:
+  - **Categoría única**: setea/limpia `categoriaId` por gasto (`add` = id, `remove` = null), propagando también a los sub-items de tarjeta. Validación `parseCategoriaBatch`.
+  - **Etiqueta (M2M)**: `connect`/`disconnect` por gasto (idempotente / no-op), propagando por item a los sub-items de tarjeta (M2M no soporta `updateMany`). Validación `parseEtiquetaBatch`.
+  - Ambos en una transacción atómica (`src/lib/gastos-batch.ts`). Sólo se seleccionan **gastos** (no sub-items sueltos), pero la propagación alcanza a sus sub-items de tarjeta.
 
 ## Evolución del gasto (gráfico mensual)
 

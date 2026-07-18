@@ -67,7 +67,7 @@ Hay dos capas de tests:
 | `src/lib/fechas.ts` (`shiftMonth`, `resolvePeriodoTarjeta`) | Aritmética de meses con wraparound de año; resolución del período de resumen de tarjeta a partir de la fecha del pago y el día de cierre (independiente del mes fuente). Importado por `gastos/[id]/pagos/route.ts`. | `fechas.test.ts` |
 | `src/lib/conceptos.ts` (`normalizeNombre`, `resolveConcepto`) | Normalización (trim + colapso de espacios) y find-or-create case-insensitive de `Concepto`. Importado por los write paths de gastos/items/pagos y `/api/conceptos`. | `conceptos.test.ts` |
 | `src/lib/reportes-compute.ts` (`enumerateMonths`, `computeReportes`, `computeReporteSubitems`) | Ventana de meses del rango (wraparound, cap 60) y agregación de reportes sobre "unidades" (`aggregateUnits`): a nivel gasto (`computeReportes`) o desglosado por sub-item con fallback a gasto (`computeReporteSubitems`). KPIs, por categoría (atribución completa + "Sin categoría"), por mes, top conceptos, por tarjeta, por tipo de pago. Importado por `reportes/route.ts`. | `reportes-compute.test.ts` |
-| `src/lib/gastos-batch.ts` (`parseCategoriaBatch`) | Validación/normalización del body de edición masiva de categorías (action `add`/`remove`, `categoria_id`, `gasto_ids` no vacío con dedup y coerción a number). Importado por `gastos/categorias/route.ts`. | `gastos-batch.test.ts` |
+| `src/lib/gastos-batch.ts` (`parseCategoriaBatch`, `parseEtiquetaBatch`) | Validación/normalización del body de edición masiva de categoría única / etiquetas (action `add`/`remove`, `categoria_id`/`etiqueta_id`, `gasto_ids` no vacío con dedup y coerción a number). Importados por `gastos/categorias/route.ts` y `gastos/etiquetas/route.ts`. | `gastos-batch.test.ts` |
 
 **2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:
 
@@ -79,6 +79,7 @@ Hay dos capas de tests:
 | `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: shift +1/+2 según próximo cierre, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |
 | `reportes/route.ts` | GET arma el `where` (OR de meses, `esTarjeta:false`, filtros snake→camel) y delega en `computeReportes`. | `reportes/route.test.ts` |
 | `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción que **setea/limpia `categoriaId`** (categoría única) por gasto **y en sus sub-items propagados de tarjeta**; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
+| `gastos/etiquetas/route.ts` | PATCH masivo: valida con `parseEtiquetaBatch` y arma la transacción de `connect`/`disconnect` de una **etiqueta (M2M)** por gasto **y en sus sub-items propagados de tarjeta**; 400 si el body es inválido. | `gastos/etiquetas/route.test.ts` |
 
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.

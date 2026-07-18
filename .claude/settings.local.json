@@ -74,7 +74,8 @@
       "PowerShell(npx prisma generate 2>&1 | Select-Object -Last 15; Write-Output \"EXIT: $LASTEXITCODE\")",
       "PowerShell(npx prisma generate 2>&1 | Select-Object -Last 8; Write-Output \"EXIT: $LASTEXITCODE\")",
       "PowerShell(Get-CimInstance *)",
-      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { Write-Output \"FOUND: $\\($g.Source\\)\" } else { Write-Output \"no en PATH\" }; foreach \\($p in @\\(\"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\Git\\\\usr\\\\bin\\\\gh.exe\"\\)\\) { if \\(Test-Path $p\\) { Write-Output \"EXISTE: $p\" } })"
+      "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { Write-Output \"FOUND: $\\($g.Source\\)\" } else { Write-Output \"no en PATH\" }; foreach \\($p in @\\(\"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\Git\\\\usr\\\\bin\\\\gh.exe\"\\)\\) { if \\(Test-Path $p\\) { Write-Output \"EXISTE: $p\" } })",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 30; Write-Output \"---TSC EXIT $LASTEXITCODE---\")"
     ]
   },
   "hooks": {

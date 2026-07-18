@@ -34,7 +34,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import BrandLogo from '@/components/shared/BrandLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
-import BulkCategoriasBar from './BulkCategoriasBar'
+import BulkClasificacionBar from './BulkClasificacionBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -126,22 +126,33 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     })
   }
 
-  const applyBulkCategoria = async (categoriaId: number, action: 'add' | 'remove') => {
+  const applyBulk = async (
+    endpoint: 'categorias' | 'etiquetas',
+    payload: Record<string, unknown>,
+    action: 'add' | 'remove',
+    labels: { add: string; remove: string },
+  ) => {
     const ids = [...selectedIds]
     if (ids.length === 0) return
     try {
-      const res = await fetch('/api/gastos/categorias', {
+      const res = await fetch(`/api/gastos/${endpoint}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gasto_ids: ids, categoria_id: categoriaId, action }),
+        body: JSON.stringify({ gasto_ids: ids, action, ...payload }),
       })
       if (!res.ok) throw new Error()
-      toast.success(action === 'add' ? 'Categoría asignada' : 'Categoría quitada')
+      toast.success(action === 'add' ? labels.add : labels.remove)
       loadGastos()
     } catch {
-      toast.error('Error al actualizar categorías')
+      toast.error('Error al actualizar la clasificación')
     }
   }
+
+  const applyBulkCategoria = (categoriaId: number, action: 'add' | 'remove') =>
+    applyBulk('categorias', { categoria_id: categoriaId }, action, { add: 'Categoría asignada', remove: 'Categoría quitada' })
+
+  const applyBulkEtiqueta = (etiquetaId: number, action: 'add' | 'remove') =>
+    applyBulk('etiquetas', { etiqueta_id: etiquetaId }, action, { add: 'Etiqueta agregada', remove: 'Etiqueta quitada' })
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -871,12 +882,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   return (
     <>
       {selectionMode ? (
-        <BulkCategoriasBar
+        <BulkClasificacionBar
           count={selectedIds.size}
           totalFiltrados={filteredIds.length}
           allSelected={allSelected}
           onToggleAll={toggleAll}
-          onApply={applyBulkCategoria}
+          onApplyCategoria={applyBulkCategoria}
+          onApplyEtiqueta={applyBulkEtiqueta}
           onCancel={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
         />
       ) : (
@@ -886,7 +898,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             startIcon={<ChecklistIcon />}
             onClick={() => setSelectionMode(true)}
           >
-            Categorizar varios
+            Clasificar varios
           </Button>
         </Box>
       )}

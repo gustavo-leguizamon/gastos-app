@@ -1,28 +1,44 @@
 /**
  * Lógica pura para operaciones masivas sobre gastos.
  *
- * `parseCategoriaBatch` valida y normaliza el body de `PATCH /api/gastos/categorias`
- * (agregar/quitar una misma categoría a varios gastos a la vez). Se extrae del route
- * handler para poder testear la validación sin Prisma/Next.
+ * `parseCategoriaBatch` / `parseEtiquetaBatch` validan y normalizan el body de los
+ * endpoints de edición masiva (`PATCH /api/gastos/categorias` y `/api/gastos/etiquetas`):
+ * asignar/quitar la categoría única o agregar/quitar una etiqueta a varios gastos a la vez.
+ * Se extraen del route handler para poder testear la validación sin Prisma/Next.
  */
 
-export type CategoriaBatchAction = 'add' | 'remove'
+export type BatchAction = 'add' | 'remove'
+// Alias histórico.
+export type CategoriaBatchAction = BatchAction
 
 export interface CategoriaBatchInput {
   gasto_ids: number[]
   categoria_id: number
-  action: CategoriaBatchAction
+  action: BatchAction
 }
 
-export function parseCategoriaBatch(body: any): CategoriaBatchInput {
+export interface EtiquetaBatchInput {
+  gasto_ids: number[]
+  etiqueta_id: number
+  action: BatchAction
+}
+
+interface ParsedBatch {
+  gasto_ids: number[]
+  target_id: number
+  action: BatchAction
+}
+
+/** Valida `{ gasto_ids, <idKey>, action }`. `idKey` es el nombre del campo id en el body. */
+function parseBatch(body: any, idKey: string): ParsedBatch {
   const action = body?.action
   if (action !== 'add' && action !== 'remove') {
     throw new Error('action debe ser "add" o "remove"')
   }
 
-  const categoriaId = Number(body?.categoria_id)
-  if (!Number.isInteger(categoriaId) || categoriaId <= 0) {
-    throw new Error('categoria_id inválido')
+  const targetId = Number(body?.[idKey])
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    throw new Error(`${idKey} inválido`)
   }
 
   const raw = body?.gasto_ids
@@ -35,9 +51,15 @@ export function parseCategoriaBatch(body: any): CategoriaBatchInput {
     throw new Error('gasto_ids contiene un id inválido')
   }
 
-  return {
-    gasto_ids: Array.from(new Set(ids)),
-    categoria_id: categoriaId,
-    action,
-  }
+  return { gasto_ids: Array.from(new Set(ids)), target_id: targetId, action }
+}
+
+export function parseCategoriaBatch(body: any): CategoriaBatchInput {
+  const { gasto_ids, target_id, action } = parseBatch(body, 'categoria_id')
+  return { gasto_ids, categoria_id: target_id, action }
+}
+
+export function parseEtiquetaBatch(body: any): EtiquetaBatchInput {
+  const { gasto_ids, target_id, action } = parseBatch(body, 'etiqueta_id')
+  return { gasto_ids, etiqueta_id: target_id, action }
 }
