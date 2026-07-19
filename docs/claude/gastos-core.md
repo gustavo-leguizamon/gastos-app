@@ -59,7 +59,7 @@ El **monto de pagos admite valores negativos** (validación en `PagoDialog` sól
 Cada `Gasto` puede tener sub-items informativos (`GastoItem`) — ej. cargos individuales bajo un resumen de tarjeta. **No afectan cálculos de pago**; son display-only. Routes: `GET|POST /api/gastos/[id]/items`, `PUT|PATCH|DELETE /api/gastos/[id]/items/[itemId]`.
 
 Cada `GastoItem` tiene tres flags booleanos:
-- `incluye_en_total` (`incluyeEnTotal`, default `true`) — si el item suma a la fila de totales de sub-items.
+- `incluye_en_total` (`incluyeEnTotal`, default `true`) — si el item suma a la fila de totales de sub-items. En `GastoItemDialog`, la card "Suma sub-items" (y por ende "Sin asignar" = `total_ars − suma`) suma **solo** los items con `incluye_en_total`; los que solo están marcados como `incluye_en_vencimiento` no cuentan.
 - `incluye_en_vencimiento` (`incluyeEnVencimiento`, default `false`) — si contribuye a la card "Pagar hoy" cuando su `fecha` matchea hoy. **Si un gasto tiene sub-items, el vencimiento se calcula SIEMPRE a partir de los sub-items marcados (nunca del total del gasto), aunque el `fechaVencimiento` del gasto sea hoy.** Sólo los gastos sin sub-items usan su propio `fechaVencimiento`/`restante`.
 - `verificado` (`verificado`, default `false`) — para revisar sub-items uno a uno y marcar cuáles están correctos. En `GastoItemDialog`, cada fila tiene un toggle (icono `CheckCircleIcon` verde si verificado / `RadioButtonUncheckedIcon` naranja si no), y la fila se pinta con fondo verde tenue (verificado) o naranja tenue (no verificado) para tener a la vista los pendientes de revisar. Se togglea vía `PATCH { verificado }`. El `PUT` (editar item completo) preserva `verificado` enviándolo en el payload — el `EditState` lo incluye.
 

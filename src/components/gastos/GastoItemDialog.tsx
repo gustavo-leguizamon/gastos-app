@@ -118,7 +118,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   if (!gasto) return null
 
   const items: GastoItem[] = gasto.items ?? []
-  const totalItems = items.reduce((s, i) => s + i.monto, 0)
+  const totalItems = items.reduce((s, i) => (i.incluye_en_total ? s + i.monto : s), 0)
 
   const startEdit = (item: GastoItem) => setEditing({
     id: item.id,
