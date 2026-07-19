@@ -47,6 +47,8 @@ En `POST /api/gastos/[id]/pagos`:
 
 El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagación (pasos 4-5) va en try/catch — si falla, el pago original se mantiene. Esta lógica también se dispara desde "Total Pagado en gasto nuevo".
 
+**Montos negativos (devoluciones):** toda la cadena de propagación acepta montos negativos sin filtro por signo — `propagatePagoToTarjeta` crea el sub-item con el `monto` tal cual, y `PagoDialog` sólo rechaza `monto === 0`. El pago inicial disparado al **crear** un gasto (`GastoDialog.handleSubmit`) usa el guard `montoPago !== 0` (no `> 0`), de modo que un gasto de crédito cargado con "pagado completo" o `total_pagado` negativo (ej. una devolución de PedidosYa) también genera su sub-item de devolución en el resumen de la tarjeta. Sólo se saltea la creación del pago cuando el monto es exactamente `0`.
+
 **Cascade al eliminar el pago:** `GastoItem.pagoId` referencia `Pago` con `onDelete: Cascade`. Al borrar un pago (vía `DELETE /api/gastos/[id]/pagos/[pagoId]` o cascade del gasto), Postgres borra automáticamente el sub-item propagado.
 
 **Cascade inverso (al borrar el sub-item):** `DELETE /api/gastos/[id]/items/[itemId]` verifica `pagoId`. Si lo tiene, borra el **Pago** referenciado — y el cascade del FK arrastra el item. Eliminar el sub-item propagado deshace el pago original. Si no tiene `pagoId`, borra directo.

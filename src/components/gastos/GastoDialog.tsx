@@ -45,11 +45,12 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
         body: JSON.stringify(data),
       })
       if (!res.ok) throw new Error('Error al guardar')
-      // Al crear: si "pagado completo" → registrar pago por el total del gasto en ARS; si no, si total_pagado > 0 → registrar ese monto
+      // Al crear: si "pagado completo" → registrar pago por el total del gasto en ARS; si no, si total_pagado != 0 → registrar ese monto.
+      // Se acepta cualquier monto distinto de cero (incluye negativos, ej. devoluciones) para que propague el sub-item a la tarjeta.
       if (!gasto) {
         const totalArs = Number(data.total_moneda) * Number(data.tipo_cambio || 1)
         const montoPago = data.pagado_completo ? totalArs : Number(data.total_pagado)
-        if (montoPago > 0) {
+        if (montoPago !== 0) {
           const nuevo = await res.json()
           try {
             const pagoRes = await fetch(`/api/gastos/${nuevo.id}/pagos`, {
