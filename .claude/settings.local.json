@@ -77,7 +77,11 @@
       "PowerShell($g = Get-Command gh -ErrorAction SilentlyContinue; if \\($g\\) { Write-Output \"FOUND: $\\($g.Source\\)\" } else { Write-Output \"no en PATH\" }; foreach \\($p in @\\(\"$env:ProgramFiles\\\\GitHub CLI\\\\gh.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\gh.exe\", \"$env:ProgramFiles\\\\Git\\\\usr\\\\bin\\\\gh.exe\"\\)\\) { if \\(Test-Path $p\\) { Write-Output \"EXISTE: $p\" } })",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 30; Write-Output \"---TSC EXIT $LASTEXITCODE---\")",
       "PowerShell(git status; \"---BRANCH---\"; git branch --show-current; \"---LOG---\"; git log --oneline -5)",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30; Write-Output \"EXIT: $LASTEXITCODE\")"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30; Write-Output \"EXIT: $LASTEXITCODE\")",
+      "PowerShell(Select-String -Path \"node_modules\\\\@mui\\\\x-data-grid\\\\hooks\\\\features\\\\pagination\\\\gridPaginationSelector.js\" -Pattern \"props.pagination|paginationEnabled|slice|gridPaginatedVisibleSortedGridRowEntriesSelector|pagination ?\" -AllMatches | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Select-String *)",
+      "PowerShell(Select-String -Path \"node_modules\\\\@mui\\\\x-data-grid\\\\DataGrid\\\\useDataGridProps.js\" -Pattern \"pagination|disableVirtualization|autoPageSize|DATA_GRID_PROPS_DEFAULT_VALUES|signature\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Select-String -Path \"node_modules\\\\@mui\\\\x-data-grid\\\\hooks\\\\features\\\\pagination\\\\useGridPaginationModel.js\" -Pattern \"pageSizeOptions|warn|not in|ALL_RESULTS|MUI X\" | ForEach-Object { $_.Line.Trim\\(\\) })"
     ]
   },
   "hooks": {

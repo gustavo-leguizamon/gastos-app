@@ -31,6 +31,8 @@ export default function AppDataGrid({
   isRowSelectable,
   sx,
   rows,
+  paginationModel,
+  initialState,
   ...props
 }: AppDataGridProps) {
   const controlled = selectedRowId !== undefined
@@ -58,6 +60,18 @@ export default function AppDataGrid({
 
   const mergedSx = { ...BASE_SX, ...(sx ?? {}) }
 
+  // El DataGrid MIT fuerza `pagination: true` con tope de 100 filas por página.
+  // Con el footer oculto no hay forma de navegar páginas, así que las filas más
+  // allá de la primera quedan invisibles. Cuando se oculta el footer y el caller
+  // no definió su propia paginación, mostramos TODAS las filas (pageSize -1 =
+  // ALL_RESULTS_PAGE_VALUE, no dispara el límite de 100).
+  const hasPaginationOverride =
+    paginationModel != null || initialState?.pagination?.paginationModel != null
+  const effectivePaginationModel =
+    props.hideFooter && !hasPaginationOverride
+      ? { page: 0, pageSize: -1 }
+      : paginationModel
+
   return (
     <DataGrid
       rows={rows}
@@ -66,6 +80,8 @@ export default function AppDataGrid({
       rowSelectionModel={effectiveSelectedId != null ? [effectiveSelectedId] : []}
       onRowSelectionModelChange={(model) => handleSelectionChange(model as GridRowId[])}
       sx={mergedSx}
+      initialState={initialState}
+      paginationModel={effectivePaginationModel}
       {...props}
     />
   )

@@ -36,6 +36,8 @@ Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
 
 El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccionada pertenece a esa grilla (checkeado via `rows.some(r => id === r.id)`), evitando double-trigger con multiples grillas.
 
+**Paginación / mostrar todas las filas:** el `DataGrid` de la versión MIT (free) **fuerza `pagination: true`** (via `DATA_GRID_FORCED_PROPS`) con un tope máximo de **100 filas por página** (setear `pageSize > 100` lanza excepción). Por eso, una grilla con `hideFooter` y más de 100 filas mostraba solo la primera página **sin ningún control para navegar** — las filas restantes quedaban invisibles (ej. Gastos de un mes con muchos ítems se cortaban por fecha). `AppDataGrid` resuelve esto: cuando se pasa `hideFooter` y el caller **no** definió su propia paginación (`paginationModel` ni `initialState.pagination.paginationModel`), inyecta `paginationModel={{ page: 0, pageSize: -1 }}` (`-1` = `ALL_RESULTS_PAGE_VALUE`, no dispara el límite de 100) para renderizar **todas** las filas. Las grillas con footer visible (inversiones, sueldos) conservan la paginación navegable normal.
+
 ## AppTextField
 
 `src/components/shared/AppTextField.tsx` — wrapper de MUI `TextField` que auto-selecciona el contenido al recibir foco (`e.target.select()` con `setTimeout(0)` para ganarle al cursor). Mantiene API completa. Todos los forms de la app importan desde acá en vez de `@mui/material/TextField`. Para desactivar: `autoSelectOnFocus={false}` o `onFocus` propio. Para crudo, importar `@mui/material/TextField`.
