@@ -57,6 +57,10 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   const totalPagado = pagos.reduce((s, p) => s + p.monto, 0)
   const restante = gasto.total_ars - totalPagado
 
+  // En un gasto de crédito el pago propaga (o borra) un sub-item en OTRA fila del grid
+  // (el resumen de la tarjeta). Para que esa fila se refresque hay que pedir full-reload.
+  const esCredito = gasto.tipo_pago === 'C' && gasto.tarjeta_id != null
+
   const startEdit = (p: Pago) => setEditing({ id: p.id, fecha: p.fecha, monto: String(p.monto) })
 
   const handleSaveEdit = async () => {
@@ -99,7 +103,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
       toast.success('Pago registrado')
       setMonto('')
       setFecha(localToday())
-      onChanged()
+      onChanged(esCredito)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al registrar el pago')
     } finally {
@@ -113,7 +117,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
       const res = await fetch(`/api/gastos/${gasto.id}/pagos/${pagoId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       toast.success('Pago eliminado')
-      onChanged()
+      onChanged(esCredito)
     } catch {
       toast.error('Error al eliminar el pago')
     } finally {

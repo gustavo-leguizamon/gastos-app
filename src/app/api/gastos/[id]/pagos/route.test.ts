@@ -4,7 +4,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     pago: { findMany: vi.fn(), create: vi.fn() },
     gasto: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
-    tarjetaCierre: { findUnique: vi.fn(), findFirst: vi.fn() },
+    tarjetaCierre: { findUnique: vi.fn(), findMany: vi.fn() },
     tarjeta: { findUnique: vi.fn() },
     moneda: { findFirst: vi.fn() },
     gastoItem: { create: vi.fn() },
@@ -52,12 +52,16 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
     expect(mp.gastoItem.create).not.toHaveBeenCalled()
   })
 
-  it('propaga al resumen del mes siguiente cuando el día del pago es posterior al cierre', async () => {
+  it('propaga al resumen que cierra después cuando el pago es posterior al cierre del mes', async () => {
     mp.gasto.findUnique.mockResolvedValue(source())
-    mp.tarjetaCierre.findUnique.mockResolvedValue({ fechaCierre: '2026-06-02' }) // día de cierre = 2
+    // El resumen de junio cierra el 02/06; el de julio cierra el 02/07.
+    mp.tarjetaCierre.findMany.mockResolvedValue([
+      { mes: 6, anio: 2026, fechaCierre: '2026-06-02' },
+      { mes: 7, anio: 2026, fechaCierre: '2026-07-02' },
+    ])
     mp.gasto.findFirst.mockResolvedValue({ id: 555 }) // targetCC ya existe
 
-    // pago el 25-jun (día 25 > 2) → resumen de julio
+    // pago el 25-jun (posterior al cierre del 02/06) → primer cierre >= 25/06 es 02/07 → resumen de julio
     await POST({ json: async () => ({ fecha: '2026-06-25', monto: 500 }) } as any, { params: { id: '1' } })
 
     expect(mp.gasto.findFirst).toHaveBeenCalledWith(expect.objectContaining({
@@ -70,17 +74,19 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
     }))
   })
 
-  it('propaga al resumen del PROPIO mes del pago cuando el día es anterior/igual al cierre', async () => {
-    // Gasto fuente clasificado en julio; pago el 1-jul, tarjeta cierra el día 2.
-    // El pago aún entra en el resumen de julio (antes se iba erróneamente a agosto).
+  it('propaga al resumen que cierra en/después de la fecha cuando el pago es anterior/igual al cierre', async () => {
+    // Gasto fuente clasificado en julio; pago el 1-jul, el resumen de julio cierra el 02/07.
+    // El pago entra en el resumen de julio (primer cierre >= 01/07 es 02/07).
     mp.gasto.findUnique.mockResolvedValue(source({ mes: 7, anio: 2026 }))
-    mp.tarjetaCierre.findUnique.mockResolvedValue({ fechaCierre: '2026-07-02' }) // día de cierre = 2
+    mp.tarjetaCierre.findMany.mockResolvedValue([
+      { mes: 7, anio: 2026, fechaCierre: '2026-07-02' },
+    ])
     mp.pago.create.mockResolvedValue({ id: 100, gastoId: 1, fecha: '2026-07-01', monto: 500, createdAt: new Date('2026-07-01T00:00:00Z') })
     mp.gasto.findFirst.mockResolvedValue({ id: 555 })
 
     await POST({ json: async () => ({ fecha: '2026-07-01', monto: 500 }) } as any, { params: { id: '1' } })
 
-    // día 1 <= 2 → resumen de julio (mismo mes del pago), NO agosto
+    // primer cierre >= 01/07 es 02/07 → resumen de julio
     expect(mp.gasto.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ mes: 7, anio: 2026 }),
     }))
@@ -88,8 +94,7 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
 
   it('responde 400 y NO crea el pago cuando la tarjeta no tiene cierre configurado', async () => {
     mp.gasto.findUnique.mockResolvedValue(source())
-    mp.tarjetaCierre.findUnique.mockResolvedValue(null)
-    mp.tarjetaCierre.findFirst.mockResolvedValue(null) // ningún cierre en toda la tarjeta
+    mp.tarjetaCierre.findMany.mockResolvedValue([]) // ningún cierre con fechaCierre en toda la tarjeta
 
     const res = await POST({ json: async () => ({ fecha: '2026-06-25', monto: 500 }) } as any, { params: { id: '1' } })
 
@@ -98,16 +103,15 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
     expect(mp.gastoItem.create).not.toHaveBeenCalled()
   })
 
-  it('usa el fechaCierre más reciente como fallback cuando falta el cierre del mes del pago', async () => {
+  it('fallback: usa el día del último cierre cuando el pago es posterior a todos los cierres conocidos', async () => {
     mp.gasto.findUnique.mockResolvedValue(source())
-    mp.tarjetaCierre.findUnique.mockResolvedValue(null) // no hay cierre del mes del pago
-    mp.tarjetaCierre.findFirst.mockResolvedValue({ fechaCierre: '2026-05-02' }) // fallback → día 2
+    // Solo hay cierres hasta el 02/05 (día 2); el pago del 25-jun es posterior a todos.
+    mp.tarjetaCierre.findMany.mockResolvedValue([{ mes: 5, anio: 2026, fechaCierre: '2026-05-02' }])
     mp.gasto.findFirst.mockResolvedValue({ id: 555 })
 
     await POST({ json: async () => ({ fecha: '2026-06-25', monto: 500 }) } as any, { params: { id: '1' } })
 
-    expect(mp.tarjetaCierre.findFirst).toHaveBeenCalled()
-    // día 25 > 2 → resumen de julio
+    // día 25 > 2 (día del último cierre) → resumen de julio
     expect(mp.gasto.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ mes: 7, anio: 2026 }),
     }))
@@ -115,7 +119,12 @@ describe('POST /api/gastos/[id]/pagos — propagación a tarjeta', () => {
 
   it('crea el gasto CC target cuando no existe, con esTarjeta=true y confirmado=false', async () => {
     mp.gasto.findUnique.mockResolvedValue(source())
-    mp.tarjetaCierre.findUnique.mockResolvedValue({ fechaCierre: '2026-06-02', fechaVencimiento: '2026-06-10' })
+    mp.tarjetaCierre.findMany.mockResolvedValue([
+      { mes: 6, anio: 2026, fechaCierre: '2026-06-02' },
+      { mes: 7, anio: 2026, fechaCierre: '2026-07-02' },
+    ])
+    // findUnique se usa dentro de la propagación para el fechaVencimiento del target (julio).
+    mp.tarjetaCierre.findUnique.mockResolvedValue({ fechaVencimiento: '2026-07-10' })
     mp.gasto.findFirst.mockResolvedValue(null) // no existe → hay que crearlo
     mp.tarjeta.findUnique.mockResolvedValue({ id: 7, nombre: 'Visa', banco: 'Galicia' })
     mp.moneda.findFirst.mockResolvedValue({ id: 1, codigo: 'ARS' })

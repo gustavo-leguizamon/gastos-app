@@ -31,3 +31,46 @@ export function resolvePeriodoTarjeta(fecha: string, diaCierre: number): { mes: 
   if (dia <= diaCierre) return { mes, anio }
   return shiftMonth(mes, anio, 1)
 }
+
+export interface CierreResumen {
+  mes: number
+  anio: number
+  fechaCierre: string | null
+}
+
+/**
+ * Resuelve el resumen de tarjeta al que pertenece un pago usando las fechas de cierre
+ * COMPLETAS de la tarjeta (no solo el día del mes).
+ *
+ * Un pago pertenece al resumen cuyo `fechaCierre` es el PRIMERO que ocurre en/después de
+ * la fecha del pago (el cierre incluye ese día). Esto es correcto aunque el cierre de un
+ * resumen caiga en un mes distinto al que lo etiqueta — ej. el resumen de "junio" puede
+ * cerrar el 28/05 y el próximo cierre ser el 02/07: un pago del 26/06 (posterior al cierre
+ * del 28/05) pertenece entonces al resumen que cierra el 02/07 (julio), no a junio. El
+ * heurístico por día suelto (`resolvePeriodoTarjeta`) fallaba en ese caso porque asumía que
+ * cada resumen cierra dentro de su propio mes.
+ *
+ * @returns el `(mes, anio)` del resumen destino, o `null` si la tarjeta no tiene ningún
+ *   `fechaCierre` configurado.
+ */
+export function resolvePeriodoTarjetaByCierres(
+  fecha: string,
+  cierres: CierreResumen[],
+): { mes: number; anio: number } | null {
+  const valid = cierres
+    .filter((c): c is CierreResumen & { fechaCierre: string } => !!c.fechaCierre)
+    .sort((a, b) => a.fechaCierre.localeCompare(b.fechaCierre))
+  if (valid.length === 0) return null
+
+  // Primer cierre en/después de la fecha del pago. La comparación lexicográfica es válida
+  // sobre el formato 'YYYY-MM-DD'.
+  const hit = valid.find(c => c.fechaCierre >= fecha)
+  if (hit) return { mes: hit.mes, anio: hit.anio }
+
+  // Pago posterior a TODOS los cierres conocidos: no hay una fecha real que lo contenga
+  // (falta configurar cierres futuros). Best-effort: proyectar con el día del último cierre
+  // conocido (el día de cierre es ~constante) vía el heurístico clásico relativo al mes del
+  // pago. Menos preciso, pero solo aplica cuando faltan datos de cierre hacia adelante.
+  const dia = Number(valid[valid.length - 1].fechaCierre.split('-')[2])
+  return resolvePeriodoTarjeta(fecha, dia)
+}

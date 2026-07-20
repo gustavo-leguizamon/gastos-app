@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shiftMonth, resolvePeriodoTarjeta } from './fechas'
+import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres } from './fechas'
 
 describe('shiftMonth', () => {
   it('avanza dentro del mismo año', () => {
@@ -50,5 +50,50 @@ describe('resolvePeriodoTarjeta', () => {
 
   it('no depende del mes fuente: 25-jun y 01-jul con cierre día 2 caen ambos en julio', () => {
     expect(resolvePeriodoTarjeta('2026-06-25', 2)).toEqual(resolvePeriodoTarjeta('2026-07-01', 2))
+  })
+})
+
+describe('resolvePeriodoTarjetaByCierres', () => {
+  // Escenario real (Visa Galicia): el resumen de junio cierra el 28/05 y el próximo
+  // cierre es el 02/07; el de julio cierra el 02/07.
+  const visa = [
+    { mes: 5, anio: 2026, fechaCierre: '2026-04-30' },
+    { mes: 6, anio: 2026, fechaCierre: '2026-05-28' },
+    { mes: 7, anio: 2026, fechaCierre: '2026-07-02' },
+  ]
+
+  it('pago posterior al cierre del resumen de junio (28/05) cae en el resumen que cierra después (julio)', () => {
+    // 26-jun: primer cierre >= 26/06 es 02/07 → resumen de julio (NO junio, como daba el heurístico por día)
+    expect(resolvePeriodoTarjetaByCierres('2026-06-26', visa)).toEqual({ mes: 7, anio: 2026 })
+  })
+
+  it('pago anterior al cierre de junio (28/05) cae en el resumen de junio', () => {
+    // 20-may: primer cierre >= 20/05 es 28/05 → resumen de junio
+    expect(resolvePeriodoTarjetaByCierres('2026-05-20', visa)).toEqual({ mes: 6, anio: 2026 })
+  })
+
+  it('pago justo el día del cierre cae en ese resumen (cierre inclusivo)', () => {
+    // 02-jul == fechaCierre de julio → resumen de julio
+    expect(resolvePeriodoTarjetaByCierres('2026-07-02', visa)).toEqual({ mes: 7, anio: 2026 })
+  })
+
+  it('pago anterior a todos los cierres cae en el resumen que cierra primero', () => {
+    // 10-abr: primer cierre >= 10/04 es 30/04 → resumen de mayo
+    expect(resolvePeriodoTarjetaByCierres('2026-04-10', visa)).toEqual({ mes: 5, anio: 2026 })
+  })
+
+  it('devuelve null cuando no hay ningún fechaCierre configurado', () => {
+    expect(resolvePeriodoTarjetaByCierres('2026-06-26', [])).toBeNull()
+    expect(resolvePeriodoTarjetaByCierres('2026-06-26', [{ mes: 6, anio: 2026, fechaCierre: null }])).toBeNull()
+  })
+
+  it('fallback: pago posterior a todos los cierres conocidos usa el día del último cierre', () => {
+    // Solo hay cierres hasta el 02/07 (día 2). Pago 20-ago (día 20 > 2) → proyecta a septiembre.
+    expect(resolvePeriodoTarjetaByCierres('2026-08-20', visa)).toEqual({ mes: 9, anio: 2026 })
+  })
+
+  it('ignora el orden de entrada de los cierres (los ordena por fecha)', () => {
+    const desordenado = [visa[2], visa[0], visa[1]]
+    expect(resolvePeriodoTarjetaByCierres('2026-06-26', desordenado)).toEqual({ mes: 7, anio: 2026 })
   })
 })
