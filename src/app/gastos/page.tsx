@@ -27,6 +27,8 @@ export default function GastosPage() {
   const [estadoPago, setEstadoPago] = useState<'todos' | 'pendiente' | 'saldado'>('pendiente')
   const [busqueda, setBusqueda] = useState('')
   const [fecha, setFecha] = useState('')
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([])
+  const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -62,13 +64,15 @@ export default function GastosPage() {
 
       <ResumenCards filtros={filtros} refreshKey={refreshKey} />
       <TarjetasCerradas filtros={filtros} refreshKey={refreshKey} />
-      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} busqueda={busqueda} setBusqueda={setBusqueda} fecha={fecha} setFecha={setFecha} />
+      <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} busqueda={busqueda} setBusqueda={setBusqueda} fecha={fecha} setFecha={setFecha} categoriaIds={categoriaIds} setCategoriaIds={setCategoriaIds} etiquetaIds={etiquetaIds} setEtiquetaIds={setEtiquetaIds} />
       <GastosTable
         filtros={filtros}
         refreshKey={refreshKey}
         estadoPago={estadoPago}
         busqueda={busqueda}
         fecha={fecha}
+        categoriaIds={categoriaIds}
+        etiquetaIds={etiquetaIds}
         onEdit={(gasto: Gasto) => openDialog(gasto)}
         onDeleted={triggerRefresh}
       />

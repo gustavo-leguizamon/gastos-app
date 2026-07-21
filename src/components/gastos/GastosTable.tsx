@@ -59,11 +59,13 @@ interface Props {
   estadoPago: 'todos' | 'pendiente' | 'saldado'
   busqueda: string
   fecha: string
+  categoriaIds: number[]
+  etiquetaIds: number[]
   onEdit: (gasto: Gasto) => void
   onDeleted: () => void
 }
 
-export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, fecha, onEdit, onDeleted }: Props) {
+export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, fecha, categoriaIds, etiquetaIds, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const triggerRefresh = useGastosStore(s => s.triggerRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
@@ -579,6 +581,16 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }).filter(g => {
     if (!fecha) return true
     return g.fecha_vencimiento === fecha
+  }).filter(g => {
+    // Categoría (FK único). Sentinel 0 = "Sin categoría".
+    if (categoriaIds.length === 0) return true
+    const catId = g.categoria?.id ?? null
+    return categoriaIds.some(id => (id === 0 ? catId === null : id === catId))
+  }).filter(g => {
+    // Etiquetas (M2M). Sentinel 0 = "Sin etiquetas".
+    if (etiquetaIds.length === 0) return true
+    const tags = g.etiquetas ?? []
+    return etiquetaIds.some(id => (id === 0 ? tags.length === 0 : tags.some(t => t.id === id)))
   })
 
   const filteredIds = gastosFiltrados.map(g => g.id)
@@ -873,7 +885,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     return (
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 4, textAlign: 'center' }}>
         <Typography color="text.secondary">
-          {busqueda.trim() || fecha ? 'No se encontraron gastos para esos filtros.' : 'No hay gastos para el período seleccionado.'}
+          {busqueda.trim() || fecha || categoriaIds.length > 0 || etiquetaIds.length > 0 ? 'No se encontraron gastos para esos filtros.' : 'No hay gastos para el período seleccionado.'}
         </Typography>
       </Box>
     )
