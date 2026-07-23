@@ -24,6 +24,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import MergeIcon from '@mui/icons-material/CallMerge'
 import toast from 'react-hot-toast'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { Concepto } from '@/lib/types'
 
 export default function ConceptosManager() {
@@ -33,6 +34,7 @@ export default function ConceptosManager() {
   const [editing, setEditing] = useState<{ id: number; nombre: string } | null>(null)
   const [mergeSource, setMergeSource] = useState<Concepto | null>(null)
   const [mergeTarget, setMergeTarget] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Concepto | null>(null)
 
   const load = () => fetch('/api/conceptos').then(r => r.json()).then(setConceptos)
   useEffect(() => { load() }, [])
@@ -122,7 +124,7 @@ export default function ConceptosManager() {
                   </Tooltip>
                   <Tooltip title={(c.uso ?? 0) > 0 ? 'En uso: fusionalo en vez de borrar' : 'Borrar'}>
                     <span>
-                      <IconButton size="small" disabled={(c.uso ?? 0) > 0} onClick={() => handleDelete(c)}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" disabled={(c.uso ?? 0) > 0} onClick={() => setConfirmDelete(c)}><DeleteIcon fontSize="small" /></IconButton>
                     </span>
                   </Tooltip>
                 </Box>
@@ -148,6 +150,14 @@ export default function ConceptosManager() {
           </Typography>
         )}
       </List>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Eliminar concepto"
+        message={`¿Seguro que querés eliminar "${confirmDelete?.nombre ?? ''}"? Esta acción no se puede deshacer.`}
+        onConfirm={async () => { if (confirmDelete) await handleDelete(confirmDelete); setConfirmDelete(null) }}
+        onCancel={() => setConfirmDelete(null)}
+      />
 
       {/* Diálogo de fusión */}
       <Dialog open={!!mergeSource} onClose={() => setMergeSource(null)} maxWidth="xs" fullWidth>

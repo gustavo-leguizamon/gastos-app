@@ -35,12 +35,16 @@ export interface TarjetaCierre {
 export interface Categoria {
   id: number
   nombre: string
+  // Cantidad de gastos + sub-items que la referencian (sólo en GET /api/categorias).
+  uso?: number
 }
 
 // Etiqueta: corte transversal (M2M). Misma forma que Categoria.
 export interface Etiqueta {
   id: number
   nombre: string
+  // Cantidad de gastos + sub-items que la referencian (sólo en GET /api/etiquetas).
+  uso?: number
 }
 
 export interface Concepto {

@@ -80,6 +80,8 @@ Hay dos capas de tests:
 | `reportes/route.ts` | GET arma el `where` (OR de meses, `esTarjeta:false`, filtros snake→camel) y delega en `computeReportes`. | `reportes/route.test.ts` |
 | `gastos/categorias/route.ts` | PATCH masivo: valida con `parseCategoriaBatch` y arma la transacción que **setea/limpia `categoriaId`** (categoría única) por gasto **y en sus sub-items propagados de tarjeta**; 400 si el body es inválido. | `gastos/categorias/route.test.ts` |
 | `gastos/etiquetas/route.ts` | PATCH masivo: valida con `parseEtiquetaBatch` y arma la transacción de `connect`/`disconnect` de una **etiqueta (M2M)** por gasto **y en sus sub-items propagados de tarjeta**; 400 si el body es inválido. | `gastos/etiquetas/route.test.ts` |
+| `categorias/[id]/route.ts` | DELETE: borra sólo si `uso` (gastos + sub-items) = 0; 409 si en uso, 404 si no existe. | `categorias/[id]/route.test.ts` |
+| `etiquetas/[id]/route.ts` | DELETE: borra sólo si `uso` (gastos + sub-items) = 0; 409 si en uso, 404 si no existe. | `etiquetas/[id]/route.test.ts` |
 
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.

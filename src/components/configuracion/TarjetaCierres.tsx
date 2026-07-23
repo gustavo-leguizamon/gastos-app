@@ -18,6 +18,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import Divider from '@mui/material/Divider'
 import toast from 'react-hot-toast'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { TarjetaCierre } from '@/lib/types'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -44,6 +45,7 @@ export default function TarjetaCierres({ tarjetaId, onCierresChange }: { tarjeta
   const [form, setForm] = useState<FormState>(emptyForm())
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<TarjetaCierre | null>(null)
 
   const load = () =>
     fetch(`/api/tarjetas/${tarjetaId}/cierres`)
@@ -189,12 +191,20 @@ export default function TarjetaCierres({ tarjetaId, onCierresChange }: { tarjeta
               </Box>
               <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
                 <IconButton size="small" onClick={() => handleEdit(c)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => handleDelete(c.id)}><DeleteIcon fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={() => setConfirmDelete(c)}><DeleteIcon fontSize="small" /></IconButton>
               </Box>
             </Box>
           ))}
         </Box>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Eliminar cierre"
+        message={confirmDelete ? `¿Seguro que querés eliminar el cierre de ${MESES[confirmDelete.mes - 1]} ${confirmDelete.anio}? Esta acción no se puede deshacer.` : ''}
+        onConfirm={async () => { if (confirmDelete) await handleDelete(confirmDelete.id); setConfirmDelete(null) }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </Box>
   )
 }

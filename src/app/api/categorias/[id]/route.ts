@@ -7,7 +7,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(categoria)
 }
 
+// DELETE /api/categorias/[id] — borra una categoría sólo si no está en uso.
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  await prisma.categoria.delete({ where: { id: Number(params.id) } })
+  const id = Number(params.id)
+  const categoria = await prisma.categoria.findUnique({
+    where: { id },
+    include: { _count: { select: { gastos: true, items: true } } },
+  })
+  if (!categoria) return NextResponse.json({ error: 'No encontrada' }, { status: 404 })
+
+  const uso = categoria._count.gastos + categoria._count.items
+  if (uso > 0) {
+    return NextResponse.json(
+      { error: `No se puede borrar: está en uso por ${uso} gasto(s)/sub-item(s).` },
+      { status: 409 },
+    )
+  }
+
+  await prisma.categoria.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }

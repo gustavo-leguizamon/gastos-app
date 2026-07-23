@@ -24,6 +24,7 @@ import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import AppToggle from '@/components/shared/AppToggle'
 import Tooltip from '@mui/material/Tooltip'
+import Chip from '@mui/material/Chip'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
@@ -32,6 +33,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import toast from 'react-hot-toast'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
@@ -57,7 +59,11 @@ function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   }
 
   const remove = async (id: number) => {
-    await fetch(`${endpoint}/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${endpoint}/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error ?? 'Error al eliminar')
+    }
     await load()
   }
 
@@ -101,6 +107,35 @@ export default function ConfiguracionPage() {
     try { await updateEtiqueta(editingEtiqueta.id, { nombre: editingEtiqueta.nombre.trim() }); setEditingEtiqueta(null); toast.success('Etiqueta actualizada') }
     catch { toast.error('Error al actualizar etiqueta') }
   }
+
+  const handleRemoveEtiqueta = async (id: number) => {
+    try { await removeEtiqueta(id); toast.success('Etiqueta eliminada') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar etiqueta') }
+  }
+
+  const handleRemoveCategoria = async (id: number) => {
+    try { await removeCategoria(id); toast.success('Categoría eliminada') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar categoría') }
+  }
+
+  const handleRemoveCasa = async (id: number) => {
+    try { await removeCasa(id); toast.success('Casa eliminada') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar casa') }
+  }
+
+  const handleRemoveMoneda = async (id: number) => {
+    try { await removeMoneda(id); toast.success('Moneda eliminada') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar moneda') }
+  }
+
+  const handleRemoveTarjeta = async (id: number) => {
+    try { await removeTarjeta(id); toast.success('Tarjeta eliminada') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar tarjeta') }
+  }
+
+  // Confirmación de borrado genérica para todas las secciones de configuración.
+  const [confirmDelete, setConfirmDelete] = useState<{ nombre: string; run: () => void | Promise<void> } | null>(null)
+  const askDelete = (nombre: string, run: () => void | Promise<void>) => setConfirmDelete({ nombre, run })
 
   const handleAddCasa = async () => {
     if (!nuevaCasa.trim()) return
@@ -218,7 +253,7 @@ export default function ConfiguracionPage() {
                       ) : (
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton size="small" onClick={() => setEditingCasa({ id: c.id, nombre: c.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeCasa(c.id); toast.success('Casa eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => askDelete(c.nombre, () => handleRemoveCasa(c.id))}><DeleteIcon fontSize="small" /></IconButton>
                         </Box>
                       )
                     }
@@ -273,7 +308,7 @@ export default function ConfiguracionPage() {
                         <ListItemText primary={`${m.simbolo} ${m.codigo}`} secondary={m.nombre} />
                         <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
                           <IconButton size="small" onClick={() => setEditingMoneda({ ...m })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeMoneda(m.id); toast.success('Moneda eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => askDelete(`${m.simbolo} ${m.codigo}`, () => handleRemoveMoneda(m.id))}><DeleteIcon fontSize="small" /></IconButton>
                         </Box>
                       </Box>
                     )}
@@ -312,9 +347,14 @@ export default function ConfiguracionPage() {
                           <IconButton size="small" onClick={() => setEditingCategoria(null)}><CloseIcon fontSize="small" /></IconButton>
                         </Box>
                       ) : (
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                          <Chip size="small" label={`${l.uso ?? 0} uso${l.uso === 1 ? '' : 's'}`} variant="outlined" sx={{ mr: 0.5 }} />
                           <IconButton size="small" onClick={() => setEditingCategoria({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeCategoria(l.id); toast.success('Categoría eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                          <Tooltip title={(l.uso ?? 0) > 0 ? 'En uso: no se puede borrar' : 'Borrar'}>
+                            <span>
+                              <IconButton size="small" disabled={(l.uso ?? 0) > 0} onClick={() => askDelete(l.nombre, () => handleRemoveCategoria(l.id))}><DeleteIcon fontSize="small" /></IconButton>
+                            </span>
+                          </Tooltip>
                         </Box>
                       )
                     }
@@ -328,7 +368,7 @@ export default function ConfiguracionPage() {
                         sx={{ mr: 9 }}
                       />
                     ) : (
-                      <ListItemText primary={l.nombre} sx={{ pr: 9 }} />
+                      <ListItemText primary={l.nombre} sx={{ pr: 16 }} />
                     )}
                   </ListItem>
                 ))}
@@ -368,9 +408,14 @@ export default function ConfiguracionPage() {
                           <IconButton size="small" onClick={() => setEditingEtiqueta(null)}><CloseIcon fontSize="small" /></IconButton>
                         </Box>
                       ) : (
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                          <Chip size="small" label={`${l.uso ?? 0} uso${l.uso === 1 ? '' : 's'}`} variant="outlined" sx={{ mr: 0.5 }} />
                           <IconButton size="small" onClick={() => setEditingEtiqueta({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => { removeEtiqueta(l.id); toast.success('Etiqueta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                          <Tooltip title={(l.uso ?? 0) > 0 ? 'En uso: no se puede borrar' : 'Borrar'}>
+                            <span>
+                              <IconButton size="small" disabled={(l.uso ?? 0) > 0} onClick={() => askDelete(l.nombre, () => handleRemoveEtiqueta(l.id))}><DeleteIcon fontSize="small" /></IconButton>
+                            </span>
+                          </Tooltip>
                         </Box>
                       )
                     }
@@ -384,7 +429,7 @@ export default function ConfiguracionPage() {
                         sx={{ mr: 9 }}
                       />
                     ) : (
-                      <ListItemText primary={l.nombre} sx={{ pr: 9 }} />
+                      <ListItemText primary={l.nombre} sx={{ pr: 16 }} />
                     )}
                   </ListItem>
                 ))}
@@ -495,7 +540,7 @@ export default function ConfiguracionPage() {
                               onClick={e => e.stopPropagation()}
                             >
                               <IconButton size="small" onClick={() => setEditingTarjeta({ ...t })}><EditIcon fontSize="small" /></IconButton>
-                              <IconButton size="small" onClick={() => { removeTarjeta(t.id); toast.success('Tarjeta eliminada') }}><DeleteIcon fontSize="small" /></IconButton>
+                              <IconButton size="small" onClick={() => askDelete(t.nombre, () => handleRemoveTarjeta(t.id))}><DeleteIcon fontSize="small" /></IconButton>
                             </Box>
                           </AccordionSummary>
                           <AccordionDetails sx={{ px: 1.5, pt: 0 }}>
@@ -606,6 +651,14 @@ export default function ConfiguracionPage() {
           </Card>
         </Grid>
       </Grid>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Confirmar eliminación"
+        message={`¿Seguro que querés eliminar "${confirmDelete?.nombre ?? ''}"? Esta acción no se puede deshacer.`}
+        onConfirm={async () => { await confirmDelete?.run(); setConfirmDelete(null) }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </Box>
   )
 }
