@@ -50,7 +50,8 @@ export default function TarjetasCerradas({ filtros, refreshKey }: Props) {
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {tarjetas.map(t => {
-          const label = t.banco || t.nombre
+          const titulo = t.banco || t.nombre
+          const subtitulo = titulo !== t.nombre ? t.nombre : null
           const accent = marcaColor((t.marca ?? null) as TarjetaMarca | null) ?? '#6366f1'
           return (
             <Tooltip
@@ -89,11 +90,11 @@ export default function TarjetasCerradas({ filtros, refreshKey }: Props) {
                 <BrandLogo marca={t.marca} width={44} height={32} />
                 <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.2 }} noWrap>
-                    {label}
+                    {titulo}
                   </Typography>
-                  {t.marca && (
-                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
-                      {t.marca}
+                  {subtitulo && (
+                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }} noWrap>
+                      {subtitulo}
                     </Typography>
                   )}
                 </Box>

@@ -219,7 +219,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
             value={monto}
             onChange={e => setMonto(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            inputProps={{ min: 0.01, step: 0.01 }}
+            inputProps={{ step: 0.01 }}
             sx={{ flex: 1 }}
           />
           <Button

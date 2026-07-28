@@ -425,7 +425,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       width: 110,
       renderCell: ({ value, row }) => {
         if (row._type === 'item' || row._type === 'items_total') return '-'
-        return value > 0 ? <span style={{ color: '#ec4899' }}>{fmtARS(value)}</span> : '-'
+        return value !== 0 ? <span style={{ color: '#ec4899' }}>{fmtARS(value)}</span> : '-'
       },
     },
     {
@@ -434,7 +434,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       width: 110,
       renderCell: ({ value, row }) => {
         if (row._type === 'item' || row._type === 'items_total') return '-'
-        return value > 0 ? <span style={{ color: '#8b5cf6' }}>{fmtARS(value)}</span> : '-'
+        return value !== 0 ? <span style={{ color: '#8b5cf6' }}>{fmtARS(value)}</span> : '-'
       },
     },
     {
@@ -757,19 +757,19 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           </Box>
 
           {/* Extras opcionales */}
-          {(g.pasaje_mes_siguiente > 0 || g.prestamo_a_otro > 0 || (g.moneda_codigo !== 'ARS')) && (
+          {(g.pasaje_mes_siguiente !== 0 || g.prestamo_a_otro !== 0 || (g.moneda_codigo !== 'ARS')) && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1 }}>
               {g.moneda_codigo !== 'ARS' && (
                 <Typography variant="caption" color="text.secondary">
                   {fmtNum(g.total_moneda, g.moneda_simbolo ?? '$')} (TC ${new Intl.NumberFormat('es-AR').format(g.tipo_cambio)})
                 </Typography>
               )}
-              {g.pasaje_mes_siguiente > 0 && (
+              {g.pasaje_mes_siguiente !== 0 && (
                 <Typography variant="caption" sx={{ color: '#ec4899' }}>
                   Pasaje: {fmtARS(g.pasaje_mes_siguiente)}
                 </Typography>
               )}
-              {g.prestamo_a_otro > 0 && (
+              {g.prestamo_a_otro !== 0 && (
                 <Typography variant="caption" sx={{ color: '#8b5cf6' }}>
                   Préstamo: {fmtARS(g.prestamo_a_otro)}
                 </Typography>

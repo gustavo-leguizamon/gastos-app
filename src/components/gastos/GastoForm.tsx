@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import BrandLogo from '@/components/shared/BrandLogo'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
-import * as yup from 'yup'
+import { gastoFormSchema } from '@/lib/gasto-form-schema'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
 import Autocomplete from '@mui/material/Autocomplete'
@@ -21,36 +21,7 @@ import type { Casa, Moneda, Tarjeta, Categoria, Etiqueta, Gasto, GastoFormData }
 
 const byNombre = (a: { nombre: string }, b: { nombre: string }) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
 
-const schema = yup.object({
-  fecha_vencimiento: yup.string().required('Requerido'),
-  descripcion: yup.string().required('Requerido').max(200),
-  casa_id: yup.number().required('Requerido').min(1, 'Seleccioná una casa'),
-  tipo_pago: yup.string().oneOf(['C', 'D']).required('Requerido'),
-  moneda_id: yup.number().required('Requerido').min(1, 'Seleccioná una moneda'),
-  tipo_cambio: yup.number().required('Requerido').min(0.0001, 'Debe ser > 0'),
-  total_moneda: yup.number().required('Requerido'),
-  total_pagado: yup.number().min(0, 'Debe ser >= 0').required('Requerido'),
-  pasaje_mes_siguiente: yup.number().min(0).required('Requerido'),
-  prestamo_a_otro: yup.number().min(0).required('Requerido'),
-  tarjeta_id: yup
-    .number()
-    .nullable()
-    .when('tipo_pago', {
-      is: 'C',
-      then: (s) => s.typeError('Seleccioná una tarjeta').required('Seleccioná una tarjeta').min(1, 'Seleccioná una tarjeta'),
-      otherwise: (s) => s.optional(),
-    }),
-  cuota_actual: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
-  cuotas_totales: yup.number().nullable().optional().min(1, 'Debe ser >= 1'),
-  mes: yup.number().required(),
-  anio: yup.number().required(),
-  notas: yup.string().optional().default(''),
-  confirmado: yup.boolean().required().default(true),
-  categoria_id: yup.number().nullable().default(null),
-  etiqueta_ids: yup.array().of(yup.number()).default([]),
-  es_tarjeta: yup.boolean().required().default(false),
-  pagado_completo: yup.boolean().required().default(false),
-})
+const schema = gastoFormSchema
 
 interface Props {
   gasto?: Gasto | null
@@ -422,9 +393,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                   label="Total Pagado (ARS)"
                   type="number"
                   size="small"
-                  inputProps={{ step: 0.01, min: 0 }}
+                  inputProps={{ step: 0.01 }}
                   error={!!errors.total_pagado}
-                  helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si > 0, se crea un pago con la fecha del gasto')}
+                  helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si es distinto de 0, se crea un pago con la fecha del gasto')}
                 />
               )}
             />
@@ -445,7 +416,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                     label="Pasaje Mes Siguiente (ARS)"
                     type="number"
                     size="small"
-                    inputProps={{ step: 0.01, min: 0 }}
+                    inputProps={{ step: 0.01 }}
                     error={!!errors.pasaje_mes_siguiente}
                     helperText={errors.pasaje_mes_siguiente?.message}
                   />
@@ -464,7 +435,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                     label="Préstamo a otra persona (ARS)"
                     type="number"
                     size="small"
-                    inputProps={{ step: 0.01, min: 0 }}
+                    inputProps={{ step: 0.01 }}
                     error={!!errors.prestamo_a_otro}
                     helperText={errors.prestamo_a_otro?.message}
                   />

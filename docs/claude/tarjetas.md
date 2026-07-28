@@ -67,8 +67,8 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 
 `TarjetasCerradas` (`src/components/gastos/TarjetasCerradas.tsx`) — montado en `/gastos` debajo de `ResumenCards`. `GET /api/tarjetas/cerradas?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como chips/cards las tarjetas cuyo `TarjetaCierre` del mes filtrado tiene `fechaProximoCierre` **menor a hoy**. Cada chip:
 - `<BrandLogo marca={t.marca} width={44} height={32} />`.
-- Banco (o nombre) como texto principal.
-- `marca` como caption.
+- Banco (o nombre si no hay banco) como texto principal.
+- **Nombre de la tarjeta** como caption (se omite si el título ya es el nombre, es decir cuando la tarjeta no tiene banco).
 - Tooltip con las 3 fechas.
 
 **Estética unificada con `/configuracion`:** ambos usan `BrandLogo` con dimensiones idénticas (44x32) y el mismo wrapper (borde + `bgcolor` tintados con `marcaColor(t.marca)`). Helper `marcaColor` exportado desde `TarjetaLogo.tsx`.

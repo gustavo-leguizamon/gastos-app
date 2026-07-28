@@ -7,7 +7,13 @@
 - `total_pagado = SUM(pagos.monto)` — del relation `Pago`, **no** de `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
-**Montos negativos:** `total_moneda` admite valores negativos (validación Yup en `GastoForm` sin `min(0)` y campo sin `min` en `inputProps`) para reflejar devoluciones/reintegros de tarjeta de crédito. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total. Los sub-items (`GastoItem.monto`) también admiten negativos. `total_pagado`/`pasaje_mes_siguiente`/`prestamo_a_otro` siguen restringidos a `>= 0`.
+**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, `prestamo_a_otro`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total.
+
+Los únicos pisos numéricos que quedan son `tipo_cambio > 0` (`min(0.0001)`) y las cuotas `>= 1`. Los pagos siguen rechazando monto `0` (`PagoDialog` valida `montoNum !== 0`).
+
+El schema Yup del formulario vive en **`src/lib/gasto-form-schema.ts`** (módulo puro, sin imports de MUI/React) y `GastoForm` lo consume vía `yupResolver`. Está testeado en `gasto-form-schema.test.ts`: acepta negativos en los cuatro montos y mantiene los pisos de `tipo_cambio`, cuotas, casa/moneda/descripción y tarjeta requerida cuando `tipo_pago === 'C'`.
+
+En el grid, las columnas **Pasaje** y **Préstamo** (y el bloque de extras de la vista mobile) se muestran cuando el valor es `!== 0` — antes usaban `> 0`, lo que ocultaba los negativos.
 
 `/api/resumen` computa estos agregados server-side para las cards. También devuelve:
 - `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas - total_pasajes`
