@@ -87,7 +87,10 @@ export default function AppSelect({
   return (
     <Autocomplete
       freeSolo={!!onCreate}
-      selectOnFocus={!!onCreate}
+      // Siempre: al hacer foco se selecciona el valor actual para poder tipear encima y buscar
+      // otra opción sin borrar a mano (misma convención que `AppTextField`). No puede quedar
+      // atado a `onCreate`: con `freeSolo={false}` MUI ya lo trae en true y pasarle false lo rompía.
+      selectOnFocus
       clearOnBlur={!!onCreate}
       handleHomeEndKeys
       options={allOptions as CreatableOption[]}
