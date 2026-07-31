@@ -38,7 +38,8 @@ import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
 import BrandLogo from '@/components/shared/BrandLogo'
-import type { Casa, Categoria, Etiqueta, Moneda, Tarjeta, TarjetaMarca } from '@/lib/types'
+import AppSelect from '@/components/shared/AppSelect'
+import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -188,12 +189,13 @@ export default function ConfiguracionPage() {
     catch { toast.error('Error al actualizar tarjeta') }
   }
 
-  // Settings (estimado próximo mes)
-  const [settings, setSettings] = useState({
+  // Settings (estimado próximo mes + defaults del alta de gastos)
+  const [settings, setSettings] = useState<Settings>({
     estim_meses_atras: 2,
-    estim_missing_behavior: 'zero' as 'zero' | 'average_found',
+    estim_missing_behavior: 'zero',
     estim_incluir_cuotas_vigentes: true,
     estim_excluir_ultima_cuota: true,
+    casa_default_id: null,
   })
   const [savingSettings, setSavingSettings] = useState(false)
   useEffect(() => {
@@ -554,6 +556,36 @@ export default function ConfiguracionPage() {
               </List>
             </AccordionDetails>
           </Accordion>
+        </Grid>
+
+        {/* Valores por defecto del alta de gastos */}
+        <Grid item xs={12}>
+          <Card>
+            <CardHeader
+              titleTypographyProps={{ fontWeight: 700, variant: 'h6' }}
+              title="Valores por defecto (nuevo gasto)"
+            />
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                El resto de los campos del alta se prefillean solos con los datos del último gasto
+                del concepto que elijas (categoría, etiquetas, medio de pago, monto).
+              </Typography>
+              <Box sx={{ maxWidth: 360, mb: 2 }}>
+                <AppSelect
+                  label="Casa por defecto"
+                  options={casas.map(c => ({ value: c.id, label: c.nombre }))}
+                  value={settings.casa_default_id}
+                  onChange={v => setSettings(p => ({ ...p, casa_default_id: v == null ? null : Number(v) }))}
+                  fullWidth
+                  emptyLabel="Sin default (elegir cada vez)"
+                  helperText="Se preselecciona al abrir el alta de un gasto"
+                />
+              </Box>
+              <Button variant="contained" onClick={handleSaveSettings} disabled={savingSettings}>
+                {savingSettings ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </CardContent>
+          </Card>
         </Grid>
 
         {/* Estimación próximo mes */}

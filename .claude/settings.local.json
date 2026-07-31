@@ -83,7 +83,9 @@
       "PowerShell(Select-String -Path \"node_modules\\\\@mui\\\\x-data-grid\\\\DataGrid\\\\useDataGridProps.js\" -Pattern \"pagination|disableVirtualization|autoPageSize|DATA_GRID_PROPS_DEFAULT_VALUES|signature\" | ForEach-Object { $_.Line.Trim\\(\\) })",
       "PowerShell(Select-String -Path \"node_modules\\\\@mui\\\\x-data-grid\\\\hooks\\\\features\\\\pagination\\\\useGridPaginationModel.js\" -Pattern \"pageSizeOptions|warn|not in|ALL_RESULTS|MUI X\" | ForEach-Object { $_.Line.Trim\\(\\) })",
       "PowerShell(npx vitest run src/app/api/categorias src/app/api/etiquetas 2>&1 | Select-Object -Last 30; Write-Output \"EXIT: $LASTEXITCODE\")",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(netstat -ano)",
+      "Bash(grep -n \"{/\\\\* [A-ZÉ]\" src/components/gastos/GastoForm.tsx)"
     ]
   },
   "hooks": {

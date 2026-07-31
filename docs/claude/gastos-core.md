@@ -118,11 +118,42 @@ Las flechas ‹ › navegan mes a mes (con wraparound de año). Además, el labe
 
 **Cancelar** cierra directo sin pedir confirmación (`onClose` en vez de `handleRequestClose`). El `ConfirmDialog` "¿Cerrar sin guardar?" sigue activo para backdrop/ESC.
 
+## GastoForm — layout y orden de campos
+
+El form está optimizado para cargar rápido: los campos con default correcto en la mayoría de las cargas están colapsados y el primer campo es el que dispara el autofill.
+
+**Área principal** — sólo lo que se tipea en toda carga, en este orden: `descripcion` (con `autoFocus` en alta) + `total_moneda` → `tipo_cambio` + "Total en ARS" (sólo si la moneda no es ARS) → `fecha_vencimiento` + **Medio de pago**.
+
+**Acordeón "Más opciones"** (`defaultExpanded` sólo en edición), en filas de dos: `categoria_id` + `etiqueta_ids` → `casa_id` + `moneda_id` → `pagado_completo` (fila propia) → `total_pagado` + cuotas → `notas` → `pasaje_mes_siguiente` + `prestamo_a_otro` (edición) → `confirmado` → `es_tarjeta`. El orden está armado para que los `sm={6}` queden emparejados y no sobre ninguno suelto: por eso `moneda_id` sube al lado de `casa_id` y las cuotas bajan al lado de `total_pagado` (cuando `pagado_completo` está marcado, `total_pagado` se oculta y las cuotas quedan solas en la fila).
+
+Todos estos campos están acá porque el autofill los llena (categoría/etiquetas desde el concepto, casa desde el default configurable) o porque su default sirve en la carga típica. Corolario: los helpers `de jun 2026` de esos campos sólo se ven al expandir el acordeón; el aviso de que hubo prefill vive en el helper de `descripcion`, que siempre está visible.
+
+**Medio de pago (colapsa `tipo_pago` + `tarjeta_id`)**: un `AppSelect` con "Débito / Efectivo" + una opción por tarjeta. Elegir tarjeta setea `tipo_pago='C'` + `tarjeta_id`; elegir débito setea `'D'` + `null`. Ambos `setValue` van con `shouldDirty: true` para que el autofill no los pise después. Las opciones de tarjeta llevan `render` (logo + nombre en el dropdown) y **`adornment`** (logo al lado del valor ya seleccionado, como `startAdornment` del input) — ver `AppSelect` en `docs/claude/inversiones-shared.md`.
+**Excepción `es_tarjeta`**: en un resumen de tarjeta se renderizan los **dos controles separados** (toggle C/D + select de tarjeta), porque ahí la tarjeta es opcional y puede convivir con `tipo_pago='D'` — combinación no representable en el control unificado.
+
+**"Guardar y cargar otro"** (`GastoDialog`, sólo en alta): guarda, deja el diálogo abierto e incrementa `resetSignal`, prop que `GastoForm` observa para hacer `reset()` conservando el contexto de carga (fecha, casa, medio de pago, moneda) y limpiando `descripcion`, montos, categoría/etiquetas, cuotas y notas (`confirmado` y `pagado_completo` vuelven a `true`). Refocusea descripción vía `descripcionRef`.
+
+## Valores por defecto del alta
+
+**Casa por defecto** — `Settings.casaDefaultId` (`casa_default_id` en la API), configurable en `/configuracion` → "Valores por defecto (nuevo gasto)". `GastoForm` la aplica sólo en alta; si no hay default configurado cae al comportamiento previo (autocompletar cuando existe **una sola** casa). `PUT /api/settings` valida que el id exista (si no, ignora el cambio) y acepta `null` para limpiarlo.
+
+**Defaults aprendidos por concepto** — al elegir un concepto ya usado, el alta se prefillea con los valores de su **último gasto**: `casa_id`, `tipo_pago`, `tarjeta_id`, `moneda_id`, `tipo_cambio`, `categoria_id`, `etiqueta_ids` y `total_moneda`. Backend: `GET /api/conceptos/[id]/ultimo-uso` + módulo puro `src/lib/concepto-defaults.ts` (`toConceptoDefaults`, `ULTIMO_USO_ORDER_BY` = `anio`/`mes`/`id` desc). Tests: `concepto-defaults.test.ts` y `ultimo-uso/route.test.ts`.
+
+Reglas del autofill:
+
+- **No se heredan** `es_tarjeta`, `notas`, cuotas, `pasaje_mes_siguiente` ni `prestamo_a_otro`: son propios de la ocurrencia puntual, no del concepto (una cuota 3/12 el mes que viene es 4/12).
+- La query excluye `esTarjeta: true` (un resumen de tarjeta no es un gasto cargable a mano) y la `tarjeta_id` sólo se hereda si el pago era con crédito.
+- **Cuándo dispara**: sólo al elegir del dropdown (`onChange`) o al salir del campo (`onBlur`) — nunca por tecla, porque tipear "Luz de la casa" pasaría por "Luz" en el camino y prefillearía con el concepto equivocado.
+- **Nunca sobreescribe** un campo que el usuario ya tocó (se chequea `formState.dirtyFields`). Los `setValue` del autofill no marcan dirty, así que cambiar la descripción reemplaza el autofill anterior pero preserva lo tipeado a mano.
+- **Monto heredado ⇒ sin confirmar**: si el autofill escribió `total_moneda`, pone `confirmado = false` (encaja con el render naranja + warning de las filas no confirmadas). **`pagado_completo` no se toca**: sigue marcado por default siempre, por decisión de producto. Consecuencia a tener presente: un gasto con monto heredado se guarda con un pago automático por ese monto aún sin confirmar; si el monto real difiere, hay que ajustar el pago.
+- **Feedback**: los campos escritos por el autofill (y aún no tocados) muestran un helper `de jun 2026`; la descripción muestra un ícono ✨ y el helper "Prefilleado con el último uso (jun 2026)".
+- **Concepto nuevo**: si al salir del campo el texto no matchea ningún `Concepto` (comparación con `normalizeNombre` case-insensitive), aparece un chip **"nuevo concepto"** y el helper avisa que se crea al guardar y que conviene revisar typos. Es la guardia contra "Netlfix": un duplicado por typo rompe en silencio el match por `conceptoId` de evolución/estimado/copiar. No hay prefill porque no hay histórico.
+
 ## GastoForm — campos condicionales
 
-- **Tipo de cambio**: `tipo_cambio` solo se renderiza cuando la moneda no es ARS. Al cambiar a ARS, set `tipo_cambio = 1`. "Total en ARS" readonly debajo cuando aplica.
-- **Cuotas**: `cuota_actual`/`cuotas_totales` ocultos por default. Toggle "Pago en cuotas" (`usaCuotas` local). Al desmarcar, ambos a `null`. Al editar gasto con cuotas pre-existentes, el toggle se inicializa marcado.
-- **Total pagado / Pagado completo**: en alta, toggle `pagado_completo` (no se persiste), **marcado por default**. Si marcado, el campo "Total Pagado (ARS)" se oculta. En `GastoDialog.handleSubmit`:
+- **Tipo de cambio**: `tipo_cambio` solo se renderiza cuando la moneda no es ARS. Al cambiar a ARS, set `tipo_cambio = 1`. "Total en ARS" readonly al lado cuando aplica.
+- **Cuotas**: un **único campo de texto** "Cuotas (opcional)" con formato `3/12`, parseado por `src/lib/cuotas.ts` (`parseCuotas`/`formatCuotas`, módulo puro testeado en `cuotas.test.ts`). Vacío = sin cuotas (ambos `null`); un solo número (`12`) equivale a `1/12`; rechaza no enteros, `< 1`, pares incompletos y cuota > total, mostrando el error en el helper sin tocar el form. Reemplazó al toggle "Pago en cuotas" + dos inputs numéricos.
+- **Total pagado / Pagado completo**: en alta, toggle `pagado_completo` (no se persiste), **marcado por default** (salvo que el autofill haya heredado el monto — ver arriba). Si marcado, el campo "Total Pagado (ARS)" se oculta. En `GastoDialog.handleSubmit`:
   - Si `pagado_completo = true` → `POST /api/gastos/[id]/pagos` con `{ fecha: gasto.fecha_vencimiento, monto: total_moneda × tipo_cambio }`.
   - Si `pagado_completo = false` y `total_pagado > 0` → registra pago parcial.
   - Si falla, toast pero gasto ya creado.
@@ -139,7 +170,7 @@ El "qué" de un gasto/sub-item (Netflix, Luz, Expensas) es una **entidad** `Conc
 
 **Resolución (write paths):** los forms siguen mandando `descripcion` como texto (o `concepto_id` si ya se eligió uno). Las routes resuelven con `resolveConcepto(prisma, texto)` (`src/lib/conceptos.ts`): find-or-create case-insensitive, normalizando con `normalizeNombre` (trim + colapso de espacios internos, casing preservado). Aplica en `gastos` POST/PUT, `items` POST/PUT, y la propagación de pagos a tarjeta (el sub-item hereda `source.conceptoId`; el gasto CC `esTarjeta` resuelve el nombre de la tarjeta a concepto).
 
-**Autocompletado:** los campos "Descripción" de `GastoForm` y `GastoItemDialog` usan `Autocomplete` `freeSolo`. `GET /api/gastos/descripciones` y `GET /api/items/descripciones` devuelven ahora los **nombres de `Concepto`** (`concepto.nombre`, ordenados con `localeCompare('es', { sensitivity: 'base' })`) — antes era un `distinct` sobre texto libre.
+**Autocompletado:** los campos "Descripción" de `GastoForm` y `GastoItemDialog` usan `Autocomplete` `freeSolo`. `GastoItemDialog` consume `GET /api/items/descripciones`, que devuelve los **nombres de `Concepto`** (`concepto.nombre`, ordenados con `localeCompare('es', { sensitivity: 'base' })`) — antes era un `distinct` sobre texto libre. `GastoForm` en cambio consume **`GET /api/conceptos`** (id + nombre + uso) porque necesita el `id` para pedir los defaults del último uso; ordena las sugerencias por **uso descendente** y desempata por nombre, para que los conceptos frecuentes aparezcan primero. Con ese cambio **`GET /api/gastos/descripciones` quedó sin consumidores** (se mantiene la route, pero es candidata a borrar).
 
 **Administración** (`/configuracion` → "Conceptos", componente `ConceptosManager`): listar (con conteo de uso), renombrar (`PATCH /api/conceptos/[id]`, rechaza colisión con 409), borrar sólo si sin uso (`DELETE`, 409 si en uso; el borrado pide confirmación con `ConfirmDialog`), y **fusionar** duplicados (`POST /api/conceptos/merge` con `{ source_id, target_id }`: reasigna gastos+items y borra el origen).
 

@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete'
 import TextField from '@mui/material/TextField'
+import Box from '@mui/material/Box'
 
 /**
  * Select estándar de la app — wrapper de MUI `Autocomplete` con API simplificada.
@@ -19,6 +20,12 @@ export interface AppSelectOption {
   label: string
   /** Render opcional para mostrar contenido rico (íconos, etc.) dentro del item del dropdown. */
   render?: () => React.ReactNode
+  /**
+   * Ícono que acompaña al valor **ya seleccionado** dentro del input (no en el dropdown, eso es
+   * `render`). Sirve para que el campo cerrado se lea igual que la opción elegida — ej. el logo
+   * de la marca en un select de tarjetas.
+   */
+  adornment?: () => React.ReactNode
 }
 
 interface CreatableOption extends AppSelectOption {
@@ -125,16 +132,25 @@ export default function AppSelect({
       size={size}
       fullWidth={fullWidth}
       sx={sx}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          label={label}
-          size={size}
-          error={error}
-          helperText={helperText}
-          placeholder={placeholder}
-        />
-      )}
+      renderInput={(params) => {
+        const adornment = selectedOption?.adornment?.()
+        return (
+          <TextField
+            {...params}
+            label={label}
+            size={size}
+            error={error}
+            helperText={helperText}
+            placeholder={placeholder}
+            InputProps={{
+              ...params.InputProps,
+              startAdornment: adornment
+                ? <Box sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}>{adornment}</Box>
+                : params.InputProps.startAdornment,
+            }}
+          />
+        )
+      }}
     />
   )
 }

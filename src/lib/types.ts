@@ -151,6 +151,32 @@ export interface GastoFormData {
   pagado_completo?: boolean
 }
 
+export interface Settings {
+  estim_meses_atras: number
+  estim_missing_behavior: 'zero' | 'average_found'
+  estim_incluir_cuotas_vigentes: boolean
+  estim_excluir_ultima_cuota: boolean
+  /** Casa preseleccionada al abrir el alta de un gasto (null = sin default). */
+  casa_default_id: number | null
+}
+
+/**
+ * Valores con los que se prefillea el alta al elegir un concepto ya usado: se leen del último
+ * gasto de ese concepto (`GET /api/conceptos/[id]/ultimo-uso`). `origen` identifica de qué mes
+ * salieron para poder mostrarlo en el form. Null cuando el concepto no tiene histórico.
+ */
+export interface ConceptoDefaults {
+  casa_id: number
+  tipo_pago: 'C' | 'D'
+  moneda_id: number
+  tipo_cambio: number
+  tarjeta_id: number | null
+  categoria_id: number | null
+  etiqueta_ids: number[]
+  total_moneda: number
+  origen: { mes: number; anio: number }
+}
+
 export interface Resumen {
   total_gastos: number
   total_gastos_neto: number

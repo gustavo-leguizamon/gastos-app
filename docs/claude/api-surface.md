@@ -23,12 +23,13 @@
 | `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` < today. Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) — categoría **única** (partición). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
 | `GET/POST /api/etiquetas` | Etiquetas CRUD (`PUT/DELETE /api/etiquetas/[id]`) — **corte transversal** (M2M). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
-| `GET/PUT /api/settings` | Singleton de configuración global (parámetros del estimado del próximo mes) |
+| `GET/PUT /api/settings` | Singleton de configuración global: parámetros del estimado del próximo mes + `casa_default_id` (casa preseleccionada en el alta de gastos; el PUT valida que exista y acepta `null` para limpiarla) |
 | `GET /api/gastos/descripciones` | Nombres de `Concepto` (para autocompletar descripciones). |
 | `GET /api/items/descripciones` | Alias — devuelve lo mismo que `/api/gastos/descripciones`. `?parent=...` se acepta pero se ignora. |
 | `GET/POST /api/conceptos` | Lista de conceptos con conteo de uso / crear (find-or-create por nombre). |
 | `PATCH/DELETE /api/conceptos/[id]` | Renombrar (409 si colisiona con otro) / borrar (409 si está en uso). |
 | `POST /api/conceptos/merge` | Fusiona `{ source_id, target_id }`: reasigna gastos+items al destino y borra el origen. |
+| `GET /api/conceptos/[id]/ultimo-uso` | Defaults para prefillear el alta con el último gasto del concepto (excluye `esTarjeta`): `casa_id`, `tipo_pago`, `tarjeta_id`, `moneda_id`, `tipo_cambio`, `categoria_id`, `etiqueta_ids`, `total_moneda` y `origen: { mes, anio }`. `null` si el concepto no tiene histórico; 400 si el id es inválido. |
 | `GET/POST /api/inversiones` | List / create inversiones (parent — only `nombre`) |
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos |

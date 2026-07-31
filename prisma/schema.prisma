@@ -157,6 +157,9 @@ model Settings {
   estimMissingBehavior        String   @default("zero")
   estimIncluirCuotasVigentes  Boolean  @default(true)
   estimExcluirUltimaCuota     Boolean  @default(true)
+  // Casa preseleccionada al abrir el alta de un gasto. Null = sin default (el usuario elige),
+  // salvo que exista una sola casa (en ese caso GastoForm la autocompleta igual).
+  casaDefaultId               Int?
   updatedAt                   DateTime @updatedAt
 }
 

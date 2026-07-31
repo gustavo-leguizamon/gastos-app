@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -27,6 +27,9 @@ const FORM_ID = 'gasto-form'
 export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  // "Guardar y cargar otro": el diálogo queda abierto y el form se limpia conservando el contexto.
+  const [resetSignal, setResetSignal] = useState(0)
+  const seguirCargando = useRef(false)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -69,10 +72,15 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
       }
       toast.success(gasto ? 'Gasto actualizado' : 'Gasto creado')
       onSaved()
-      onClose()
+      if (seguirCargando.current) {
+        setResetSignal(n => n + 1)
+      } else {
+        onClose()
+      }
     } catch {
       toast.error('Error al guardar el gasto')
     } finally {
+      seguirCargando.current = false
       setLoading(false)
     }
   }
@@ -90,10 +98,21 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
             defaultAnio={filtros.anio}
             onSubmit={handleSubmit}
             formId={FORM_ID}
+            resetSignal={resetSignal}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={onClose} disabled={loading}>Cancelar</Button>
+          {!gasto && (
+            <Button
+              type="submit"
+              form={FORM_ID}
+              disabled={loading}
+              onClick={() => { seguirCargando.current = true }}
+            >
+              Guardar y cargar otro
+            </Button>
+          )}
           <Button
             type="submit"
             form={FORM_ID}
