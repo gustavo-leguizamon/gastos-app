@@ -61,6 +61,8 @@ El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccio
 - `onCreate?: (nombre) => Promise<{value,label} | null>` — si se provee, habilita **crear** una opción tipeando (freeSolo + item "Agregar «X»"); debe persistirla y devolver la nueva opción (o null si falla). Cuando no se pasa, el comportamiento es idéntico al anterior (sin freeSolo ni filtro custom).
 - `size`, `fullWidth`, `sx`, `error`, `helperText`, `placeholder` — passthrough.
 
+**Foco:** `selectOnFocus` está activo **siempre** (no sólo con `onCreate`), así al entrar al campo se selecciona el valor actual y se puede tipear encima para buscar otra opción sin borrar a mano — misma convención que `AppTextField`. Ojo: con `freeSolo={false}` el default de MUI ya es `true`, así que atarlo a `onCreate` lo desactivaba en todos los selects sin alta inline.
+
 **`render` vs `adornment`**: `render?: () => ReactNode` dibuja el item del **dropdown**; `adornment?: () => ReactNode` dibuja un ícono junto al valor **ya seleccionado** dentro del input (se inyecta como `startAdornment`, preservando el `params.InputProps.startAdornment` de MUI cuando la opción no lo define). Se pasan juntos cuando el campo cerrado tiene que leerse igual que la opción elegida — ej. el logo de marca en los selects de tarjeta de `GastoForm`.
 
 Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `render` + `adornment` para `BrandLogo`, Casa, Moneda, **Categoría con `onCreate`**), `GastoItemDialog` (Categoría con `onCreate`), `CopiarGastoDialog`/`CopiarMesDialog` (Mes/Año), `configuracion` (Casa por defecto).
