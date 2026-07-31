@@ -34,7 +34,7 @@ import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import BrandLogo from '@/components/shared/BrandLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
-import BulkClasificacionBar from './BulkClasificacionBar'
+import BulkAccionesBar from './BulkAccionesBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
@@ -80,6 +80,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [sortModel, setSortModel] = useState<GridSortModel>([])
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const sortGastos = (rows: Gasto[]) => {
     if (sortModel.length === 0) return rows
@@ -155,6 +156,27 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
 
   const applyBulkEtiqueta = (etiquetaId: number, action: 'add' | 'remove') =>
     applyBulk('etiquetas', { etiqueta_id: etiquetaId }, action, { add: 'Etiqueta agregada', remove: 'Etiqueta quitada' })
+
+  // Borrado masivo de los gastos seleccionados (`DELETE /api/gastos`, todo o nada).
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    try {
+      const res = await fetch('/api/gastos', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasto_ids: ids }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`${ids.length} gasto${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}`)
+      setBulkDeleteOpen(false)
+      setSelectionMode(false)
+      setSelectedIds(new Set())
+      onDeleted()
+    } catch {
+      toast.error('Error al eliminar los gastos')
+    }
+  }
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -894,13 +916,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   return (
     <>
       {selectionMode ? (
-        <BulkClasificacionBar
+        <BulkAccionesBar
           count={selectedIds.size}
           totalFiltrados={filteredIds.length}
           allSelected={allSelected}
           onToggleAll={toggleAll}
           onApplyCategoria={applyBulkCategoria}
           onApplyEtiqueta={applyBulkEtiqueta}
+          onDelete={() => setBulkDeleteOpen(true)}
           onCancel={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
         />
       ) : (
@@ -910,7 +933,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             startIcon={<ChecklistIcon />}
             onClick={() => setSelectionMode(true)}
           >
-            Clasificar varios
+            Seleccionar varios
           </Button>
         </Box>
       )}
@@ -1019,6 +1042,15 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         message="¿Estás seguro que querés eliminar este gasto? Esta acción no se puede deshacer."
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Eliminar gastos"
+        message={`¿Estás seguro que querés eliminar ${selectedIds.size} gasto${selectedIds.size !== 1 ? 's' : ''}? Se borran también sus pagos y sub-items. Esta acción no se puede deshacer.`}
+        confirmLabel={`Eliminar ${selectedIds.size}`}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
       />
 
       <PagoDialog

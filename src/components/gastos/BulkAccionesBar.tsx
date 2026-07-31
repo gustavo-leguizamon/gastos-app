@@ -11,6 +11,7 @@ import Divider from '@mui/material/Divider'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
 import CloseIcon from '@mui/icons-material/Close'
+import DeleteIcon from '@mui/icons-material/Delete'
 import IconButton from '@mui/material/IconButton'
 import AppSelect from '@/components/shared/AppSelect'
 import type { Categoria, Etiqueta } from '@/lib/types'
@@ -22,22 +23,25 @@ interface Props {
   onToggleAll: (checked: boolean) => void
   onApplyCategoria: (categoriaId: number, action: 'add' | 'remove') => Promise<void>
   onApplyEtiqueta: (etiquetaId: number, action: 'add' | 'remove') => Promise<void>
+  onDelete: () => void
   onCancel: () => void
 }
 
 /**
- * Barra contextual de acciones masivas sobre la clasificación de los gastos seleccionados.
+ * Barra contextual de acciones masivas sobre los gastos seleccionados.
  * Se muestra al activar el modo selección en `GastosTable`. Permite:
  *  - asignar/quitar la **categoría única** (partición) de todos los seleccionados;
- *  - agregar/quitar una **etiqueta** (corte transversal M2M) de todos los seleccionados.
+ *  - agregar/quitar una **etiqueta** (corte transversal M2M) de todos los seleccionados;
+ *  - **eliminar** todos los seleccionados (con confirmación en `GastosTable`).
  */
-export default function BulkClasificacionBar({
+export default function BulkAccionesBar({
   count,
   totalFiltrados,
   allSelected,
   onToggleAll,
   onApplyCategoria,
   onApplyEtiqueta,
+  onDelete,
   onCancel,
 }: Props) {
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -140,6 +144,22 @@ export default function BulkClasificacionBar({
         </Button>
         <Button variant="outlined" size="small" color="warning" startIcon={<RemoveIcon />} disabled={etDisabled} onClick={() => run(() => onApplyEtiqueta(etiquetaId!, 'remove'))}>
           Quitar etiqueta
+        </Button>
+      </Box>
+
+      <Divider />
+
+      {/* Fila 4: borrado masivo */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          color="error"
+          startIcon={<DeleteIcon />}
+          disabled={aplicando || count === 0}
+          onClick={onDelete}
+        >
+          Eliminar seleccionados
         </Button>
       </Box>
     </Paper>

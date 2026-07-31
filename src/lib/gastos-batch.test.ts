@@ -1,5 +1,33 @@
 import { describe, it, expect } from 'vitest'
-import { parseCategoriaBatch, parseEtiquetaBatch } from './gastos-batch'
+import { parseCategoriaBatch, parseEtiquetaBatch, parseGastoIdsBatch } from './gastos-batch'
+
+describe('parseGastoIdsBatch', () => {
+  it('parsea un body válido y deduplica gasto_ids', () => {
+    expect(parseGastoIdsBatch({ gasto_ids: [3, 1, 3, 2] })).toEqual({ gasto_ids: [3, 1, 2] })
+  })
+
+  it('coerce strings numéricos a number', () => {
+    expect(parseGastoIdsBatch({ gasto_ids: ['4', '5'] })).toEqual({ gasto_ids: [4, 5] })
+  })
+
+  it('ignora campos extra del body', () => {
+    expect(parseGastoIdsBatch({ gasto_ids: [1], action: 'add' })).toEqual({ gasto_ids: [1] })
+  })
+
+  it('rechaza gasto_ids vacío, no-array o ausente', () => {
+    expect(() => parseGastoIdsBatch({ gasto_ids: [] })).toThrow(/gasto_ids/)
+    expect(() => parseGastoIdsBatch({ gasto_ids: 'nope' })).toThrow(/gasto_ids/)
+    expect(() => parseGastoIdsBatch({})).toThrow(/gasto_ids/)
+    expect(() => parseGastoIdsBatch(null)).toThrow(/gasto_ids/)
+  })
+
+  it('rechaza gasto_ids con un id inválido', () => {
+    expect(() => parseGastoIdsBatch({ gasto_ids: [1, 0] })).toThrow(/id inválido/)
+    expect(() => parseGastoIdsBatch({ gasto_ids: [1, -2] })).toThrow(/id inválido/)
+    expect(() => parseGastoIdsBatch({ gasto_ids: [1, 'x'] })).toThrow(/id inválido/)
+    expect(() => parseGastoIdsBatch({ gasto_ids: [1.5] })).toThrow(/id inválido/)
+  })
+})
 
 describe('parseCategoriaBatch', () => {
   it('parsea un body válido y deduplica gasto_ids', () => {

@@ -68,13 +68,13 @@ Hay dos capas de tests:
 | `src/lib/conceptos.ts` (`normalizeNombre`, `resolveConcepto`) | Normalización (trim + colapso de espacios) y find-or-create case-insensitive de `Concepto`. Importado por los write paths de gastos/items/pagos y `/api/conceptos`. | `conceptos.test.ts` |
 | `src/lib/reportes-compute.ts` (`enumerateMonths`, `computeReportes`, `computeReporteSubitems`) | Ventana de meses del rango (wraparound, cap 60) y agregación de reportes sobre "unidades" (`aggregateUnits`): a nivel gasto (`computeReportes`) o desglosado por sub-item con fallback a gasto (`computeReporteSubitems`). KPIs, por categoría (atribución completa + "Sin categoría"), por mes, top conceptos, por tarjeta, por tipo de pago. Importado por `reportes/route.ts`. | `reportes-compute.test.ts` |
 | `src/lib/gasto-form-schema.ts` (`gastoFormSchema`) | Schema Yup del formulario de gasto (extraído de `GastoForm` para poder testearlo). Todos los montos (`total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, `prestamo_a_otro`) admiten negativos; pisos que se mantienen: `tipo_cambio > 0`, cuotas `>= 1`, casa/moneda/descripción requeridas, tarjeta requerida si `tipo_pago === 'C'`. | `gasto-form-schema.test.ts` |
-| `src/lib/gastos-batch.ts` (`parseCategoriaBatch`, `parseEtiquetaBatch`) | Validación/normalización del body de edición masiva de categoría única / etiquetas (action `add`/`remove`, `categoria_id`/`etiqueta_id`, `gasto_ids` no vacío con dedup y coerción a number). Importados por `gastos/categorias/route.ts` y `gastos/etiquetas/route.ts`. | `gastos-batch.test.ts` |
+| `src/lib/gastos-batch.ts` (`parseCategoriaBatch`, `parseEtiquetaBatch`, `parseGastoIdsBatch`) | Validación/normalización del body de las acciones masivas: categoría única / etiquetas (action `add`/`remove`, `categoria_id`/`etiqueta_id`) y borrado masivo (`gasto_ids` solo). En todos, `gasto_ids` no vacío con dedup y coerción a number. Importados por `gastos/categorias/route.ts`, `gastos/etiquetas/route.ts` y `gastos/route.ts` (DELETE). | `gastos-batch.test.ts` |
 
 **2. API routes con Prisma mockeado** (`vi.mock('@/lib/db', ...)`) — verifican el armado de filtros y el mapping snake_case↔camelCase de entrada/salida:
 
 | Route | Qué cubre | Test |
 |---|---|---|
-| `gastos/route.ts` | GET arma `where` desde query params; POST mapea body y aplica defaults. | `gastos/route.test.ts` |
+| `gastos/route.ts` | GET arma `where` desde query params; POST mapea body y aplica defaults; DELETE masivo (dedup de `gasto_ids` → un `deleteMany`, 400 body inválido, 404 sin borrar nada si falta algún id). | `gastos/route.test.ts` |
 | `gastos/[id]/route.ts` | GET 404/mapeo; PUT mapping + sync de concepto+categoría+etiquetas a items propagados de tarjeta; DELETE. | `gastos/[id]/route.test.ts` |
 | `gastos/[id]/items/route.ts` | POST mapping y defaults de flags. | `gastos/[id]/items/route.test.ts` |
 | `gastos/[id]/pagos/route.ts` | Propagación de pago a tarjeta: resolución del período destino por fechas de cierre completas (`resolvePeriodoTarjetaByCierres`), fallback por día del último cierre, `400` si no hay cierres, creación del gasto CC target, sub-item. | `gastos/[id]/pagos/route.test.ts` |

@@ -6,6 +6,7 @@ vi.mock('@/lib/db', () => ({
     gasto: {
       findMany: vi.fn(),
       create: vi.fn(),
+      deleteMany: vi.fn(),
     },
     concepto: {
       findFirst: vi.fn(),
@@ -14,11 +15,11 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-import { GET, POST } from './route'
+import { GET, POST, DELETE } from './route'
 import { prisma } from '@/lib/db'
 
 const mockPrisma = prisma as unknown as {
-  gasto: { findMany: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
+  gasto: { findMany: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> }
   concepto: { findFirst: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
 }
 
@@ -110,5 +111,39 @@ describe('POST /api/gastos', () => {
     expect(data.tarjetaId).toBeNull()
     expect(data.confirmado).toBe(true)
     expect(data.esTarjeta).toBe(false)
+  })
+})
+
+describe('DELETE /api/gastos (borrado masivo)', () => {
+  it('borra todos los ids en un solo deleteMany y devuelve el count', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([{ id: 4 }, { id: 9 }])
+    mockPrisma.gasto.deleteMany.mockResolvedValue({ count: 2 })
+
+    const res = await DELETE({ json: async () => ({ gasto_ids: [4, 9, 4] }) } as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toEqual({ ok: true, deleted: 2 })
+    // gasto_ids deduplicado por parseGastoIdsBatch
+    expect(mockPrisma.gasto.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [4, 9] } } })
+  })
+
+  it('400 si el body es inválido, sin tocar la DB', async () => {
+    const res = await DELETE({ json: async () => ({ gasto_ids: [] }) } as any)
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/gasto_ids/)
+    expect(mockPrisma.gasto.findMany).not.toHaveBeenCalled()
+    expect(mockPrisma.gasto.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('404 y no borra nada si alguno de los ids no existe', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([{ id: 4 }])
+
+    const res = await DELETE({ json: async () => ({ gasto_ids: [4, 9] }) } as any)
+
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toMatch(/9/)
+    expect(mockPrisma.gasto.deleteMany).not.toHaveBeenCalled()
   })
 })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
+import { parseGastoIdsBatch } from '@/lib/gastos-batch'
 
 const INCLUDE = {
   casa: true,
@@ -63,4 +64,33 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(toGastoResponse(gasto), { status: 201 })
+}
+
+/**
+ * DELETE /api/gastos — borrado masivo. Body: { gasto_ids: number[] }.
+ * Mismo efecto que llamar `DELETE /api/gastos/[id]` por cada id, pero en un solo
+ * `deleteMany` (todo o nada): la cascada de la DB borra los pagos y sub-items propios y
+ * los sub-items propagados a la tarjeta (linkeados por un pago del gasto).
+ * Si alguno de los ids no existe no se borra nada y responde 404 — así el cliente no
+ * se queda con la idea de que borró todo cuando venía con ids viejos.
+ */
+export async function DELETE(req: NextRequest) {
+  let input
+  try {
+    input = parseGastoIdsBatch(await req.json())
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 })
+  }
+
+  const { gasto_ids } = input
+
+  const existentes = await prisma.gasto.findMany({ where: { id: { in: gasto_ids } }, select: { id: true } })
+  if (existentes.length !== gasto_ids.length) {
+    const encontrados = new Set(existentes.map(g => g.id))
+    const faltantes = gasto_ids.filter(id => !encontrados.has(id))
+    return NextResponse.json({ error: `Gastos no encontrados: ${faltantes.join(', ')}` }, { status: 404 })
+  }
+
+  const { count } = await prisma.gasto.deleteMany({ where: { id: { in: gasto_ids } } })
+  return NextResponse.json({ ok: true, deleted: count })
 }
