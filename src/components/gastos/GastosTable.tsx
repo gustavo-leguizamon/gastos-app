@@ -33,6 +33,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import BrandLogo from '@/components/shared/BrandLogo'
+import BancoLogo from '@/components/shared/BancoLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import BulkAccionesBar from './BulkAccionesBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
@@ -43,7 +44,8 @@ import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
 import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
-import type { Gasto, FiltrosGastos } from '@/lib/types'
+import { hasBancoIcono } from '@/lib/bancos'
+import type { Gasto, FiltrosGastos, Tarjeta } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -51,6 +53,19 @@ function fmtARS(n: number) {
 
 function fmtNum(n: number, simbolo: string) {
   return `${simbolo} ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}`
+}
+
+// Badge superpuesto en una esquina del chip "Crédito" (marca a la derecha, banco
+// a la izquierda). El fondo `background.paper` lo despega del borde del chip.
+const badgeSx = {
+  position: 'absolute' as const,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  bgcolor: 'background.paper',
+  borderRadius: 0.5,
+  p: '1px',
+  boxShadow: 1,
 }
 
 interface Props {
@@ -81,6 +96,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [tarjetaIconos, setTarjetaIconos] = useState<Record<number, string>>({})
 
   const sortGastos = (rows: Gasto[]) => {
     if (sortModel.length === 0) return rows
@@ -117,6 +133,21 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }
 
   useEffect(() => { loadGastos() }, [filtros, refreshKey])
+
+  // Iconos de banco subidos por el usuario (data URIs). No viajan en la response
+  // de cada gasto para no inflar el payload del grid: se traen una vez y se
+  // resuelven por `tarjeta_id`.
+  useEffect(() => {
+    fetch('/api/tarjetas', { cache: 'no-store' })
+      .then(r => r.json())
+      .then((data: Tarjeta[]) => {
+        if (!Array.isArray(data)) return
+        const map: Record<number, string> = {}
+        for (const t of data) if (t.banco_icono) map[t.id] = t.banco_icono
+        setTarjetaIconos(map)
+      })
+      .catch(() => setTarjetaIconos({}))
+  }, [refreshKey])
 
   // Salir del modo selección al cambiar de período o ante un refresh global.
   useEffect(() => { setSelectionMode(false); setSelectedIds(new Set()) }, [filtros, refreshKey])
@@ -356,6 +387,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         const tarjetaTitle = row.tarjeta_banco
           ? `${row.tarjeta_nombre} (${row.tarjeta_banco})`
           : row.tarjeta_nombre ?? ''
+        const bancoIcono = row.tarjeta_id != null ? tarjetaIconos[row.tarjeta_id] : undefined
         return (
           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
             <Chip
@@ -366,21 +398,15 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             />
             {showTarjeta && (
               <Tooltip title={tarjetaTitle}>
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: -9,
-                    right: -12,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'background.paper',
-                    borderRadius: 0.5,
-                    p: '1px',
-                    boxShadow: 1,
-                  }}
-                >
+                <Box sx={{ ...badgeSx, top: -9, right: -12 }}>
                   <BrandLogo marca={row.tarjeta_marca} width={26} height={18} />
+                </Box>
+              </Tooltip>
+            )}
+            {showTarjeta && hasBancoIcono(bancoIcono, row.tarjeta_banco_logo, row.tarjeta_banco) && (
+              <Tooltip title={tarjetaTitle}>
+                <Box sx={{ ...badgeSx, top: -9, left: -8 }}>
+                  <BancoLogo banco={row.tarjeta_banco_logo} icono={bancoIcono} bancoTexto={row.tarjeta_banco} size={18} />
                 </Box>
               </Tooltip>
             )}
@@ -716,7 +742,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 )}
                 {(g.tarjeta_id || g.es_tarjeta) && (
                   <Tooltip title={g.tarjeta_nombre ? (g.tarjeta_banco ? `${g.tarjeta_nombre} (${g.tarjeta_banco})` : g.tarjeta_nombre) : ''}>
-                    <Box sx={{ flexShrink: 0, display: 'inline-flex' }}>
+                    <Box sx={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
+                      <BancoLogo
+                        banco={g.tarjeta_banco_logo}
+                        icono={g.tarjeta_id != null ? tarjetaIconos[g.tarjeta_id] : undefined}
+                        bancoTexto={g.tarjeta_banco}
+                        size={18}
+                      />
                       <BrandLogo marca={g.tarjeta_marca} width={28} height={20} />
                     </Box>
                   </Tooltip>

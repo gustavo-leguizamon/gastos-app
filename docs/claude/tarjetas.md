@@ -12,6 +12,53 @@ Migración `20260516020000_add_tarjeta_marca` agrega columna `marca TEXT NULL`.
 
 **`BrandLogo`** (`src/components/shared/BrandLogo.tsx`): componente reutilizable que recibe `marca` y devuelve SVG inline estilizado (viewBox 44x32, ~1.4:1). Soporta Visa, Mastercard, Amex, Cabal, Naranja, Diners, Discover, JCB. Fallback `CreditCardIcon`. Provee contraste visual sin assets externos.
 
+## Logo del banco emisor
+
+Además de la marca, cada `Tarjeta` identifica a su **banco emisor** con dos campos opcionales, y **la imagen subida gana sobre la lista**:
+
+| Campo Prisma | API | Qué es |
+|---|---|---|
+| `bancoIcono` | `banco_icono` | **Imagen subida** por el usuario, guardada como **data URI** (no hay storage de archivos en el proyecto). Prioridad 1. |
+| `bancoLogo` | `banco_logo` (`TarjetaBanco`) | Slug de la **lista fija** de bancos/fintechs argentinos → badge generado por código. Prioridad 2. |
+
+Ambos se cargan en `/configuracion` → Tarjetas (alta y edición inline): select "Banco del icono (opcional)" + `IconoBancoUpload` para la imagen. Migraciones `20260804090000_add_tarjeta_banco_logo` (`bancoLogo TEXT NULL`) y `20260804100000_add_tarjeta_banco_icono` (`bancoIcono TEXT NULL`).
+
+### Carga de la imagen (`src/lib/imagen-icono.ts`)
+
+Puro + testeado (`imagen-icono.test.ts`), salvo `fileToIconoDataUri` que usa APIs del browser:
+- `ICONO_MAX_PX = 96` (lado máximo del icono final), `MAX_FILE_BYTES = 4 MB` (archivo original), `MAX_DATA_URI_BYTES = 120 KB` (resultado).
+- `validateIconoFile({type,size})` → mensaje de error o `null`. Acepta PNG, JPG, WEBP, GIF y SVG.
+- `computeFitSize(w, h, max)` → escala el lado mayor a `max` sin agrandar imágenes chicas ni devolver lados en 0.
+- `dataUriBytes(uri)` / `isIconoDataUri(uri)` — el segundo se usa como **validación de server**: `POST`/`PUT /api/tarjetas` guardan `bancoIcono` sólo si es un data URI de imagen, sino `null` (no se aceptan URLs remotas).
+- `fileToIconoDataUri(file)` (browser): lee el archivo, lo redimensiona en un `<canvas>` a `ICONO_MAX_PX` y devuelve un PNG data URI; los **SVG se guardan tal cual** (son vectoriales). Rechaza si el resultado excede `MAX_DATA_URI_BYTES`.
+
+**`IconoBancoUpload`** (`src/components/shared/IconoBancoUpload.tsx`): preview + botón "Subir/Cambiar icono" + botón para quitarlo (vuelve al badge de la lista). Muestra el error de validación en el caption. Recibe `value`/`onChange` (data URI o `null`) y `bancoLogo`/`bancoTexto` para previsualizar el fallback.
+
+### Lista fija (`src/lib/bancos.ts`)
+
+Puro, testeado en `bancos.test.ts`; es la fuente de verdad del badge:
+- `BANCOS`: lista de `{ value, label, color, sigla, alias? }` — `value` es el slug que se persiste, `color` el color institucional, `sigla` el texto de 1 a 4 caracteres del badge. Incluye Galicia, Santander, BBVA, Nación, Provincia, Ciudad, Macro, ICBC, HSBC, Supervielle, Patagonia, Credicoop, Comafi, Hipotecario, Brubank, Ualá, Naranja X, Mercado Pago y `otro`.
+- `resolveBanco(bancoLogo, bancoTexto?)`: gana el **slug explícito**; si está vacío, el banco se **infiere del texto libre de `banco`** (normalizado sin acentos, match por slug o `alias` — ej. `"Banco Nación"`/`"BNA"` → `nacion`), así las tarjetas ya cargadas muestran logo sin re-editarlas. `otro` nunca se infiere del texto. Devuelve `null` si no hay match.
+- `bancoColor` / `bancoLabel`: helpers derivados.
+- `hasBancoIcono(icono, bancoLogo, bancoTexto)`: `true` si hay imagen subida **o** banco resoluble. Los callers lo usan para no renderizar el contenedor del badge cuando no hay nada que mostrar.
+
+### Render (`BancoLogo`)
+
+**`BancoLogo`** (`src/components/shared/BancoLogo.tsx`) resuelve en este orden: **1)** `icono` (imagen subida) → `<img>` a `size` con `objectFit: contain`, `borderRadius` y **placa blanca de fondo** (los logos suelen ser oscuros con fondo transparente y así se leen en tema claro y oscuro); **2)** badge de la lista fija — SVG inline (viewBox 32x32, `rx=7`) con la sigla en blanco sobre el color del banco, o `AccountBalanceIcon` gris para `otro`; **3)** `null`, así el caller no reserva espacio.
+
+Se muestra en:
+- **`GastosTable`, columna `tipo_pago`**: superpuesto en la esquina **superior izquierda** del chip "Crédito" (`size=18`), en espejo del `BrandLogo` de la marca que va arriba a la derecha. Ambos usan el helper `badgeSx` del módulo y el mismo `Tooltip` `Nombre (Banco)`. Sólo cuando `tipo_pago === 'C'` y hay `tarjeta_id`.
+- **`GastosTable` vista mobile (card)**: junto al `BrandLogo` que acompaña la descripción.
+- **`/configuracion`** → fila de la tarjeta (`size=24`) y preview del uploader.
+- **`TarjetasCerradas`** (`size=24`), al lado del `BrandLogo`.
+
+**Cómo llega cada campo al cliente:**
+- `tarjeta_banco_logo` viaja en la response de cada gasto (`toGastoResponse` → `g.tarjeta?.bancoLogo ?? null`) — es un slug corto.
+- `banco_icono` **no** viaja en la response de gastos (un data URI por fila inflaría el payload del grid). `GastosTable` hace un `fetch('/api/tarjetas')` propio (efecto atado a `refreshKey`), arma un `Record<tarjetaId, dataUri>` y lo resuelve por `row.tarjeta_id`.
+- `/api/tarjetas` (GET/POST/PUT) y `/api/tarjetas/cerradas` exponen `banco_logo` y `banco_icono`, y los write paths aceptan ambos en el body (mapeados a `bancoLogo`/`bancoIcono`).
+
+El campo `banco` sigue siendo **texto libre** — no se reemplazó por el select porque alimenta las descripciones derivadas (`"Nombre (Banco)"` de los resúmenes de tarjeta). `banco_logo` y `banco_icono` son ejes independientes y opcionales.
+
 ## Tarjeta de crédito (resumen de tarjeta)
 
 Flag `es_tarjeta` (Prisma `esTarjeta`, default `false`). Cuando está activo:

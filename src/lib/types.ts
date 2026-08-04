@@ -12,11 +12,20 @@ export interface Casa {
 
 export type TarjetaMarca = 'visa' | 'mastercard' | 'amex' | 'diners' | 'discover' | 'jcb' | 'otra'
 
+/** Banco emisor, elegido de una lista fija (ver `BANCOS` en `BancoLogo.tsx`). */
+export type TarjetaBanco =
+  | 'galicia' | 'santander' | 'bbva' | 'nacion' | 'provincia' | 'ciudad' | 'macro'
+  | 'icbc' | 'hsbc' | 'supervielle' | 'patagonia' | 'credicoop' | 'comafi'
+  | 'hipotecario' | 'brubank' | 'uala' | 'naranja' | 'mercadopago' | 'otro'
+
 export interface Tarjeta {
   id: number
   nombre: string
   banco: string | null
   marca: TarjetaMarca | null
+  banco_logo: TarjetaBanco | null
+  /** Icono subido por el usuario (data URI). Gana sobre `banco_logo`. */
+  banco_icono: string | null
   cierres?: TarjetaCierre[]
 }
 
@@ -104,6 +113,7 @@ export interface Gasto {
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
   tarjeta_marca?: TarjetaMarca | null
+  tarjeta_banco_logo?: TarjetaBanco | null
   // Categoría única (partición) + etiquetas (corte transversal).
   categoria_id: number | null
   categoria: Categoria | null

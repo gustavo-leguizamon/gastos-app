@@ -17,10 +17,10 @@
 | `GET /api/reportes` | Métricas agregadas para la sección Reportes. Params: rango `mes_desde`/`anio_desde`/`mes_hasta`/`anio_hasta` (obligatorio, 400 si falta), `casa_id`, `tipo_pago`, `categoria_ids`/`tarjeta_ids`/`concepto_ids` (listas `1,2,3`), `incluir_tarjetas` (default excluye `esTarjeta`), `top` (límite conceptos). Devuelve `{ kpis, por_categoria, por_mes, top_conceptos, por_tarjeta, por_tipo_pago }`. Ver `docs/claude/reportes.md`. |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
-| `GET/POST /api/tarjetas` | Credit cards CRUD (incluye `marca` opcional). El GET incluye array `cierres: TarjetaCierre[]` para señalizar tarjetas sin cierre completo del mes actual. |
+| `GET/POST /api/tarjetas` | Credit cards CRUD (incluye `marca`, `banco_logo` y `banco_icono` opcionales; `banco_icono` se persiste sólo si pasa `isIconoDataUri`). El GET incluye array `cierres: TarjetaCierre[]` para señalizar tarjetas sin cierre completo del mes actual. |
 | `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
 | `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
-| `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` < today. Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
+| `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` < today. Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, banco_logo, banco_icono, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) — categoría **única** (partición). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
 | `GET/POST /api/etiquetas` | Etiquetas CRUD (`PUT/DELETE /api/etiquetas/[id]`) — **corte transversal** (M2M). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
 | `GET/PUT /api/settings` | Singleton de configuración global: parámetros del estimado del próximo mes + `casa_default_id` (casa preseleccionada en el alta de gastos; el PUT valida que exista y acepta `null` para limpiarla) |

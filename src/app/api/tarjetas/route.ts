@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { isIconoDataUri } from '@/lib/imagen-icono'
 
 export async function GET() {
   const tarjetas = await prisma.tarjeta.findMany({
@@ -11,6 +12,8 @@ export async function GET() {
     nombre: t.nombre,
     banco: t.banco,
     marca: t.marca,
+    banco_logo: t.bancoLogo,
+    banco_icono: t.bancoIcono,
     cierres: t.cierres.map(c => ({
       id: c.id,
       tarjeta_id: c.tarjetaId,
@@ -26,7 +29,18 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { nombre, banco, marca } = await req.json()
-  const tarjeta = await prisma.tarjeta.create({ data: { nombre, banco: banco || null, marca: marca || null } })
-  return NextResponse.json(tarjeta, { status: 201 })
+  const { nombre, banco, marca, banco_logo, banco_icono } = await req.json()
+  const tarjeta = await prisma.tarjeta.create({
+    data: {
+      nombre,
+      banco: banco || null,
+      marca: marca || null,
+      bancoLogo: banco_logo || null,
+      bancoIcono: isIconoDataUri(banco_icono) ? banco_icono : null,
+    },
+  })
+  return NextResponse.json(
+    { ...tarjeta, banco_logo: tarjeta.bancoLogo, banco_icono: tarjeta.bancoIcono },
+    { status: 201 },
+  )
 }
