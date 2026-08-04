@@ -22,12 +22,15 @@ model Casa {
 }
 
 model Tarjeta {
-  id      Int             @id @default(autoincrement())
-  nombre  String
-  banco   String?
-  marca   String?
-  gastos  Gasto[]
-  cierres TarjetaCierre[]
+  id        Int             @id @default(autoincrement())
+  nombre    String
+  banco     String?
+  marca     String?
+  bancoLogo String?
+  /// Icono subido por el usuario (data URI, ver src/lib/imagen-icono.ts). Gana sobre bancoLogo.
+  bancoIcono String?
+  gastos    Gasto[]
+  cierres   TarjetaCierre[]
 }
 
 model TarjetaCierre {

@@ -37,9 +37,12 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
+import BancoLogo from '@/components/shared/BancoLogo'
+import IconoBancoUpload from '@/components/shared/IconoBancoUpload'
+import { BANCOS } from '@/lib/bancos'
 import BrandLogo from '@/components/shared/BrandLogo'
 import AppSelect from '@/components/shared/AppSelect'
-import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaMarca } from '@/lib/types'
+import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaBanco, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -84,7 +87,7 @@ export default function ConfiguracionPage() {
 
   // Tarjetas
   const { items: tarjetas, add: addTarjeta, update: updateTarjeta, remove: removeTarjeta, reload: reloadTarjetas } = useSimpleCrud<Tarjeta>('/api/tarjetas')
-  const [nuevaTarjeta, setNuevaTarjeta] = useState<{ nombre: string; banco: string; marca: TarjetaMarca | '' }>({ nombre: '', banco: '', marca: '' })
+  const [nuevaTarjeta, setNuevaTarjeta] = useState<{ nombre: string; banco: string; marca: TarjetaMarca | ''; banco_logo: TarjetaBanco | ''; banco_icono: string | null }>({ nombre: '', banco: '', marca: '', banco_logo: '', banco_icono: null })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
   // Categorias
@@ -177,8 +180,8 @@ export default function ConfiguracionPage() {
   const handleAddTarjeta = async () => {
     if (!nuevaTarjeta.nombre.trim()) return
     try {
-      await addTarjeta({ ...nuevaTarjeta, marca: nuevaTarjeta.marca || null })
-      setNuevaTarjeta({ nombre: '', banco: '', marca: '' })
+      await addTarjeta({ ...nuevaTarjeta, marca: nuevaTarjeta.marca || null, banco_logo: nuevaTarjeta.banco_logo || null })
+      setNuevaTarjeta({ nombre: '', banco: '', marca: '', banco_logo: '', banco_icono: null })
       toast.success('Tarjeta agregada')
     } catch { toast.error('Error al agregar tarjeta') }
   }
@@ -471,6 +474,22 @@ export default function ConfiguracionPage() {
                   <option value="">—</option>
                   {MARCAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </TextField>
+                <TextField
+                  select size="small" label="Banco del icono (opcional)"
+                  SelectProps={{ native: true }}
+                  helperText="Si lo dejás vacío se infiere del texto de Banco"
+                  value={nuevaTarjeta.banco_logo}
+                  onChange={e => setNuevaTarjeta(p => ({ ...p, banco_logo: e.target.value as TarjetaBanco | '' }))}
+                >
+                  <option value="">—</option>
+                  {BANCOS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                </TextField>
+                <IconoBancoUpload
+                  value={nuevaTarjeta.banco_icono}
+                  onChange={dataUri => setNuevaTarjeta(p => ({ ...p, banco_icono: dataUri }))}
+                  bancoLogo={nuevaTarjeta.banco_logo}
+                  bancoTexto={nuevaTarjeta.banco}
+                />
                 <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTarjeta} size="small">Agregar</Button>
               </Box>
               <Divider sx={{ mb: 1 }} />
@@ -490,6 +509,22 @@ export default function ConfiguracionPage() {
                           <option value="">—</option>
                           {MARCAS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                         </TextField>
+                        <TextField
+                          select size="small" label="Banco del icono (opcional)"
+                          SelectProps={{ native: true }}
+                          helperText="Si lo dejás vacío se infiere del texto de Banco"
+                          value={editingTarjeta.banco_logo ?? ''}
+                          onChange={e => setEditingTarjeta(p => p ? { ...p, banco_logo: (e.target.value || null) as TarjetaBanco | null } : p)}
+                        >
+                          <option value="">—</option>
+                          {BANCOS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                        </TextField>
+                        <IconoBancoUpload
+                          value={editingTarjeta.banco_icono}
+                          onChange={dataUri => setEditingTarjeta(p => p ? { ...p, banco_icono: dataUri } : p)}
+                          bancoLogo={editingTarjeta.banco_logo}
+                          bancoTexto={editingTarjeta.banco}
+                        />
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={handleSaveTarjeta}>Guardar</Button>
                           <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingTarjeta(null)}>Cancelar</Button>
@@ -530,6 +565,7 @@ export default function ConfiguracionPage() {
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                               <BrandLogo marca={t.marca} width={44} height={32} />
+                              <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
                               <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
                               {incompleto && (
                                 <Tooltip arrow title={alertaMsg}>

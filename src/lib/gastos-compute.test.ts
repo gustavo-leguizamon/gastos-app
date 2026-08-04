@@ -90,6 +90,7 @@ describe('toGastoResponse', () => {
         nombre: 'Visa Gold',
         banco: 'Galicia',
         marca: 'visa',
+        bancoLogo: 'galicia',
         cierres: [
           { mes: 5, anio: 2026, fechaCierre: '2026-05-20', fechaVencimiento: '2026-05-28', fechaProximoCierre: null },
           { mes: 6, anio: 2026, fechaCierre: '2026-06-20', fechaVencimiento: '2026-06-28', fechaProximoCierre: '2026-07-20' },
@@ -98,6 +99,8 @@ describe('toGastoResponse', () => {
     }))
     expect(r.tarjeta_nombre).toBe('Visa Gold')
     expect(r.tarjeta_marca).toBe('visa')
+    expect(r.tarjeta_banco).toBe('Galicia')
+    expect(r.tarjeta_banco_logo).toBe('galicia')
     expect(r.cierre).toEqual({
       fecha_cierre: '2026-06-20',
       fecha_vencimiento: '2026-06-28',
@@ -112,6 +115,7 @@ describe('toGastoResponse', () => {
       tarjeta: { nombre: 'X', cierres: [{ mes: 1, anio: 2026 }] },
     }))
     expect(r.cierre).toBeNull()
+    expect(r.tarjeta_banco_logo).toBeNull()
   })
 
   it('mapea sub-items a snake_case con sus flags y categorías', () => {

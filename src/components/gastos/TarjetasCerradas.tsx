@@ -6,6 +6,7 @@ import Card from '@mui/material/Card'
 import Typography from '@mui/material/Typography'
 import Tooltip from '@mui/material/Tooltip'
 import BrandLogo from '@/components/shared/BrandLogo'
+import BancoLogo from '@/components/shared/BancoLogo'
 import { marcaColor } from '@/components/shared/TarjetaLogo'
 import type { FiltrosGastos, TarjetaMarca } from '@/lib/types'
 
@@ -14,6 +15,8 @@ type TarjetaCerrada = {
   nombre: string
   banco: string | null
   marca: string | null
+  banco_logo: string | null
+  banco_icono: string | null
   fecha_cierre: string | null
   fecha_vencimiento: string | null
   fecha_proximo_cierre: string | null
@@ -88,6 +91,7 @@ export default function TarjetasCerradas({ filtros, refreshKey }: Props) {
                 }}
               >
                 <BrandLogo marca={t.marca} width={44} height={32} />
+                <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
                 <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.2 }} noWrap>
                     {titulo}

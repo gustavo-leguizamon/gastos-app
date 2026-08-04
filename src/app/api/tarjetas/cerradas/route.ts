@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
     nombre: c.tarjeta.nombre,
     banco: c.tarjeta.banco,
     marca: c.tarjeta.marca,
+    banco_logo: c.tarjeta.bancoLogo,
+    banco_icono: c.tarjeta.bancoIcono,
     fecha_cierre: c.fechaCierre,
     fecha_vencimiento: c.fechaVencimiento,
     fecha_proximo_cierre: c.fechaProximoCierre,
