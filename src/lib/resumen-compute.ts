@@ -2,6 +2,8 @@
 // imports so it can be unit-tested in isolation: the route fetches the rows and
 // settings, then delegates all aggregation/estimation logic here.
 
+import { vencePorGasto } from './vencimientos'
+
 export interface ResumenSettings {
   estimMesesAtras: number
   estimMissingBehavior: string
@@ -125,15 +127,14 @@ export function computeResumen(
     total_prestamos += prestamo
     total_pasajes += g.pasajeMesSiguiente ?? 0
     if (g.tipoPago === 'C' && prestamo === 0) total_tarjetas += totalArs
-    if (g.items.length > 0) {
+    if (vencePorGasto(g.esTarjeta, g.items.length)) {
+      // Gasto sin sub-items (o resumen de tarjeta): vence por su propia fechaVencimiento.
+      if (g.fechaVencimiento === today) pagar_hoy += restante
+    } else {
       // Gasto con sub-items: sólo cuentan los sub-items marcados "incluir en vencimiento" cuya fecha sea hoy.
-      const itemsHoy = g.items
+      pagar_hoy += g.items
         .filter((i: any) => i.incluyeEnVencimiento && i.fecha === today)
         .reduce((s: number, i: any) => s + i.monto, 0)
-      pagar_hoy += itemsHoy
-    } else if (g.fechaVencimiento === today) {
-      // Gasto sin sub-items: vence por su propia fechaVencimiento.
-      pagar_hoy += restante
     }
   }
 
