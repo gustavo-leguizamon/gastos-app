@@ -282,7 +282,8 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     {
       field: '_expand',
       headerName: '',
-      width: 90,
+      // Ancho para warning + toggle + logos de banco/marca en filas de tarjeta.
+      width: 112,
       sortable: false,
       disableColumnMenu: true,
       renderCell: ({ row }) => {
@@ -322,7 +323,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   ) : 'Sin cierre cargado para este mes/año — configurarlo en /configuracion'
                 }
               >
-                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}>
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, ml: 0.5 }}>
+                  <BancoLogo
+                    banco={row.tarjeta_banco_logo}
+                    icono={row.tarjeta_id != null ? tarjetaIconos[row.tarjeta_id] : undefined}
+                    bancoTexto={row.tarjeta_banco}
+                    size={18}
+                  />
                   <BrandLogo marca={row.tarjeta_marca} width={30} height={22} />
                 </Box>
               </Tooltip>

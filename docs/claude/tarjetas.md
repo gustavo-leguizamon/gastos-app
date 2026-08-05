@@ -48,6 +48,7 @@ Puro, testeado en `bancos.test.ts`; es la fuente de verdad del badge:
 
 Se muestra en:
 - **`GastosTable`, columna `tipo_pago`**: superpuesto en la esquina **superior izquierda** del chip "Crédito" (`size=18`), en espejo del `BrandLogo` de la marca que va arriba a la derecha. Ambos usan el helper `badgeSx` del módulo y el mismo `Tooltip` `Nombre (Banco)`. Sólo cuando `tipo_pago === 'C'` y hay `tarjeta_id`.
+- **`GastosTable`, columna `_expand`** (filas de **resumen de tarjeta**, `es_tarjeta`): a la izquierda del `BrandLogo` de la marca (`size=18`), dentro del mismo `Tooltip` de cierre/vencimiento. La columna mide 112px para que entren warning + toggle + los dos logos.
 - **`GastosTable` vista mobile (card)**: junto al `BrandLogo` que acompaña la descripción.
 - **`/configuracion`** → fila de la tarjeta (`size=24`) y preview del uploader.
 - **`TarjetasCerradas`** (`size=24`), al lado del `BrandLogo`.
