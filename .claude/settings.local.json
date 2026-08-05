@@ -85,7 +85,14 @@
       "PowerShell(npx vitest run src/app/api/categorias src/app/api/etiquetas 2>&1 | Select-Object -Last 30; Write-Output \"EXIT: $LASTEXITCODE\")",
       "Bash(git log *)",
       "Bash(netstat -ano)",
-      "Bash(grep -n \"{/\\\\* [A-ZÉ]\" src/components/gastos/GastoForm.tsx)"
+      "Bash(grep -n \"{/\\\\* [A-ZÉ]\" src/components/gastos/GastoForm.tsx)",
+      "PowerShell($url = git config --get remote.origin.url; if \\($url -match '://[^:]+:\\([^@]+\\)@'\\) { $env:GH_TOKEN = $matches[1]; $env:GITHUB_TOKEN = $matches[1]; gh api user --jq .login } else { \"no token in remote url\" })",
+      "PowerShell(gh api *)",
+      "PowerShell($url = git config --get remote.origin.url; if \\($url -match '://[^:]+:\\([^@]+\\)@'\\) { $env:GH_TOKEN = $matches[1] }; gh pr list --repo gustavo-leguizamon/gastos-app --state all --limit 6 --json number,title,state,headRefOid | ConvertFrom-Json | ForEach-Object { $_ } | ForEach-Object { $s = gh api \"repos/gustavo-leguizamon/gastos-app/commits/$\\($_.headRefOid\\)/status\" --jq .state; \"PR #$\\($_.number\\) [$\\($_.state\\)] vercel=$s  $\\($_.title\\)\" })",
+      "PowerShell(git status *)",
+      "PowerShell(Select-String -Path \"node_modules\\\\.prisma\\\\client\\\\index.d.ts\" -Pattern \"bancoIcono\" -SimpleMatch | Select-Object -First 2; npx tsc --noEmit 2>&1 | Select-Object -First 20; \"TSC_EXIT=$LASTEXITCODE\")",
+      "PowerShell(node -e \"const {PrismaClient}=require\\('@prisma/client'\\); const p=new PrismaClient\\(\\); p.tarjeta.findMany\\({select:{id:true,nombre:true,banco:true,bancoLogo:true,bancoIcono:true}}\\).then\\(r=>{console.log\\(JSON.stringify\\(r,null,1\\)\\)}\\).catch\\(e=>{console.error\\('FAIL',e.message\\)}\\).finally\\(\\(\\)=>p.$disconnect\\(\\)\\)\" 2>&1 | Select-Object -First 40)",
+      "PowerShell(git status --short; \"---BRANCH---\"; git branch --show-current; \"---REMOTE---\"; git remote -v)"
     ]
   },
   "hooks": {
