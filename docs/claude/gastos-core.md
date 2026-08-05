@@ -66,7 +66,9 @@ Cada `Gasto` puede tener sub-items informativos (`GastoItem`) — ej. cargos ind
 
 Cada `GastoItem` tiene tres flags booleanos:
 - `incluye_en_total` (`incluyeEnTotal`, default `true`) — si el item suma a la fila de totales de sub-items. En `GastoItemDialog`, la card "Suma sub-items" (y por ende "Sin asignar" = `total_ars − suma`) suma **solo** los items con `incluye_en_total`; los que solo están marcados como `incluye_en_vencimiento` no cuentan.
-- `incluye_en_vencimiento` (`incluyeEnVencimiento`, default `false`) — si contribuye a la card "Pagar hoy" cuando su `fecha` matchea hoy. **Si un gasto tiene sub-items, el vencimiento se calcula SIEMPRE a partir de los sub-items marcados (nunca del total del gasto), aunque el `fechaVencimiento` del gasto sea hoy.** Sólo los gastos sin sub-items usan su propio `fechaVencimiento`/`restante`.
+- `incluye_en_vencimiento` (`incluyeEnVencimiento`, default `false`) — si contribuye a la card "Pagar hoy" cuando su `fecha` matchea hoy. **Si un gasto tiene sub-items, el vencimiento se calcula a partir de los sub-items marcados (nunca del total del gasto), aunque el `fechaVencimiento` del gasto sea hoy** — salvo los **resúmenes de tarjeta** (`es_tarjeta`), ver abajo. Los gastos sin sub-items usan su propio `fechaVencimiento`/`restante`.
+
+**Regla compartida — `vencePorGasto(esTarjeta, itemsCount)` (`src/lib/vencimientos.ts`, testeada en `vencimientos.test.ts`)**: un gasto vence **por sí mismo** (`fechaVencimiento` + restante) si no tiene sub-items **o si es un resumen de tarjeta**. Los sub-items de un resumen de tarjeta son los consumos propagados del período (creados siempre con `incluyeEnVencimiento: false`), no vencimientos independientes: el total del resumen vence en la fecha de vencimiento de la tarjeta. Sin esta excepción los resúmenes de tarjeta nunca entraban en "Pagar hoy" ni en el alert. La usan `computeResumen` (`pagar_hoy`) y `VencimientosHoyAlert`, para que card y alert no se desincronicen.
 - `verificado` (`verificado`, default `false`) — para revisar sub-items uno a uno y marcar cuáles están correctos. En `GastoItemDialog`, cada fila tiene un toggle (icono `CheckCircleIcon` verde si verificado / `RadioButtonUncheckedIcon` naranja si no), y la fila se pinta con fondo verde tenue (verificado) o naranja tenue (no verificado) para tener a la vista los pendientes de revisar. Se togglea vía `PATCH { verificado }`. El `PUT` (editar item completo) preserva `verificado` enviándolo en el payload — el `EditState` lo incluye.
 
 Los flags `incluye_en_total` / `incluye_en_vencimiento` se renderizan como checkboxes inline en la columna de acciones (no columnas separadas). `PATCH` para toggle parcial. Toggle de `incluye_en_vencimiento` llama `triggerResumenRefresh()`.
@@ -178,8 +180,10 @@ El "qué" de un gasto/sub-item (Netflix, Luz, Expensas) es una **entidad** `Conc
 
 `VencimientosHoyAlert` (`src/components/gastos/VencimientosHoyAlert.tsx`) — montado al inicio de `gastos/page.tsx`. En `useEffect` (una sola vez por mount) hace `GET /api/gastos?mes=<hoy>&anio=<hoy>` y arma la lista de vencimientos del día con **la misma lógica que `pagar_hoy` en `/api/resumen`**:
 
-- Si el gasto **tiene sub-items**: se recorren sus `items` y entran como sub-item los que tengan `incluye_en_vencimiento = true && fecha === today` (sin importar el `fecha_vencimiento` del gasto padre).
-- Si el gasto **no tiene sub-items** y `g.fecha_vencimiento === today` y `total_restante > 0` y `confirmado`: entra como entrada principal.
+- Se saltea el gasto si `!confirmado && items.length === 0` (mismo criterio que `computeResumen`).
+- Reparte con `vencePorGasto(g.es_tarjeta, items.length)`:
+  - **Vence por gasto** (sin sub-items o `es_tarjeta`): entra como entrada principal si `g.fecha_vencimiento === today` y el restante > 0. El restante se calcula igual que en el resumen: `total_ars` si está confirmado, o la suma de sub-items con `incluye_en_total` si no, menos `total_pagado`.
+  - **Vence por sub-items**: se recorren sus `items` y entran como sub-item los que tengan `incluye_en_vencimiento = true && fecha === today` (sin importar el `fecha_vencimiento` del gasto padre).
 
 Si hay matches abre `Dialog` con la lista (sub-items con `SubdirectoryArrowRightIcon` y caption del padre) y total. Se monta cada navegación a `/gastos`, sin localStorage ni dismissal persistente.
 

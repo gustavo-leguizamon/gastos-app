@@ -123,6 +123,37 @@ describe('computeResumen — pagar_hoy', () => {
     )
     expect(r.pagar_hoy).toBe(100)
   })
+
+  it('resumen de tarjeta: vence por su propia fechaVencimiento aunque tenga consumos propagados', () => {
+    const r = computeResumen(
+      [makeGasto({
+        esTarjeta: true,
+        totalMoneda: 1000,
+        fechaVencimiento: TODAY,
+        pagos: [{ monto: 300 }],
+        // Los consumos propagados siempre vienen con incluyeEnVencimiento: false.
+        items: [
+          { conceptoId: 30, monto: 600, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: '2026-06-02' },
+          { conceptoId: 31, monto: 400, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: '2026-06-05' },
+        ],
+      })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.pagar_hoy).toBe(700)
+  })
+
+  it('resumen de tarjeta con vencimiento en otra fecha no cuenta', () => {
+    const r = computeResumen(
+      [makeGasto({
+        esTarjeta: true,
+        totalMoneda: 1000,
+        fechaVencimiento: '2026-06-11',
+        items: [{ conceptoId: 30, monto: 1000, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: TODAY }],
+      })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.pagar_hoy).toBe(0)
+  })
 })
 
 describe('computeResumen — estimado próximo mes', () => {

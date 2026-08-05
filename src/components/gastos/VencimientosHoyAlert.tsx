@@ -10,6 +10,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
+import { vencePorGasto } from '@/lib/vencimientos'
 import type { Gasto } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -38,10 +39,27 @@ export default function VencimientosHoyAlert() {
       .then((gastos: Gasto[]) => {
         const out: Entrada[] = []
         for (const g of gastos) {
-          if (!g.confirmado) continue
-          if ((g.items?.length ?? 0) > 0) {
+          const items = g.items ?? []
+          if (!g.confirmado && items.length === 0) continue
+          if (vencePorGasto(g.es_tarjeta, items.length)) {
+            // Gasto sin sub-items (o resumen de tarjeta): vence por su propia fecha_vencimiento.
+            // Igual que en `computeResumen`, si no está confirmado el total sale de los sub-items.
+            const totalArs = g.confirmado
+              ? g.total_ars
+              : items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+            const restante = Math.round((totalArs - g.total_pagado) * 100) / 100
+            if (g.fecha_vencimiento === today && restante > 0) {
+              out.push({
+                key: `g-${g.id}`,
+                tipo: 'gasto',
+                descripcion: g.descripcion,
+                casa_nombre: g.casa_nombre,
+                monto: restante,
+              })
+            }
+          } else {
             // Gasto con sub-items: sólo cuentan los sub-items marcados "incluir en vencimiento" cuya fecha sea hoy.
-            for (const it of g.items) {
+            for (const it of items) {
               if (it.incluye_en_vencimiento && it.fecha === today) {
                 out.push({
                   key: `i-${it.id}`,
@@ -53,15 +71,6 @@ export default function VencimientosHoyAlert() {
                 })
               }
             }
-          } else if (g.fecha_vencimiento === today && g.total_restante > 0) {
-            // Gasto sin sub-items: vence por su propia fechaVencimiento.
-            out.push({
-              key: `g-${g.id}`,
-              tipo: 'gasto',
-              descripcion: g.descripcion,
-              casa_nombre: g.casa_nombre,
-              monto: g.total_restante,
-            })
           }
         }
         if (out.length > 0) {
