@@ -24,12 +24,13 @@ import ClearIcon from '@mui/icons-material/Clear'
 import TuneIcon from '@mui/icons-material/Tune'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import type { Casa, Categoria, Etiqueta, FiltrosGastos } from '@/lib/types'
+import BrandLogo from '@/components/shared/BrandLogo'
+import type { Casa, Categoria, Etiqueta, Tarjeta, FiltrosGastos } from '@/lib/types'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
-// Valor centinela para filtrar gastos sin categoría / sin etiquetas (los ids reales son > 0).
+// Valor centinela para filtrar gastos sin categoría / sin etiquetas / sin tarjeta (los ids reales son > 0).
 export const SIN_CLASIFICAR = 0
 
 interface Props {
@@ -45,12 +46,15 @@ interface Props {
   setCategoriaIds: (v: number[]) => void
   etiquetaIds: number[]
   setEtiquetaIds: (v: number[]) => void
+  tarjetaIds: number[]
+  setTarjetaIds: (v: number[]) => void
 }
 
-export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda, fecha, setFecha, categoriaIds, setCategoriaIds, etiquetaIds, setEtiquetaIds }: Props) {
+export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEstadoPago, busqueda, setBusqueda, fecha, setFecha, categoriaIds, setCategoriaIds, etiquetaIds, setEtiquetaIds, tarjetaIds, setTarjetaIds }: Props) {
   const [casas, setCasas] = useState<Casa[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   // Panel de filtros avanzados desplegable
   const [open, setOpen] = useState(false)
@@ -61,6 +65,7 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
     fetch('/api/casas').then((r) => r.json()).then(setCasas)
     fetch('/api/categorias').then((r) => r.json()).then(setCategorias)
     fetch('/api/etiquetas').then((r) => r.json()).then(setEtiquetas)
+    fetch('/api/tarjetas').then((r) => r.json()).then((d) => setTarjetas(Array.isArray(d) ? d : []))
   }, [])
 
   const prevMes = () => {
@@ -98,13 +103,15 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
     (filtros.tipo_pago != null ? 1 : 0) +
     (fecha ? 1 : 0) +
     (categoriaIds.length > 0 ? 1 : 0) +
-    (etiquetaIds.length > 0 ? 1 : 0)
+    (etiquetaIds.length > 0 ? 1 : 0) +
+    (tarjetaIds.length > 0 ? 1 : 0)
 
   const limpiar = () => {
     setFiltros({ casa_id: null, tipo_pago: null })
     setFecha('')
     setCategoriaIds([])
     setEtiquetaIds([])
+    setTarjetaIds([])
   }
 
   return (
@@ -269,6 +276,28 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
             ]}
             value={etiquetaIds}
             onChange={(v) => setEtiquetaIds(v.map(Number))}
+            placeholder="Todas"
+            fullWidth
+          />
+
+          {/* Tarjeta de pago — incluye "Sin tarjeta" para los gastos que no se pagan con una */}
+          <AppMultiSelect
+            label="Tarjetas"
+            options={[
+              { value: SIN_CLASIFICAR, label: 'Sin tarjeta' },
+              ...tarjetas.map((t) => ({
+                value: t.id,
+                label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
+                render: () => (
+                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <BrandLogo marca={t.marca} width={30} height={22} />
+                    <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
+                  </Box>
+                ),
+              })),
+            ]}
+            value={tarjetaIds}
+            onChange={(v) => setTarjetaIds(v.map(Number))}
             placeholder="Todas"
             fullWidth
           />

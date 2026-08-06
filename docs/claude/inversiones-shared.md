@@ -78,7 +78,7 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `rend
 - `onCreate?: (nombre) => Promise<{value,label} | null>` — igual que en `AppSelect`: habilita crear tipeando ("Agregar «X»"). Sin `onCreate`, comportamiento idéntico al anterior.
 - `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
 
-Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas con `onCreate`), `GastoItemDialog` (Etiquetas con `onCreate`), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos).
+Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas con `onCreate`), `GastoItemDialog` (Etiquetas con `onCreate`), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos), `FiltrosGastos` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`).
 
 ## CategoriasCell
 

@@ -76,11 +76,12 @@ interface Props {
   fecha: string
   categoriaIds: number[]
   etiquetaIds: number[]
+  tarjetaIds: number[]
   onEdit: (gasto: Gasto) => void
   onDeleted: () => void
 }
 
-export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, fecha, categoriaIds, etiquetaIds, onEdit, onDeleted }: Props) {
+export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda, fecha, categoriaIds, etiquetaIds, tarjetaIds, onEdit, onDeleted }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const triggerRefresh = useGastosStore(s => s.triggerRefresh)
   const [gastos, setGastos] = useState<Gasto[]>([])
@@ -646,6 +647,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     if (etiquetaIds.length === 0) return true
     const tags = g.etiquetas ?? []
     return etiquetaIds.some(id => (id === 0 ? tags.length === 0 : tags.some(t => t.id === id)))
+  }).filter(g => {
+    // Tarjeta de pago. Sentinel 0 = "Sin tarjeta".
+    if (tarjetaIds.length === 0) return true
+    return tarjetaIds.some(id => (id === 0 ? g.tarjeta_id == null : g.tarjeta_id === id))
   })
 
   const filteredIds = gastosFiltrados.map(g => g.id)
@@ -946,7 +951,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     return (
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 4, textAlign: 'center' }}>
         <Typography color="text.secondary">
-          {busqueda.trim() || fecha || categoriaIds.length > 0 || etiquetaIds.length > 0 ? 'No se encontraron gastos para esos filtros.' : 'No hay gastos para el período seleccionado.'}
+          {busqueda.trim() || fecha || categoriaIds.length > 0 || etiquetaIds.length > 0 || tarjetaIds.length > 0 ? 'No se encontraron gastos para esos filtros.' : 'No hay gastos para el período seleccionado.'}
         </Typography>
       </Box>
     )
