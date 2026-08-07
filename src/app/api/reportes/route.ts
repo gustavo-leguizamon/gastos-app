@@ -42,10 +42,32 @@ export async function GET(req: NextRequest) {
   if (!incluirTarjetas) where.esTarjeta = false
   if (casa_id) where.casaId = Number(casa_id)
   if (tipo_pago === 'C' || tipo_pago === 'D') where.tipoPago = tipo_pago
-  if (categoriaIds.length) where.categoriaId = { in: categoriaIds }
-  if (etiquetaIds.length) where.etiquetas = { some: { id: { in: etiquetaIds } } }
   if (tarjetaIds.length) where.tarjetaId = { in: tarjetaIds }
-  if (conceptoIds.length) where.conceptoId = { in: conceptoIds }
+
+  if (porSubitem) {
+    // En el desglose por sub-ítem las dimensiones de categorización son las del sub-ítem,
+    // así que el `where` (que sólo alcanza al gasto) actúa como **pre-filtro**: trae el gasto
+    // si matchea él mismo o alguno de sus sub-ítems computables. El filtrado fino, unidad por
+    // unidad, lo hace `computeReporteSubitems` con `filtros`.
+    const and: any[] = []
+    if (categoriaIds.length) and.push({ OR: [
+      { categoriaId: { in: categoriaIds } },
+      { items: { some: { incluyeEnTotal: true, categoriaId: { in: categoriaIds } } } },
+    ] })
+    if (etiquetaIds.length) and.push({ OR: [
+      { etiquetas: { some: { id: { in: etiquetaIds } } } },
+      { items: { some: { incluyeEnTotal: true, etiquetas: { some: { id: { in: etiquetaIds } } } } } },
+    ] })
+    if (conceptoIds.length) and.push({ OR: [
+      { conceptoId: { in: conceptoIds } },
+      { items: { some: { incluyeEnTotal: true, conceptoId: { in: conceptoIds } } } },
+    ] })
+    if (and.length) where.AND = and
+  } else {
+    if (categoriaIds.length) where.categoriaId = { in: categoriaIds }
+    if (etiquetaIds.length) where.etiquetas = { some: { id: { in: etiquetaIds } } }
+    if (conceptoIds.length) where.conceptoId = { in: conceptoIds }
+  }
 
   // Para el desglose por sub-item necesitamos las categorías/concepto de cada item.
   const gastos = await prisma.gasto.findMany({
@@ -61,7 +83,10 @@ export async function GET(req: NextRequest) {
 
   const topConceptos = Number.isFinite(topParam) && topParam > 0 ? Math.min(50, Math.round(topParam)) : 12
   const result = porSubitem
-    ? computeReporteSubitems(gastos, months, { topConceptos })
+    ? computeReporteSubitems(gastos, months, {
+        topConceptos,
+        filtros: { categoriaIds, etiquetaIds, conceptoIds },
+      })
     : computeReportes(gastos, months, { topConceptos })
   return NextResponse.json(result)
 }

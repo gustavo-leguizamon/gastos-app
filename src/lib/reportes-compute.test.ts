@@ -308,3 +308,82 @@ describe('computeReporteSubitems', () => {
     expect(r.por_tipo_pago).toEqual([{ tipo: 'C', nombre: 'Crédito', total_ars: 1200 }])
   })
 })
+
+describe('computeReporteSubitems — filtros a nivel sub-ítem', () => {
+  const months = enumerateMonths(6, 2026, 6, 2026)
+
+  // Resumen de tarjeta con categoría propia ("Tarjeta crédito") y sub-items etiquetados.
+  const resumenTarjeta = () => gasto({
+    esTarjeta: true,
+    categoriaId: 9,
+    categoria: { id: 9, nombre: 'Tarjeta crédito' },
+    etiquetas: [],
+    tarjetaId: 3,
+    tarjeta: { id: 3, nombre: 'Visa' },
+    items: [
+      { monto: 700, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'ABL' }, categoriaId: 1, categoria: { id: 1, nombre: 'Servicios' }, etiquetas: [{ id: 4, nombre: 'Impuesto' }] },
+      { monto: 300, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Super' }, categoriaId: 2, categoria: { id: 2, nombre: 'Comida' }, etiquetas: [] },
+    ],
+  })
+
+  it('filtra por la etiqueta del sub-ítem, aunque el gasto padre no la tenga', () => {
+    const r = computeReporteSubitems([resumenTarjeta()], months, { filtros: { etiquetaIds: [4] } })
+    expect(r.kpis.total).toBe(700)
+    expect(r.por_etiqueta).toEqual([{ id: 4, nombre: 'Impuesto', total_ars: 700 }])
+  })
+
+  it('combina categoría del padre + etiqueta del sub-ítem (el caso reportado)', () => {
+    const r = computeReporteSubitems(
+      [resumenTarjeta()],
+      months,
+      { filtros: { categoriaIds: [9], etiquetaIds: [4] } },
+    )
+    // La categoría "Tarjeta crédito" es del contenedor: el sub-ítem la hereda y sobrevive.
+    expect(r.kpis.total).toBe(700)
+    expect(r.kpis.cantidad_gastos).toBe(1)
+  })
+
+  it('la categoría del sub-ítem también matchea (no sólo la heredada)', () => {
+    const r = computeReporteSubitems([resumenTarjeta()], months, { filtros: { categoriaIds: [2] } })
+    expect(r.kpis.total).toBe(300)
+    expect(r.por_categoria).toEqual([{ id: 2, nombre: 'Comida', total_ars: 300 }])
+  })
+
+  it('descarta los sub-ítems que no matchean aunque el gasto padre sí matchee', () => {
+    const r = computeReporteSubitems([resumenTarjeta()], months, { filtros: { conceptoIds: [11] } })
+    expect(r.kpis.total).toBe(700)
+    expect(r.top_conceptos).toEqual([{ concepto_id: 11, nombre: 'ABL', total_ars: 700 }])
+  })
+
+  it('entre dimensiones distintas el filtro es AND', () => {
+    const r = computeReporteSubitems(
+      [resumenTarjeta()],
+      months,
+      { filtros: { categoriaIds: [2], etiquetaIds: [4] } },
+    )
+    // El sub-ítem de categoría 2 no tiene la etiqueta 4; el de la etiqueta 4 es categoría 1.
+    expect(r.kpis.total).toBe(0)
+    expect(r.kpis.cantidad_gastos).toBe(0)
+  })
+
+  it('el fallback a nivel gasto se filtra por las dimensiones del gasto', () => {
+    const gastos = [
+      gasto({ totalMoneda: 500, categoriaId: 5, categoria: { id: 5, nombre: 'Auto' }, items: [] }),
+      gasto({ totalMoneda: 200, categoriaId: 6, categoria: { id: 6, nombre: 'Otro' }, items: [] }),
+    ]
+    const r = computeReporteSubitems(gastos, months, { filtros: { categoriaIds: [5] } })
+    expect(r.kpis.total).toBe(500)
+    expect(r.kpis.cantidad_gastos).toBe(1)
+  })
+
+  it('cantidad_gastos cuenta sólo los gastos con unidades sobrevivientes', () => {
+    const gastos = [resumenTarjeta(), gasto({ totalMoneda: 100, items: [] })]
+    const r = computeReporteSubitems(gastos, months, { filtros: { etiquetaIds: [4] } })
+    expect(r.kpis.cantidad_gastos).toBe(1)
+  })
+
+  it('sin filtros no descarta nada', () => {
+    const r = computeReporteSubitems([resumenTarjeta()], months, { filtros: {} })
+    expect(r.kpis.total).toBe(1000)
+  })
+})

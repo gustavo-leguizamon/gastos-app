@@ -21,6 +21,12 @@
 //
 // Los gastos `esTarjeta` (resúmenes contenedores) se excluyen en la route por defecto
 // para no doble-contar los consumos, que ya existen como gastos individuales.
+//
+// Filtros de categorización en el modo sub-ítem: el `where` de Prisma sólo puede filtrar
+// a nivel gasto, así que en `computeReporteSubitems` se filtra **por unidad** (ver
+// `filterUnits`). Un sub-ítem matchea si matchea él mismo **o** su gasto padre (el
+// sub-ítem "hereda" el contexto del contenedor: p. ej. la categoría "Tarjeta crédito" del
+// resumen aplica a todos sus consumos).
 
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -116,15 +122,27 @@ interface Unit {
   tarjetaId: number | null
   tarjetaNombre: string | null
   tipoPago: 'C' | 'D' | null
+  // Índice del gasto que originó la unidad (para contar gastos distintos en el KPI).
+  gastoIndex: number
+  // Dimensiones del gasto padre — sólo para filtrar (herencia), nunca para agregar.
+  padre: { categoriaId: number | null; etiquetaIds: number[]; conceptoId: number }
 }
 
 function normTipo(t: any): 'C' | 'D' | null {
   return t === 'C' || t === 'D' ? t : null
 }
 
+function padreDims(g: any) {
+  return {
+    categoriaId: g.categoriaId ?? null,
+    etiquetaIds: ((g.etiquetas ?? []) as { id: number }[]).map((e) => e.id),
+    conceptoId: g.conceptoId,
+  }
+}
+
 // Una unidad por gasto (nivel gasto).
 export function gastosToUnits(gastos: any[]): Unit[] {
-  return gastos.map((g) => ({
+  return gastos.map((g, gastoIndex) => ({
     monto: gastoTotalArs(g),
     categoriaId: g.categoriaId ?? null,
     categoriaNombre: g.categoria?.nombre ?? null,
@@ -136,6 +154,8 @@ export function gastosToUnits(gastos: any[]): Unit[] {
     tarjetaId: g.tarjetaId ?? null,
     tarjetaNombre: g.tarjeta?.nombre ?? null,
     tipoPago: normTipo(g.tipoPago),
+    gastoIndex,
+    padre: padreDims(g),
   }))
 }
 
@@ -155,9 +175,10 @@ export function gastosToUnits(gastos: any[]): Unit[] {
 // coinciden con la pantalla.
 export function gastosToSubitemUnits(gastos: any[]): Unit[] {
   const out: Unit[] = []
-  for (const g of gastos) {
+  gastos.forEach((g, gastoIndex) => {
     // Un sub-item de un resumen de tarjeta es, por definición, un consumo de crédito.
     const tipoPago: 'C' | 'D' | null = g.esTarjeta ? 'C' : normTipo(g.tipoPago)
+    const padre = padreDims(g)
     const itemsIncl = (g.items ?? []).filter((i: any) => i.incluyeEnTotal)
     if (itemsIncl.length > 0) {
       for (const it of itemsIncl) {
@@ -173,6 +194,8 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
           tarjetaId: g.tarjetaId ?? null,
           tarjetaNombre: g.tarjeta?.nombre ?? null,
           tipoPago,
+          gastoIndex,
+          padre,
         })
       }
     } else {
@@ -188,10 +211,45 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
         tarjetaId: g.tarjetaId ?? null,
         tarjetaNombre: g.tarjeta?.nombre ?? null,
         tipoPago,
+        gastoIndex,
+        padre,
       })
     }
-  }
+  })
   return out
+}
+
+/**
+ * Filtros de categorización aplicados a nivel unidad (sub-ítem). Vacío/ausente = sin filtrar.
+ * Entre dimensiones distintas la semántica es AND; dentro de una dimensión, OR (igual que
+ * el `where` de la route a nivel gasto).
+ */
+export interface UnitFilters {
+  categoriaIds?: number[]
+  etiquetaIds?: number[]
+  conceptoIds?: number[]
+}
+
+const anyIn = (ids: number[], values: (number | null)[]) =>
+  values.some((v) => v != null && ids.includes(v))
+
+/**
+ * Filtra unidades por las dimensiones de categorización. Una unidad matecha si matchea
+ * el sub-ítem **o** su gasto padre — el sub-ítem hereda el contexto del contenedor, así
+ * un filtro por la categoría del resumen de tarjeta no descarta sus consumos, y un filtro
+ * por una etiqueta cargada sólo en los sub-ítems tampoco descarta el gasto.
+ */
+export function filterUnits(units: Unit[], f: UnitFilters = {}): Unit[] {
+  const cats = f.categoriaIds ?? []
+  const etis = f.etiquetaIds ?? []
+  const cons = f.conceptoIds ?? []
+  if (!cats.length && !etis.length && !cons.length) return units
+  return units.filter((u) => {
+    if (cats.length && !anyIn(cats, [u.categoriaId, u.padre.categoriaId])) return false
+    if (etis.length && !anyIn(etis, [...u.etiquetas.map((e) => e.id), ...u.padre.etiquetaIds])) return false
+    if (cons.length && !anyIn(cons, [u.conceptoId, u.padre.conceptoId])) return false
+    return true
+  })
 }
 
 /**
@@ -314,11 +372,18 @@ export function computeReportes(
   return aggregateUnits(gastosToUnits(gastos), months, gastos.length, opts)
 }
 
-/** Reporte desglosado por sub-item (con fallback al nivel gasto si no hay sub-items). */
+/**
+ * Reporte desglosado por sub-item (con fallback al nivel gasto si no hay sub-items).
+ * `opts.filtros` filtra a nivel sub-ítem (ver `filterUnits`): la route no puede hacerlo
+ * en el `where`, que sólo alcanza al gasto. El KPI `cantidad_gastos` cuenta los gastos
+ * distintos que quedaron con al menos una unidad.
+ */
 export function computeReporteSubitems(
   gastos: any[],
   months: { mes: number; anio: number }[],
-  opts: { topConceptos?: number } = {},
+  opts: { topConceptos?: number; filtros?: UnitFilters } = {},
 ): ReporteResult {
-  return aggregateUnits(gastosToSubitemUnits(gastos), months, gastos.length, opts)
+  const units = filterUnits(gastosToSubitemUnits(gastos), opts.filtros)
+  const cantidadGastos = new Set(units.map((u) => u.gastoIndex)).size
+  return aggregateUnits(units, months, cantidadGastos, opts)
 }

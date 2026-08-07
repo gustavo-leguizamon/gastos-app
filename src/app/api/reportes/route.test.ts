@@ -88,6 +88,47 @@ describe('GET /api/reportes', () => {
     expect(body.por_categoria.find((c: any) => c.id === 2)?.total_ars).toBe(30)
   })
 
+  it('agrupar=subitem pre-filtra por gasto O sub-ítem en las dimensiones de categorización', async () => {
+    await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&agrupar=subitem&categoria_ids=9&etiqueta_ids=4&concepto_ids=7&tarjeta_ids=3'))
+    const where = mockPrisma.gasto.findMany.mock.calls[0][0].where
+    // tarjeta sigue siendo nivel gasto
+    expect(where.tarjetaId).toEqual({ in: [3] })
+    // categorización: OR gasto/sub-ítem, ANDeadas entre sí
+    expect(where).not.toHaveProperty('categoriaId')
+    expect(where.AND).toEqual([
+      { OR: [
+        { categoriaId: { in: [9] } },
+        { items: { some: { incluyeEnTotal: true, categoriaId: { in: [9] } } } },
+      ] },
+      { OR: [
+        { etiquetas: { some: { id: { in: [4] } } } },
+        { items: { some: { incluyeEnTotal: true, etiquetas: { some: { id: { in: [4] } } } } } },
+      ] },
+      { OR: [
+        { conceptoId: { in: [7] } },
+        { items: { some: { incluyeEnTotal: true, conceptoId: { in: [7] } } } },
+      ] },
+    ])
+  })
+
+  it('agrupar=subitem filtra los sub-ítems por etiqueta aunque el gasto padre no la tenga', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([
+      rawGasto({
+        esTarjeta: true,
+        categoriaId: 9,
+        categoria: { id: 9, nombre: 'Tarjeta crédito' },
+        items: [
+          { monto: 700, incluyeEnTotal: true, conceptoId: 11, concepto: { id: 11, nombre: 'ABL' }, categoriaId: 1, categoria: { id: 1, nombre: 'Servicios' }, etiquetas: [{ id: 4, nombre: 'Impuesto' }] },
+          { monto: 300, incluyeEnTotal: true, conceptoId: 12, concepto: { id: 12, nombre: 'Super' }, categoriaId: 2, categoria: { id: 2, nombre: 'Comida' }, etiquetas: [] },
+        ],
+      }),
+    ])
+    const res = await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&agrupar=subitem&incluir_tarjetas=true&categoria_ids=9&etiqueta_ids=4'))
+    const body = await res.json()
+    expect(body.kpis.total).toBe(700)
+    expect(body.por_etiqueta).toEqual([{ id: 4, nombre: 'Impuesto', total_ars: 700 }])
+  })
+
   it('incluir_tarjetas=true no fuerza esTarjeta=false', async () => {
     await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&incluir_tarjetas=true'))
     const where = mockPrisma.gasto.findMany.mock.calls[0][0].where

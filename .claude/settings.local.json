@@ -92,7 +92,9 @@
       "PowerShell(git status *)",
       "PowerShell(Select-String -Path \"node_modules\\\\.prisma\\\\client\\\\index.d.ts\" -Pattern \"bancoIcono\" -SimpleMatch | Select-Object -First 2; npx tsc --noEmit 2>&1 | Select-Object -First 20; \"TSC_EXIT=$LASTEXITCODE\")",
       "PowerShell(node -e \"const {PrismaClient}=require\\('@prisma/client'\\); const p=new PrismaClient\\(\\); p.tarjeta.findMany\\({select:{id:true,nombre:true,banco:true,bancoLogo:true,bancoIcono:true}}\\).then\\(r=>{console.log\\(JSON.stringify\\(r,null,1\\)\\)}\\).catch\\(e=>{console.error\\('FAIL',e.message\\)}\\).finally\\(\\(\\)=>p.$disconnect\\(\\)\\)\" 2>&1 | Select-Object -First 40)",
-      "PowerShell(git status --short; \"---BRANCH---\"; git branch --show-current; \"---REMOTE---\"; git remote -v)"
+      "PowerShell(git status --short; \"---BRANCH---\"; git branch --show-current; \"---REMOTE---\"; git remote -v)",
+      "PowerShell(npx vitest run src/lib/reportes-compute.test.ts src/app/api/reportes/route.test.ts 2>&1 | Select-Object -Last 40)",
+      "PowerShell(git status; \"---\"; git log origin/main..HEAD --oneline)"
     ]
   },
   "hooks": {
