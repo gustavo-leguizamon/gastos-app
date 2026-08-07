@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import { vencePorGasto } from '@/lib/vencimientos'
+import { sumItemsTotal } from '@/lib/subitems-total'
 import type { Gasto } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -46,7 +47,7 @@ export default function VencimientosHoyAlert() {
             // Igual que en `computeResumen`, si no está confirmado el total sale de los sub-items.
             const totalArs = g.confirmado
               ? g.total_ars
-              : items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+              : sumItemsTotal(items)
             const restante = Math.round((totalArs - g.total_pagado) * 100) / 100
             if (g.fecha_vencimiento === today && restante > 0) {
               out.push({

@@ -73,6 +73,18 @@ Cada `GastoItem` tiene tres flags booleanos:
 
 Los flags `incluye_en_total` / `incluye_en_vencimiento` se renderizan como checkboxes inline en la columna de acciones (no columnas separadas). `PATCH` para toggle parcial. Toggle de `incluye_en_vencimiento` llama `triggerResumenRefresh()`.
 
+### Subtotal de sub-items vs. total cargado
+
+`src/lib/subitems-total.ts` (testeado en `subitems-total.test.ts`) centraliza la comparación:
+
+- `sumItemsTotal(items)` — suma **sólo** los items con `incluye_en_total`.
+- `checkSubitemsTotal(items, total_ars)` → `{ hasItems, itemsTotal, gastoTotal, diferencia, matches }`. `diferencia = itemsTotal − gastoTotal` (positivo = los sub-items suman de más) y `matches` es `true` si `|diferencia| < TOTAL_EPSILON` (`0.005`) **o si no hay sub-items**.
+- `difiereSubtotal(items, total_ars)` — atajo `hasItems && !matches`.
+
+Lo usan la fila "TOTAL SUB-ITEMS" del grid (`buildFlatRows`), `renderSubItems` (mobile), el display de "Total ARS" cuando el gasto no está confirmado, `GastoItemDialog` (card "Suma sub-items") y `VencimientosHoyAlert`, así que todas las vistas comparten el mismo criterio.
+
+**Indicador de diferencia en la fila del gasto** (`SubtotalDifiereIcon` en `GastosTable`): cuando el gasto tiene sub-items y el subtotal **no** coincide con `total_ars`, se muestra un `ErrorOutlineIcon` rojo **al lado del total cargado** — en la columna "Total ARS" del grid y en el bloque "Total" de la card mobile — sin necesidad de expandir. El tooltip muestra subtotal de sub-items, total cargado y la diferencia con signo; al clickear el icono se expande/colapsa el gasto para ver el detalle. Si el gasto no está confirmado, la celda sigue mostrando el subtotal (en naranja) pero el icono se calcula igual contra `total_ars`.
+
 Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en vencimiento primero) y luego por `fecha` asc (nulls last) — en `buildFlatRows`, `renderSubItems` y `GastoItemDialog`. En `GastoItemDialog` el desempate ante misma fecha (o ambos sin fecha) es por `id` asc. La fila total de sub-items aparece **antes** de los items individuales al expandir; luego van los incluidos en vencimiento y por último el resto.
 
 **Sorting de la grilla**: `GastosTable` usa `sortingMode="server"` y `sortModel` controlado. Al click en header el sort aplica solo a filas de gasto (vía `sortGastos()`), y `buildFlatRows` arma flat rows desde los gastos ya ordenados. Sub-items y fila de totales quedan pegados al padre. Comparador soporta `number` y strings (`localeCompare`); nulos al final.

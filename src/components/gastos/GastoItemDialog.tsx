@@ -33,6 +33,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
+import { sumItemsTotal } from '@/lib/subitems-total'
 import type { Gasto, GastoItem, Categoria, Etiqueta } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -118,7 +119,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   if (!gasto) return null
 
   const items: GastoItem[] = gasto.items ?? []
-  const totalItems = items.reduce((s, i) => (i.incluye_en_total ? s + i.monto : s), 0)
+  const totalItems = sumItemsTotal(items)
 
   const startEdit = (item: GastoItem) => setEditing({
     id: item.id,

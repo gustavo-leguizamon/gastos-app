@@ -30,6 +30,7 @@ import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRig
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import BrandLogo from '@/components/shared/BrandLogo'
@@ -45,7 +46,8 @@ import GastoItemDialog from './GastoItemDialog'
 import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
-import type { Gasto, FiltrosGastos, Tarjeta } from '@/lib/types'
+import { checkSubitemsTotal } from '@/lib/subitems-total'
+import type { Gasto, GastoItem, FiltrosGastos, Tarjeta } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -53,6 +55,56 @@ function fmtARS(n: number) {
 
 function fmtNum(n: number, simbolo: string) {
   return `${simbolo} ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}`
+}
+
+/**
+ * Icono al lado del total cargado cuando el subtotal de los sub-items no
+ * coincide con él. El tooltip muestra ambos montos y la diferencia; el click
+ * expande los sub-items para ver el detalle.
+ */
+function SubtotalDifiereIcon({
+  items,
+  totalArs,
+  onClick,
+  size = 15,
+}: {
+  items: GastoItem[] | undefined
+  totalArs: number
+  onClick?: () => void
+  size?: number
+}) {
+  const { hasItems, matches, itemsTotal, gastoTotal, diferencia } = checkSubitemsTotal(items, totalArs)
+  if (!hasItems || matches) return null
+  const signo = diferencia > 0 ? '+' : '-'
+  return (
+    <Tooltip
+      arrow
+      title={
+        <Box>
+          <Typography variant="caption" sx={{ display: 'block', fontWeight: 700 }}>
+            El subtotal de sub-items no coincide
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            <strong>Sub-items:</strong> {fmtARS(itemsTotal)}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            <strong>Total cargado:</strong> {fmtARS(gastoTotal)}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            <strong>Diferencia:</strong> {signo}{fmtARS(Math.abs(diferencia))}
+          </Typography>
+        </Box>
+      }
+    >
+      <Box
+        component="span"
+        onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+        sx={{ display: 'inline-flex', alignItems: 'center', cursor: onClick ? 'pointer' : 'default', flexShrink: 0 }}
+      >
+        <ErrorOutlineIcon sx={{ fontSize: size, color: '#ef4444' }} />
+      </Box>
+    </Tooltip>
+  )
 }
 
 // Badge superpuesto en una esquina del chip "Crédito" (marca a la derecha, banco
@@ -446,11 +498,24 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         if (row._type === 'item') return (
           <span style={{ color: '#a78bfa', fontWeight: 600 }}>{fmtARS(row._monto)}</span>
         )
-        if (!row.confirmado && row.items?.length > 0) {
-          const itemsTotal = row.items.filter((i: any) => i.incluye_en_total).reduce((s: number, i: any) => s + i.monto, 0)
-          return <span style={{ fontWeight: 600, color: '#f59e0b' }}>{fmtARS(itemsTotal)}</span>
-        }
-        return <span style={{ fontWeight: 600 }}>{fmtARS(value)}</span>
+        // Sin confirmar y con sub-items se muestra el subtotal en vez del total
+        // cargado, pero el icono de diferencia se calcula siempre contra `total_ars`.
+        const unconfirmedConItems = !row.confirmado && (row.items?.length ?? 0) > 0
+        const display = unconfirmedConItems
+          ? checkSubitemsTotal(row.items, row.total_ars).itemsTotal
+          : value
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <span style={{ fontWeight: 600, color: unconfirmedConItems ? '#f59e0b' : undefined }}>
+              {fmtARS(display)}
+            </span>
+            <SubtotalDifiereIcon
+              items={row.items}
+              totalArs={row.total_ars}
+              onClick={() => toggleExpand(row.id)}
+            />
+          </Box>
+        )
       },
     },
     {
@@ -682,8 +747,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           if (!b.fecha) return -1
           return a.fecha.localeCompare(b.fecha)
         })
-        const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
-        const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
+        const { itemsTotal, matches } = checkSubitemsTotal(g.items, g.total_ars)
         result.push({
           id: `total_${g.id}`,
           _type: 'items_total',
@@ -724,7 +788,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     const hasItems = (g.items?.length ?? 0) > 0
     const expanded = expandedIds.has(g.id)
     const displayTotalARS = !g.confirmado && hasItems
-      ? g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
+      ? checkSubitemsTotal(g.items, g.total_ars).itemsTotal
       : g.total_ars
 
     return (
@@ -804,9 +868,17 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0.5, mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Total</Typography>
-              <Typography variant="body2" fontWeight={600} sx={{ color: !g.confirmado && hasItems ? '#f59e0b' : undefined }}>
-                {fmtARS(displayTotalARS)}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="body2" fontWeight={600} sx={{ color: !g.confirmado && hasItems ? '#f59e0b' : undefined }}>
+                  {fmtARS(displayTotalARS)}
+                </Typography>
+                <SubtotalDifiereIcon
+                  items={g.items}
+                  totalArs={g.total_ars}
+                  onClick={() => toggleExpand(g.id)}
+                  size={14}
+                />
+              </Box>
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Pagado</Typography>
@@ -876,8 +948,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       if (!b.fecha) return -1
       return a.fecha.localeCompare(b.fecha)
     })
-    const itemsTotal = g.items.filter(i => i.incluye_en_total).reduce((s, i) => s + i.monto, 0)
-    const matches = Math.abs(itemsTotal - g.total_ars) < 0.005
+    const { itemsTotal, matches } = checkSubitemsTotal(g.items, g.total_ars)
 
     return (
       <Box sx={{ mt: 1, pl: 1, borderLeft: '2px solid', borderColor: 'divider' }}>
