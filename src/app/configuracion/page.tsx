@@ -36,6 +36,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
+import NotificacionesCard from '@/components/configuracion/NotificacionesCard'
 import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
 import BancoLogo from '@/components/shared/BancoLogo'
 import IconoBancoUpload from '@/components/shared/IconoBancoUpload'
@@ -592,6 +593,11 @@ export default function ConfiguracionPage() {
               </List>
             </AccordionDetails>
           </Accordion>
+        </Grid>
+
+        {/* Notificaciones push de vencimientos */}
+        <Grid item xs={12}>
+          <NotificacionesCard />
         </Grid>
 
         {/* Valores por defecto del alta de gastos */}

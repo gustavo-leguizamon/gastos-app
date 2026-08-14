@@ -36,5 +36,8 @@
 | `PUT/DELETE /api/inversiones/[id]/movimientos/[movId]` | Edit / remove a movimiento |
 | `GET/POST /api/sueldos` | List / create sueldos — **restringido** al email permitido (403 si no) |
 | `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
+| `GET/POST/DELETE /api/push/subscribe` | Suscripciones Web Push del usuario logueado (email de la sesión). `POST` upsertea por `endpoint` (body `{ endpoint, p256dh, auth }`, 400 si falta alguno); `DELETE` borra la de este browser (body `{ endpoint }`, filtrado también por email); `GET` devuelve `{ subscriptions: n }`. 401 sin sesión. Ver `docs/claude/auth-pwa.md`. |
+| `POST /api/push/test` | Manda una notificación de prueba a todos los devices del usuario logueado. 404 si no hay suscripciones, 500 si faltan las claves VAPID. Borra las suscripciones muertas (404/410). |
+| `GET /api/cron/vencimientos` | **Job diario** (Vercel Cron, `vercel.json`, `0 11 * * *` UTC = 8:00 ART). Fuera del middleware de sesión: autentica con `Authorization: Bearer $CRON_SECRET` (401 si no matchea, 500 si la env var no está). Calcula "hoy" en timezone Argentina (`fechaEnTimeZone`), busca los gastos de ese `mes`/`anio`, aplica `vencimientosDelDia` y manda el push armado por `buildVencimientosPush` a **todas** las suscripciones. Params de prueba: `today=YYYY-MM-DD` (400 si el formato es inválido), `dry=1` (devuelve el payload sin enviar). Respuesta: `{ ok, today, vencimientos, enviadas, eliminadas, errores }`. |
 
 Todos los responses de `/api/gastos` incluyen `pagos` y `items` vía constante `INCLUDE` y mapper `toGastoResponse()` en cada route file.

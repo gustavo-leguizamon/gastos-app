@@ -188,3 +188,18 @@ model Pago {
   gasto Gasto       @relation(fields: [gastoId], references: [id], onDelete: Cascade)
   items GastoItem[]
 }
+
+/// Suscripción Web Push de un browser/dispositivo. Un mismo email puede tener varias
+/// (celular, desktop, PWA instalada). `endpoint` es la URL del push service y es la
+/// identidad de la suscripción — si el browser la renueva, cambia el endpoint.
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  email     String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
