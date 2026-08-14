@@ -2,6 +2,28 @@
 // en aislamiento la aritmética de meses (que es fácil de romper con el wraparound).
 
 /**
+ * Timezone de referencia de la app. Los jobs programados (cron de Vercel) corren en UTC,
+ * así que no pueden usar la fecha local del server para decidir "hoy".
+ */
+export const TZ_ARGENTINA = 'America/Argentina/Buenos_Aires'
+
+/**
+ * Fecha `YYYY-MM-DD` de un `Date` en un timezone dado (default: Argentina).
+ *
+ * Es el equivalente server-side de lo que los client components hacen con
+ * `getFullYear()/getMonth()/getDate()`: nunca usar `toISOString()`, que da UTC y
+ * corre el día para timezones detrás de UTC. `en-CA` formatea justo como `YYYY-MM-DD`.
+ */
+export function fechaEnTimeZone(date: Date, timeZone: string = TZ_ARGENTINA): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+/**
  * Avanza un par (mes, anio) por `n` meses, manejando el wraparound de fin de año.
  * `mes` es 1-12. `n` puede ser negativo.
  *

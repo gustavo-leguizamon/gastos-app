@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres } from './fechas'
+import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres, fechaEnTimeZone, TZ_ARGENTINA } from './fechas'
+
+describe('fechaEnTimeZone', () => {
+  it('formatea como YYYY-MM-DD', () => {
+    expect(fechaEnTimeZone(new Date('2026-08-14T14:00:00Z'))).toBe('2026-08-14')
+  })
+
+  it('usa el día de Argentina, no el de UTC', () => {
+    // 01:30 UTC del 15 es todavía el 14 a las 22:30 en Argentina (UTC-3).
+    expect(fechaEnTimeZone(new Date('2026-08-15T01:30:00Z'), TZ_ARGENTINA)).toBe('2026-08-14')
+  })
+
+  it('el cron de las 11:00 UTC cae en el mismo día en Argentina', () => {
+    expect(fechaEnTimeZone(new Date('2026-08-14T11:00:00Z'))).toBe('2026-08-14')
+  })
+
+  it('respeta un timezone explícito', () => {
+    expect(fechaEnTimeZone(new Date('2026-08-14T23:00:00Z'), 'UTC')).toBe('2026-08-14')
+    expect(fechaEnTimeZone(new Date('2026-08-14T23:00:00Z'), 'Asia/Tokyo')).toBe('2026-08-15')
+  })
+})
 
 describe('shiftMonth', () => {
   it('avanza dentro del mismo año', () => {
