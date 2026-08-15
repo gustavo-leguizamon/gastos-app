@@ -229,3 +229,96 @@ describe('computeResumen — estimado próximo mes', () => {
     expect(r.total_proximo_mes).toBe(150)
   })
 })
+
+describe('computeResumen — ingresos y ahorro', () => {
+  // Ingreso en ARS: el tipo de cambio es 1 y el monto no se convierte.
+  const ingresoArs = (monto: number) => ({ montoMoneda: monto, tipoCambio: 1 })
+
+  it('total_debito suma los gastos en débito estén pagados o no', () => {
+    const r = computeResumen(
+      [
+        makeGasto({ totalMoneda: 800, tipoPago: 'D', pagos: [] }),        // sin pagar → cuenta igual
+        makeGasto({ totalMoneda: 200, tipoPago: 'D', pagos: [{ monto: 200 }] }),
+      ],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_debito).toBe(1000)
+  })
+
+  it('total_debito excluye los consumos de crédito (ya están en el resumen de tarjeta)', () => {
+    const r = computeResumen(
+      [
+        makeGasto({ totalMoneda: 5000, tipoPago: 'C' }),                          // consumo de crédito
+        makeGasto({ totalMoneda: 5000, tipoPago: 'D', esTarjeta: true }),         // resumen de la tarjeta
+        makeGasto({ totalMoneda: 300, tipoPago: 'D' }),                           // débito común
+      ],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    // Sólo el resumen de tarjeta + el débito: el consumo de crédito no se cuenta dos veces.
+    expect(r.total_debito).toBe(5300)
+  })
+
+  it('ahorra contra lo gastado en débito, no contra lo pagado ni contra el total de gastos', () => {
+    const r = computeResumen(
+      [
+        makeGasto({ totalMoneda: 400, tipoPago: 'D', pagos: [{ monto: 100 }] }),
+        makeGasto({ totalMoneda: 5000, tipoPago: 'C' }),                          // crédito: no resta
+      ],
+      [], SETTINGS_DEFAULT, TODAY,
+      [ingresoArs(600), ingresoArs(400)],
+    )
+    expect(r.total_ingresos).toBe(1000)
+    expect(r.total_debito).toBe(400)
+    // 1000 − 400 débito (no − 100 pagado, no − 5400 total de gastos)
+    expect(r.total_ahorro).toBe(600)
+    expect(r.ahorro_pct).toBe(60)
+  })
+
+  it('sin ingresos cargados el ahorro es el débito en negativo y el % es 0', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 250, tipoPago: 'D' })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_ingresos).toBe(0)
+    expect(r.total_ahorro).toBe(-250)
+    expect(r.ahorro_pct).toBe(0)
+  })
+
+  it('el ahorro queda negativo cuando se gastó en débito más de lo que entró', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 1500, tipoPago: 'D' })],
+      [], SETTINGS_DEFAULT, TODAY,
+      [ingresoArs(1000)],
+    )
+    expect(r.total_ahorro).toBe(-500)
+    expect(r.ahorro_pct).toBe(-50)
+  })
+
+  it('convierte a ARS los ingresos en otra moneda antes de comparar', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 350, tipoPago: 'D' })],
+      [], SETTINGS_DEFAULT, TODAY,
+      [{ montoMoneda: 1, tipoCambio: 1350 }, ingresoArs(50)],
+    )
+    expect(r.total_ingresos).toBe(1400)
+    expect(r.total_ahorro).toBe(1050)
+  })
+
+  it('en débito no confirmado usa la suma de sub-items, igual que el resto de los totales', () => {
+    const r = computeResumen(
+      [makeGasto({
+        tipoPago: 'D',
+        confirmado: false,
+        totalMoneda: 9999,
+        items: [
+          { conceptoId: 5, monto: 120, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null },
+          { conceptoId: 6, monto: 80, incluyeEnTotal: false, incluyeEnVencimiento: false, fecha: null },
+        ],
+      })],
+      [], SETTINGS_DEFAULT, TODAY,
+      [ingresoArs(1000)],
+    )
+    expect(r.total_debito).toBe(120)
+    expect(r.total_ahorro).toBe(880)
+  })
+})

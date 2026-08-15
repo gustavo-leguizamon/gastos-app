@@ -8,17 +8,19 @@ datasource db {
 }
 
 model Moneda {
-  id      Int     @id @default(autoincrement())
-  codigo  String  @unique
-  nombre  String
-  simbolo String
-  gastos  Gasto[]
+  id       Int       @id @default(autoincrement())
+  codigo   String    @unique
+  nombre   String
+  simbolo  String
+  gastos   Gasto[]
+  ingresos Ingreso[]
 }
 
 model Casa {
-  id     Int     @id @default(autoincrement())
-  nombre String
-  gastos Gasto[]
+  id       Int       @id @default(autoincrement())
+  nombre   String
+  gastos   Gasto[]
+  ingresos Ingreso[]
 }
 
 model Tarjeta {
@@ -134,6 +136,31 @@ model GastoItem {
   categoria  Categoria? @relation(fields: [categoriaId], references: [id])
   etiquetas Etiqueta[] @relation("GastoItemEtiquetas")
   pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+}
+
+// Ingreso de dinero de un mes. Se cargan varios por mes (los cobros pueden entrar en días
+// distintos) y el total del mes es la suma. Igual que en `Gasto`, `mes`/`anio` son explícitos
+// y NO se derivan de `fecha`: permiten imputar un cobro que entró un día a otro mes.
+// `casaId` es opcional — un ingreso sin casa es "general" y cuenta para cualquier casa.
+// La moneda sigue el mismo mecanismo que `Gasto`: `montoMoneda * tipoCambio` = monto en ARS,
+// con `tipoCambio` en 1 cuando la moneda es ARS (el caso normal).
+model Ingreso {
+  id          Int      @id @default(autoincrement())
+  fecha       String
+  mes         Int
+  anio        Int
+  monedaId    Int
+  tipoCambio  Float    @default(1)
+  montoMoneda Float
+  descripcion String?
+  casaId      Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  casa   Casa?  @relation(fields: [casaId], references: [id])
+  moneda Moneda @relation(fields: [monedaId], references: [id])
+
+  @@index([anio, mes])
 }
 
 model Inversion {

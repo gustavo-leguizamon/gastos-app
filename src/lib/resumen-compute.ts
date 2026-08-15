@@ -3,6 +3,7 @@
 // settings, then delegates all aggregation/estimation logic here.
 
 import { vencePorGasto } from './vencimientos'
+import { computeAhorro, type IngresoRow } from './ingresos-compute'
 
 export interface ResumenSettings {
   estimMesesAtras: number
@@ -22,6 +23,19 @@ export interface ResumenResult {
   total_pagado: number
   pagar_hoy: number
   total_proximo_mes: number
+  /** Suma de los ingresos cargados para el mes (varias entradas, ver `Ingreso`). */
+  total_ingresos: number
+  /**
+   * Lo gastado en débito/efectivo: `SUM(total_ars)` de los gastos con `tipoPago === 'D'`,
+   * estén pagados o no. Incluye los resúmenes de tarjeta (que se cargan como débito, porque
+   * el resumen se paga de la cuenta) y excluye los consumos de crédito individuales, que ya
+   * están representados dentro de esos resúmenes — así no se cuenta dos veces.
+   */
+  total_debito: number
+  /** `total_ingresos − total_debito`: cuánta de la plata que entró todavía no salió. */
+  total_ahorro: number
+  /** `total_ahorro` como % de `total_ingresos` (0 si no hay ingresos cargados). */
+  ahorro_pct: number
 }
 
 type Unit = {
@@ -91,14 +105,15 @@ function findMatch(units: Unit[], target: Unit): number | null {
 /**
  * Calcula el resumen mensual a partir de los gastos del mes (`gastos`, con
  * `pagos` e `items`), los gastos de los meses previos (`prevGastos`, con
- * `items`, uno por cada mes atrás), los settings de estimación y la fecha
- * `today` (YYYY-MM-DD local del usuario).
+ * `items`, uno por cada mes atrás), los settings de estimación, la fecha
+ * `today` (YYYY-MM-DD local del usuario) y los `ingresos` del mes.
  */
 export function computeResumen(
   gastos: any[],
   prevGastos: any[][],
   settings: ResumenSettings,
   today: string,
+  ingresos: IngresoRow[] = [],
 ): ResumenResult {
   const missingBehavior: 'zero' | 'average_found' =
     settings.estimMissingBehavior === 'average_found' ? 'average_found' : 'zero'
@@ -112,6 +127,7 @@ export function computeResumen(
   let total_prestamos = 0
   let total_tarjetas = 0
   let total_pasajes = 0
+  let total_debito = 0
 
   for (const g of gastos) {
     if (!g.confirmado && g.items.length === 0) continue
@@ -127,6 +143,8 @@ export function computeResumen(
     total_prestamos += prestamo
     total_pasajes += g.pasajeMesSiguiente ?? 0
     if (g.tipoPago === 'C' && prestamo === 0) total_tarjetas += totalArs
+    // Débito/efectivo — la plata que sale de la cuenta. Es la base del ahorro del mes.
+    if (g.tipoPago === 'D') total_debito += totalArs
     if (vencePorGasto(g.esTarjeta, g.items.length)) {
       // Gasto sin sub-items (o resumen de tarjeta): vence por su propia fechaVencimiento.
       if (g.fechaVencimiento === today) pagar_hoy += restante
@@ -162,6 +180,9 @@ export function computeResumen(
   }
 
   const r = (n: number) => Math.round(n * 100) / 100
+  // El ahorro se mide contra lo gastado en débito/efectivo: la plata que efectivamente sale
+  // de la cuenta. Los consumos de crédito no restan acá — restan cuando se paga el resumen.
+  const ahorro = computeAhorro(ingresos, r(total_debito))
   return {
     total_gastos: r(total_gastos),
     total_gastos_neto: r(total_gastos - total_prestamos - total_tarjetas - total_pasajes),
@@ -173,5 +194,9 @@ export function computeResumen(
     total_pagado: r(total_pagado),
     pagar_hoy: r(pagar_hoy),
     total_proximo_mes: r(total_proximo_mes),
+    total_ingresos: ahorro.total_ingresos,
+    total_debito: r(total_debito),
+    total_ahorro: ahorro.ahorro,
+    ahorro_pct: ahorro.ahorro_pct,
   }
 }
