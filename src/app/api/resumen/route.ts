@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { computeResumen } from '@/lib/resumen-compute'
+import { buildIngresosWhere } from '@/lib/ingresos-compute'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -37,11 +38,12 @@ export async function GET(req: NextRequest) {
     prevMonths.push({ mes: pm, anio: pa })
   }
 
-  const [gastos, ...prevGastos] = await Promise.all([
+  const [ingresos, gastos, ...prevGastos] = await Promise.all([
+    prisma.ingreso.findMany({ where: buildIngresosWhere(mes, anio, casa_id), select: { montoMoneda: true, tipoCambio: true } }),
     prisma.gasto.findMany({ where, include: { pagos: true, items: true } }),
     ...prevMonths.map(p => prisma.gasto.findMany({ where: { ...baseWhere, mes: p.mes, anio: p.anio }, include: { items: true } })),
   ])
 
-  const resumen = computeResumen(gastos, prevGastos, settings, today)
+  const resumen = computeResumen(gastos, prevGastos, settings, today, ingresos)
   return NextResponse.json(resumen)
 }

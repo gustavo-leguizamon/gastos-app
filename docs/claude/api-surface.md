@@ -13,7 +13,9 @@
 | `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
 | `PUT/PATCH/DELETE /api/gastos/[id]/items/[itemId]` | Full edit / partial toggle / remove a sub-item |
-| `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params |
+| `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params. Incluye además `total_ingresos`, `total_debito` (gastos con `tipo_pago = 'D'`), `total_ahorro` (= ingresos − `total_debito`) y `ahorro_pct` — ver `docs/claude/ingresos.md`. |
+| `GET/POST /api/ingresos` | Ingresos del mes (varias entradas que se suman). `GET`: params `mes`, `anio`, `casa_id` (incluye los ingresos **sin casa**), orden `fecha desc, id desc`; devuelve `monto_moneda` + `moneda_*` + `tipo_cambio` y el derivado `monto_ars`. `POST`: body `{ fecha, monto_moneda, moneda_id, tipo_cambio?, descripcion?, casa_id?, mes?, anio? }` — `mes`/`anio` se derivan de `fecha` si no vienen, `tipo_cambio` default 1 (ARS); 400 si el body no pasa `parseIngresoBody`. Ver `docs/claude/ingresos.md`. |
+| `PUT/DELETE /api/ingresos/[id]` | Edita / elimina un ingreso. 400 con id o body inválido, 404 si no existe. |
 | `GET /api/reportes` | Métricas agregadas para la sección Reportes. Params: rango `mes_desde`/`anio_desde`/`mes_hasta`/`anio_hasta` (obligatorio, 400 si falta), `casa_id`, `tipo_pago`, `categoria_ids`/`tarjeta_ids`/`concepto_ids` (listas `1,2,3`), `incluir_tarjetas` (default excluye `esTarjeta`), `top` (límite conceptos). Devuelve `{ kpis, por_categoria, por_mes, top_conceptos, por_tarjeta, por_tipo_pago }`. Ver `docs/claude/reportes.md`. |
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |

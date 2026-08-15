@@ -5,6 +5,7 @@ import { useGastosStore } from '@/store/gastosStore'
 import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
+import CardActionArea from '@mui/material/CardActionArea'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
@@ -12,6 +13,9 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import TodayIcon from '@mui/icons-material/Today'
 import EventRepeatIcon from '@mui/icons-material/EventRepeat'
+import PaymentsIcon from '@mui/icons-material/Payments'
+import SavingsIcon from '@mui/icons-material/Savings'
+import IngresosDialog from '@/components/ingresos/IngresosDialog'
 import type { Resumen, FiltrosGastos } from '@/lib/types'
 
 function formatARS(n: number) {
@@ -54,7 +58,40 @@ const CARDS = [
     color: '#06b6d4',
     bg: 'rgba(6,182,212,0.12)',
   },
+  // Ingresos del mes (suma de las entradas cargadas) y lo que queda de ellos una vez
+  // descontado lo gastado en débito/efectivo. La card de Ingresos abre el ABM del mes.
+  {
+    key: 'total_ingresos' as const,
+    label: 'Ingresos',
+    icon: <PaymentsIcon />,
+    color: '#14b8a6',
+    bg: 'rgba(20,184,166,0.12)',
+  },
+  {
+    key: 'total_ahorro' as const,
+    label: 'Ahorro',
+    icon: <SavingsIcon />,
+    color: '#8b5cf6',
+    bg: 'rgba(139,92,246,0.12)',
+  },
 ]
+
+const RESUMEN_VACIO: Resumen = {
+  total_gastos: 0,
+  total_gastos_neto: 0,
+  total_prestamos: 0,
+  total_tarjetas: 0,
+  total_pasajes: 0,
+  total_restante: 0,
+  total_restante_neto: 0,
+  total_pagado: 0,
+  pagar_hoy: 0,
+  total_proximo_mes: 0,
+  total_ingresos: 0,
+  total_debito: 0,
+  total_ahorro: 0,
+  ahorro_pct: 0,
+}
 
 interface Props {
   filtros: FiltrosGastos
@@ -63,7 +100,9 @@ interface Props {
 
 export default function ResumenCards({ filtros, refreshKey }: Props) {
   const resumenRefreshKey = useGastosStore(s => s.resumenRefreshKey)
-  const [resumen, setResumen] = useState<Resumen>({ total_gastos: 0, total_gastos_neto: 0, total_prestamos: 0, total_tarjetas: 0, total_pasajes: 0, total_restante: 0, total_restante_neto: 0, total_pagado: 0, pagar_hoy: 0, total_proximo_mes: 0 })
+  const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
+  const [resumen, setResumen] = useState<Resumen>(RESUMEN_VACIO)
+  const [ingresosOpen, setIngresosOpen] = useState(false)
 
   useEffect(() => {
     const d = new Date()
@@ -79,11 +118,19 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
       .then(setResumen)
   }, [filtros, refreshKey, resumenRefreshKey])
 
+  // Sin ingresos cargados el "ahorro" sería sólo el débito en negativo — no informa nada.
+  const hayIngresos = resumen.total_ingresos !== 0
+  const ahorroColor = resumen.total_ahorro < 0 ? '#ef4444' : '#8b5cf6'
+
   return (
-    <Grid container spacing={2} sx={{ mb: 3 }}>
-      {CARDS.map((card) => (
-        <Grid item xs={12} sm={6} md={3} key={card.key}>
-          <Card sx={{ border: `1px solid ${card.color}33` }}>
+    <>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {CARDS.map((card) => {
+          const esIngresos = card.key === 'total_ingresos'
+          const esAhorro = card.key === 'total_ahorro'
+          const color = esAhorro && hayIngresos ? ahorroColor : card.color
+
+          const contenido = (
             <CardContent sx={{ pb: '16px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body2" color="text.secondary" fontWeight={500}>
@@ -93,9 +140,34 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
                   {card.icon}
                 </Box>
               </Box>
-              <Typography variant="h6" fontWeight={700} sx={{ color: card.color }}>
-                {formatARS(resumen[card.key])}
+              <Typography variant="h6" fontWeight={700} sx={{ color }}>
+                {esAhorro && !hayIngresos ? '—' : formatARS(resumen[card.key])}
               </Typography>
+              {esIngresos && (
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {hayIngresos ? 'Tocá para editar los ingresos del mes' : 'Tocá para cargar los ingresos del mes'}
+                  </Typography>
+                </Box>
+              )}
+              {esAhorro && (
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
+                  {hayIngresos ? (
+                    <>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        <strong>{resumen.ahorro_pct.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%</strong> de lo ingresado
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Ingresos {formatARS(resumen.total_ingresos)} − débito {formatARS(resumen.total_debito)}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Cargá los ingresos del mes para verlo
+                    </Typography>
+                  )}
+                </Box>
+              )}
               {card.key === 'total_restante' && resumen.total_pasajes > 0 && (
                 <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
@@ -129,9 +201,28 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
                 </Box>
               )}
             </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+          )
+
+          return (
+            <Grid item xs={12} sm={6} md={3} key={card.key}>
+              <Card sx={{ border: `1px solid ${color}33`, height: '100%' }}>
+                {esIngresos ? (
+                  <CardActionArea onClick={() => setIngresosOpen(true)} sx={{ height: '100%' }}>
+                    {contenido}
+                  </CardActionArea>
+                ) : contenido}
+              </Card>
+            </Grid>
+          )
+        })}
+      </Grid>
+
+      <IngresosDialog
+        open={ingresosOpen}
+        filtros={filtros}
+        onClose={() => setIngresosOpen(false)}
+        onChanged={triggerResumenRefresh}
+      />
+    </>
   )
 }

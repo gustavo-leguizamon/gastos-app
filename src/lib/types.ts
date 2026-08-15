@@ -198,6 +198,40 @@ export interface Resumen {
   total_pagado: number
   pagar_hoy: number
   total_proximo_mes: number
+  /** Suma de los ingresos cargados para el mes. */
+  total_ingresos: number
+  /** Lo gastado en débito/efectivo (`tipo_pago === 'D'`), incluye los resúmenes de tarjeta. */
+  total_debito: number
+  /** `total_ingresos − total_debito`. */
+  total_ahorro: number
+  /** `total_ahorro` como % de `total_ingresos` (0 si no hay ingresos). */
+  ahorro_pct: number
+}
+
+/**
+ * Ingreso de dinero de un mes. Se cargan varios (los cobros entran en días distintos) y el
+ * total del mes es la suma. `casa_id` opcional: sin casa el ingreso es general y cuenta para
+ * cualquier casa que se filtre.
+ */
+export interface Ingreso {
+  id: number
+  fecha: string
+  mes: number
+  anio: number
+  moneda_id: number
+  moneda_codigo: string | null
+  moneda_simbolo: string | null
+  /** Cotización a ARS. Siempre 1 cuando la moneda es ARS (el caso normal). */
+  tipo_cambio: number
+  /** Monto en la moneda del ingreso. */
+  monto_moneda: number
+  /** `monto_moneda * tipo_cambio` — derivado, no se persiste. */
+  monto_ars: number
+  descripcion: string | null
+  casa_id: number | null
+  casa_nombre: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Inversion {
