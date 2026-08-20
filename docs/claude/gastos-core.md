@@ -93,7 +93,7 @@ Matchea: descripción, categoría, etiquetas y **notas** del gasto, más la desc
 - **`shiftFechaAPeriodo`** (`src/lib/mover-periodo.ts`) conserva el día y lo **recorta al último del mes destino** (31 de enero → 28/29 de febrero), sin desbordar al mes siguiente.
 - Si la fecha guardada está mal formada, el período se mueve igual y la fecha queda como está.
 
-UI: **"Mover a otro mes"** en el menú de la fila (`DriveFileMove`), con preview del cambio de fecha y un aviso cuando es un **resumen de tarjeta** (los `TarjetaCierre` viven aparte por mes y no se mueven con él).
+UI: **`MoverGastoDialog`** (`src/components/gastos/MoverGastoDialog.tsx`), que se abre desde **"Mover a otro mes"** en el menú de la fila (`DriveFileMove`). Muestra el preview del cambio de fecha y avisa cuando es un **resumen de tarjeta** (los `TarjetaCierre` viven aparte por mes y no se mueven con él). Al terminar dispara el refresh global, no el de la fila: el gasto sale del mes que se está mirando, así que la grilla y las cards del resumen quedan desactualizadas.
 
 ## Exportar a CSV
 
