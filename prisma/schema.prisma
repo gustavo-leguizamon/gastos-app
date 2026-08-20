@@ -62,6 +62,29 @@ model Categoria {
   nombre String      @unique
   gastos Gasto[]
   items  GastoItem[]
+  presupuestos Presupuesto[]
+}
+
+/// Tope de gasto mensual de una categoría. La app mostraba montos absolutos pero nada contra
+/// qué compararlos: no había forma de responder "¿me pasé en Comida este mes?".
+///
+/// Es por (categoría, mes, año) y no un default que se arrastra, para que cambiar el
+/// presupuesto de un mes no reescriba la historia de los meses ya cerrados. La **ausencia de
+/// fila significa "sin presupuesto"**, que no es lo mismo que un presupuesto en 0 (ese sí
+/// dice "acá no se gasta nada" y cualquier gasto lo excede).
+model Presupuesto {
+  id          Int      @id @default(autoincrement())
+  categoriaId Int
+  mes         Int
+  anio        Int
+  monto       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaId, mes, anio])
+  @@index([anio, mes])
 }
 
 // Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito

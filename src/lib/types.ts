@@ -344,3 +344,46 @@ export interface FiltrosReporte {
   tarjeta_ids: number[]
   concepto_ids: number[]
 }
+
+/** Tope mensual de una categoría. La ausencia de fila = "sin presupuesto" (no es un 0). */
+export interface Presupuesto {
+  id: number
+  categoria_id: number
+  categoria_nombre: string | null
+  mes: number
+  anio: number
+  monto: number
+}
+
+export type EstadoPresupuesto = 'ok' | 'cerca' | 'excedido'
+
+/** Una categoría con su tope (si tiene) y lo que se lleva gastado del período. */
+export interface EjecucionPresupuesto {
+  categoria_id: number
+  categoria_nombre: string
+  /** `null` cuando la categoría tiene gasto pero no tiene tope cargado. */
+  monto: number | null
+  gastado: number
+  restante: number | null
+  consumido_pct: number | null
+  estado: EstadoPresupuesto
+}
+
+export interface TotalesPresupuesto {
+  presupuestado: number
+  /** Sólo lo gastado en categorías **con** tope, para que sea comparable con el total. */
+  gastado: number
+  /** Lo gastado en categorías sin tope, informado aparte. */
+  sin_presupuesto: number
+  restante: number
+  consumido_pct: number | null
+  excedidas: number
+}
+
+export interface PresupuestosResponse {
+  mes: number
+  anio: number
+  presupuestos: Presupuesto[]
+  ejecucion: EjecucionPresupuesto[]
+  totales: TotalesPresupuesto
+}
