@@ -10,7 +10,6 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import SavingsIcon from '@mui/icons-material/Savings'
 import { useState } from 'react'
 import { useGastosStore } from '@/store/gastosStore'
 import ResumenCards from '@/components/gastos/ResumenCards'
@@ -20,13 +19,11 @@ import GastosTable from '@/components/gastos/GastosTable'
 import GastoDialog from '@/components/gastos/GastoDialog'
 import CopiarMesDialog from '@/components/gastos/CopiarMesDialog'
 import VencimientosHoyAlert from '@/components/gastos/VencimientosHoyAlert'
-import PresupuestosDialog from '@/components/presupuestos/PresupuestosDialog'
 import type { Gasto } from '@/lib/types'
 
 export default function GastosPage() {
   const { filtros, setFiltros, dialogOpen, gastoEditando, openDialog, closeDialog, refreshKey, triggerRefresh } = useGastosStore()
   const [copiarMesOpen, setCopiarMesOpen] = useState(false)
-  const [presupuestosOpen, setPresupuestosOpen] = useState(false)
   const [estadoPago, setEstadoPago] = useState<'todos' | 'pendiente' | 'saldado'>('pendiente')
   const [busqueda, setBusqueda] = useState('')
   const [fecha, setFecha] = useState('')
@@ -48,41 +45,22 @@ export default function GastosPage() {
             {MESES[filtros.mes - 1]} {filtros.anio}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {isMobile ? (
-            <>
-              <Tooltip title="Presupuestos del mes">
-                <IconButton color="primary" onClick={() => setPresupuestosOpen(true)}>
-                  <SavingsIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Copiar mes">
-                <IconButton color="primary" onClick={() => setCopiarMesOpen(true)}>
-                  <ContentCopyIcon />
-                </IconButton>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outlined"
-                startIcon={<SavingsIcon />}
-                onClick={() => setPresupuestosOpen(true)}
-                size="small"
-              >
-                Presupuestos
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<ContentCopyIcon />}
-                onClick={() => setCopiarMesOpen(true)}
-                size="small"
-              >
-                Copiar mes
-              </Button>
-            </>
-          )}
-        </Box>
+        {isMobile ? (
+          <Tooltip title="Copiar mes">
+            <IconButton color="primary" onClick={() => setCopiarMesOpen(true)}>
+              <ContentCopyIcon />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="outlined"
+            startIcon={<ContentCopyIcon />}
+            onClick={() => setCopiarMesOpen(true)}
+            size="small"
+          >
+            Copiar mes
+          </Button>
+        )}
       </Box>
 
       <ResumenCards filtros={filtros} refreshKey={refreshKey} />
@@ -110,13 +88,6 @@ export default function GastosPage() {
         <AddIcon sx={{ mr: isMobile ? 0 : 1 }} />
         {!isMobile && 'Nuevo Gasto'}
       </Fab>
-
-      <PresupuestosDialog
-        open={presupuestosOpen}
-        mes={filtros.mes}
-        anio={filtros.anio}
-        onClose={() => setPresupuestosOpen(false)}
-      />
 
       <CopiarMesDialog
         open={copiarMesOpen}

@@ -12,6 +12,7 @@ Params (todos snake_case):
 - `incluir_tarjetas` — `"true"` para **no** excluir los gastos `esTarjeta` (ver abajo). Default: se excluyen.
 - `agrupar` — `"subitem"` para desglosar por sub-item (`computeReporteSubitems`); trae `items` con su `categoria`+`etiquetas`+`concepto`. Cualquier otro valor → nivel gasto (`computeReportes`).
 - `top` — límite del ranking de conceptos (default 12, acotado 1–50).
+- `comparar` — `"true"` para traer también el total de la **ventana anterior** del mismo largo (segunda query; ver abajo). La pantalla lo pide siempre.
 
 El `where` se arma: `OR` de los `{mes,anio}` de la ventana (`enumerateMonths`), `esTarjeta: false` (salvo `incluir_tarjetas`), + filtros mapeados a camelCase (`casaId`, `tipoPago`, `categoriaId: { in }`, `etiquetas: { some: { id: { in } } }`, `tarjetaId: { in }`, `conceptoId: { in }`). Include: `categoria`, `etiquetas`, `concepto`, `items`, `tarjeta`.
 
@@ -29,8 +30,11 @@ Response (`Reporte` en `types.ts`):
   por_mes:       { mes, anio, label, total_ars }[],  // cronológico, 0 en meses sin gastos
   top_conceptos: { concepto_id, nombre, total_ars }[], // desc, hasta `top`
   por_tarjeta:   { id, nombre, total_ars }[],        // desc; id null = "Sin tarjeta" (débito/efectivo)
-  por_tipo_pago: { tipo, nombre, total_ars }[] }     // desc; tipo 'C'/'D', nombre "Crédito"/"Débito"
+  por_tipo_pago: { tipo, nombre, total_ars }[],      // desc; tipo 'C'/'D', nombre "Crédito"/"Débito"
+  por_casa:      { id, nombre, total_ars }[] }       // PARTICIÓN: desc; id null = "Sin casa"
 ```
+
+Los `kpis` incluyen además `total_previo` y `variacion_pct` (ambos `null` sin `comparar`).
 
 ## Lógica pura (`src/lib/reportes-compute.ts`)
 
@@ -49,6 +53,24 @@ Sin imports de Prisma/Next (testeable). Importado por la route. Test: `reportes-
 Ambas delegan en un agregador común `aggregateUnits(units, months, cantidadGastos, opts)` sobre "unidades" (`Unit`), que produce las dimensiones (categoría, etiqueta, mes, conceptos, tarjeta, tipo de pago) + KPIs. Cada `Unit` tiene `categoriaId`/`categoriaNombre` (única) y `etiquetas[]`. `cantidad_gastos` cuenta **filas de gasto** (no unidades), así que en el reporte por sub-items un gasto con N sub-items sigue contando como 1; con filtros aplicados cuenta los gastos **distintos que quedaron con al menos una unidad** (vía `Unit.gastoIndex`), así el "no hay gastos que coincidan" de la UI funciona.
 
 **Métrica `total_ars` por gasto:** misma definición que `/api/gastos/evolucion` — si `!confirmado` y hay sub-items, suma de items `incluyeEnTotal`; si no, `totalMoneda × tipoCambio`. Admite negativos (devoluciones).
+
+### Dimensión Casa (`por_casa`)
+
+La casa existía **sólo como filtro**: se podía mirar una a la vez, pero no comparar cuánto gastó cada una — la pregunta obvia cuando hay más de una. Es una **partición** (un gasto pertenece a una sola casa), así que la suma de sus buckets da exactamente el total, igual que `por_categoria`. En el desglose por sub-ítem la casa es la del **gasto padre**. El `include` de la route suma `casa: true`.
+
+### Comparación con el período anterior
+
+Los KPIs eran todos absolutos: un total sin referencia no dice si el período fue caro o barato. Con `comparar=true` la route enumera la ventana **inmediatamente anterior del mismo largo** (con `shiftMonth`) y la agrega en `kpis`:
+
+- `total_previo` — total de esa ventana.
+- `variacion_pct` — `(total − previo) / |previo| × 100`.
+
+Detalles que importan:
+
+- La ventana previa se consulta **con los mismos filtros y en el mismo modo de agregación**: comparar un total por sub-ítem contra uno a nivel gasto daría una variación inventada.
+- `variacion_pct` es `null` si el previo fue **0** — dividir por cero daría un `+∞%` que no informa nada.
+- Se usa el **valor absoluto** del previo, así un período previo negativo (devoluciones) no invierte el signo de la variación.
+- En los KPIs de la UI el signo positivo va en **rojo**: más gasto es peor, al revés de la convención habitual del "+" en verde.
 
 **Decisiones de producto:**
 - **Categoría = partición:** cada unidad cuenta una vez en su **categoría única** → `por_categoria` suma exactamente el `total` de KPIs, sin duplicar. Unidades sin categoría → **"Sin categoría"** (`id: null`).
@@ -73,7 +95,9 @@ Debajo de los tabs se muestra un caption explicando la vista activa. Los filtros
 - **`ReporteEtiquetaChart`** — ranking horizontal de `por_etiqueta` (cobertura; el subtítulo aclara que un gasto puede sumar a varias etiquetas).
 - **`ReporteMensualChart`** — `BarChart` vertical, serie única (Total ARS por mes).
 - **`ReporteTipoPagoChart`** — donut de 2 slices (Crédito slot blue / Débito slot aqua, color estable por tipo).
-- **`ReporteConceptosChart`** / **`ReporteTarjetaChart`** — rankings horizontales (top conceptos / gasto por tarjeta, incluye "Sin tarjeta").
+- **`ReporteConceptosChart`** / **`ReporteTarjetaChart`** / **`ReporteCasaChart`** — rankings horizontales (top conceptos / gasto por tarjeta, incluye "Sin tarjeta" / gasto por casa). El de casa **sólo se renderiza con más de una casa**: con una sola repetiría el total.
+
+**Exportar a CSV:** botón "Exportar" en el header de la pantalla, que baja el reporte **tal como está en pantalla** (mismo período, filtros y vista) con `reporteACsv`. Sale una tabla por dimensión separada por línea en blanco. Ver [CSV](gastos-core.md#exportar-a-csv).
 
 **Componentes genéricos reusables** (extraídos para no duplicar):
 - **`ReporteDonutChart`** — donut + leyenda propia (swatch + nombre + monto + %). Recibe los slices con color ya resuelto. Lo usan categoría y tipo de pago.

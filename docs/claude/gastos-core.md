@@ -58,6 +58,55 @@ Card adicional en el resumen que proyecta el gasto del próximo mes basado en hi
 
 `/api/resumen` ejecuta `1 + estim_meses_atras` queries en paralelo. Los meses previos no necesitan `pagos`.
 
+## Vencidos (lo que ya pasó de fecha y sigue impago)
+
+El único aviso de vencimientos era **"vence hoy"**: si no abrías la app ese día, nada volvía a avisarte. Un gasto vencido e impago quedaba invisible salvo por el color naranja de su fecha en la grilla, y sólo dentro del mes filtrado.
+
+**`vencimientosPendientes(gastos, today)`** (`src/lib/vencimientos.ts`) devuelve los de hoy **y** los atrasados, con `estado: 'hoy' | 'vencido'`, `fecha` y `dias_atraso`. Ordena del más viejo al más nuevo. `vencimientosDelDia` pasa a ser un filtro sobre ella, así `pagar_hoy` y el alert del día no cambian de semántica. `sumVencimientos` centraliza el total.
+
+**Asimetría deliberada en los sub-items vencidos:** un sub-item no tiene estado de pago propio (son display-only), así que el único indicio disponible es el **restante del gasto padre**. Para `estado: 'vencido'` se exige que el padre siga con saldo; sin esa guarda, un resumen de tarjeta ya pagado reportaría como vencido cada consumo pasado, para siempre. Los sub-items de **hoy** conservan el comportamiento histórico (entran sin mirar el restante del padre) para no alterar `pagar_hoy` ni el alert.
+
+**`total_vencido`** en `/api/resumen` alimenta la card **"Vencido"**, que **se oculta cuando está en cero** (en un mes al día una card en cero sería ruido, y cuando aparece tiene que llamar la atención). Es **month-scoped**, igual que todas las demás cards del resumen: el resumen sólo carga el mes consultado.
+
+**El alert y el push miran también el mes anterior** (`shiftMonth(-1)`), para que un atraso de fin de mes no desaparezca el día 1 sólo porque cambió el período. El push (`buildVencimientosPush`) pone los vencidos por delante en el título: *"Vencido hace 3 días: Luz"*, *"3 vencimientos atrasados"*, *"2 vencidos y 1 vence hoy"*.
+
+`diasEntre(desde, hasta)` (`src/lib/fechas.ts`) arma las fechas en **UTC a mediodía**: `new Date(str)` correría el día en timezones detrás de UTC, y armarlas como locales haría que un cambio de horario de verano devuelva 0,96 días.
+
+## Notas visibles y búsqueda ampliada
+
+`Gasto.notas` se cargaba en el form y se guardaba, pero **no se veía en ningún lado**: había que abrir a editar el gasto para saber que existían.
+
+- **Desktop:** icono `StickyNote2Outlined` al lado de la descripción, con tooltip que muestra el texto completo (respetando saltos de línea).
+- **Mobile:** la nota va **en texto** debajo de los chips (2 líneas máximo). Un tooltip sobre un icono chico no se puede abrir con el dedo.
+
+**`matchBusqueda(gasto, busqueda)`** (`src/lib/gastos-filtro.ts`, puro y testeado) es ahora el predicado de la búsqueda libre. Vive fuera del componente porque decide **qué filas ve el usuario**: si se rompe en silencio, un gasto "desaparece" y no hay forma de notarlo en pantalla.
+
+Matchea: descripción, categoría, etiquetas y **notas** del gasto, más la descripción, categoría y etiquetas de **cada sub-ítem**. Los sub-ítems entran porque en un resumen de tarjeta el detalle vive ahí: buscar "Netflix" tiene que encontrar el resumen que lo contiene. El match por sub-ítem devuelve la **fila del gasto padre**, que es el nivel al que filtra la grilla.
+
+## Mover un gasto a otro mes
+
+`mes`/`anio` salían del filtro activo al cargar el gasto y **no eran editables por ningún lado**: un gasto imputado al mes equivocado sólo se podía arreglar borrándolo y volviendo a cargarlo, perdiendo sus pagos y sus sub-items.
+
+**`PATCH /api/gastos/[id]/periodo`** con `{ mes, anio, mover_fecha?: boolean }`. Es un endpoint acotado a propósito y no un `PUT` completo: mover de mes no debe poder pisar montos, concepto ni clasificación por un body incompleto. Los pagos y sub-items viajan con el gasto sin tocarse.
+
+- **`mover_fecha` es opcional y explícito.** Reimputar a otro mes es una decisión contable y no siempre implica que la `fechaVencimiento` real haya cambiado (un gasto que venció el 31/7 puede imputarse a agosto conservando su fecha).
+- **`shiftFechaAPeriodo`** (`src/lib/mover-periodo.ts`) conserva el día y lo **recorta al último del mes destino** (31 de enero → 28/29 de febrero), sin desbordar al mes siguiente.
+- Si la fecha guardada está mal formada, el período se mueve igual y la fecha queda como está.
+
+UI: **"Mover a otro mes"** en el menú de la fila (`DriveFileMove`), con preview del cambio de fecha y un aviso cuando es un **resumen de tarjeta** (los `TarjetaCierre` viven aparte por mes y no se mueven con él).
+
+## Exportar a CSV
+
+No había forma de sacar los datos de la app. `src/lib/csv.ts` (serializador genérico) + `src/lib/csv-export.ts` (qué columnas sale de cada cosa) + `src/lib/csv-descargar.ts` (el `Blob`/`<a download>`, separado porque toca `document`/`URL`, que no existen en los tests).
+
+Formato apuntado a que **abra bien en Excel en español**: separador **`;`** (con `,` la configuración es-AR mete la fila entera en una celda), **coma decimal** sin separador de miles, y **BOM UTF-8** (sin él Excel lee el archivo como ANSI y rompe los acentos). Escapado RFC 4180: se entrecomilla ante separador, comillas o saltos de línea, y las comillas internas se duplican. `null` queda como celda vacía, no como la cadena `"null"`; los booleanos salen `Sí`/`No`.
+
+Desde la grilla, el botón **"Exportar"** ofrece **Gastos** y **Sub-ítems** (una fila por sub-ítem con el gasto padre de contexto). Se exporta **`gastosFiltrados`**, no todos los del mes: el archivo tiene que coincidir con lo que el usuario está viendo. La exportación de gastos incluye los computados (`total_ars`, `total_pagado`, `total_restante`) porque no se pueden recalcular desde el CSV — el pagado sale de la tabla `Pago`.
+
+## Presupuestos
+
+Topes mensuales por categoría, en su propia sección `/presupuestos` (comparte el `filtros` del `gastosStore`, así que sigue el mes que se está mirando). Ver [presupuestos.md](presupuestos.md).
+
 ## Payment system
 
 Pagos vía modelo `Pago` (tabla separada), no el legacy `Gasto.totalPagado`. La columna `totalPagado` sigue en la DB pero se ignora. Routes: `GET|POST /api/gastos/[id]/pagos`, `PUT|DELETE /api/gastos/[id]/pagos/[pagoId]`. `PUT` acepta `{ fecha, monto }` para editar inline desde `PagoDialog`.
@@ -96,6 +145,12 @@ Sub-items ordenados primero por `incluye_en_vencimiento` (los incluidos en venci
 ## Categorías y etiquetas
 
 `Gasto` y `GastoItem` se clasifican en **dos ejes distintos**:
+
+**Unicidad y fusión.** `Categoria.nombre` y `Etiqueta.nombre` son **`@unique`**, y el `POST` de ambas hace **find-or-create case-insensitive** (`resolveCategoria`/`resolveEtiqueta` en `src/lib/clasificadores.ts`, normalizando trim + colapso de espacios, igual que `resolveConcepto`). Antes eran un `create` pelado con el texto crudo y ninguna de las dos columnas era única: como se crean inline desde los selects del form, era cuestión de tiempo terminar con "Comida" y "comida " partiendo el reporte por categoría en dos sin que nada lo señalara. El `PUT` rechaza con **409** la colisión de nombre y sugiere fusionar.
+
+**Merge:** `POST /api/categorias/merge` y `/api/etiquetas/merge` (`{ source_id, target_id }`). La categoría es FK única y se reapunta con `updateMany`; la etiqueta es M2M y se conecta fila por fila (Prisma no soporta `updateMany` sobre M2M), aprovechando que `connect` es **idempotente** cuando la fila ya tenía las dos. Las filas de la tabla intermedia del origen se van solas al borrarlo. Migración `20260819110000_categoria_etiqueta_unicas`, que **normaliza → fusiona duplicados → recién ahí crea los índices únicos** (en ese orden, o falla en cualquier base con duplicados).
+
+**UI:** el ABM de ambas está en **`ClasificadorManager`** (`src/components/configuracion/ClasificadorManager.tsx`), un solo componente para los dos ejes — los bloques de categorías y etiquetas en `/configuracion` eran copias literales de ~120 líneas cada una.
 
 - **Categoría** — **FK único** (`categoriaId` nullable → `categoria`). Es la *partición* ("¿en qué rubro se fue la plata?"): una por gasto/ítem, de modo que el reporte por categoría suma 100% sin duplicar. En la API: `categoria_id: number | null` (body) + `categoria: {id,nombre} | null` (display). Modelo Prisma `Categoria` (relación 1-a-muchos). CRUD en `/api/categorias` (`GET/POST` + `PUT/DELETE [id]`). El `GET` incluye el conteo de uso (`uso` = gastos + sub-items) y el `DELETE` rechaza con **409** si `uso > 0`.
 - **Etiquetas** — relación **muchos-a-muchos** (`Etiqueta`, relaciones implícitas `GastoEtiquetas`/`GastoItemEtiquetas`). Es el *corte transversal* ("¿qué gastos son del viaje / deducibles?"): varias por gasto/ítem, se solapan a propósito. En la API: `etiqueta_ids: number[]` (body) + `etiquetas: {id,nombre}[]` (display). CRUD en `/api/etiquetas`. El `GET` incluye `uso` y el `DELETE` rechaza con **409** si `uso > 0`. Write paths: POST conecta con `{ connect }`, PUT reemplaza con `{ set }`.

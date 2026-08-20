@@ -10,9 +10,21 @@ Sección standalone (`/inversiones`, desde `TopBar`) para tracking de balance sn
 
 Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
 
-**Computed columns** (no almacenados, derivados client-side después de sort por `fecha` asc, ties por `id`):
+**Moneda:** `Inversion.monedaId` es **nullable y sin backfill** — `null` significa "sin moneda declarada" y se muestra como pesos, que es lo que se venía asumiendo; poner ARS a la fuerza en las existentes afirmaría algo que nadie declaró. **No hay `tipoCambio`** como en `Gasto`/`Ingreso` a propósito: una inversión en dólares se sigue en dólares. Convertir a ARS con la cotización de hoy mezclaría la variación del tipo de cambio con el rendimiento real. Se elige en el diálogo de alta/edición (migración `20260820100000_inversion_moneda`).
+
+**Cálculos (`src/lib/inversiones-compute.ts`, puro, testeado):** estaban inline en la página y sólo derivaban el cambio absoluto. La distinción que faltaba: **`cambio` sube igual si depositás plata que si la inversión rinde**, y son cosas distintas — depositar 1000 mostraba "+1000" como si hubiera ganado 1000.
+
 - `monto_actualizado = monto_actual + movimiento`
 - `cambio = monto_actualizado(actual) - monto_actualizado(previo)` — `null` para la primera fila (`—`). Positivo verde, negativo rojo.
+- **`ganancia = saldo − saldo_previo − movimiento`** — descuenta aportes y retiros y deja sólo lo que generó la inversión. `null` en la primera fila.
+- `rendimiento_pct` — `ganancia` sobre el saldo previo. `null` si el previo era 0.
+- `resumenInversion(movimientos)` → `{ saldo_actual, aportado, ganancia_total, rendimiento_pct, cantidad }`. El rendimiento total se mide sobre el **capital expuesto** (primer saldo + aportes posteriores), **no** sobre el saldo final: ese saldo ya incluye la ganancia y subestimaría el rendimiento de una inversión que creció.
+- `serieEvolucion(movimientos)` → puntos `{ fecha, saldo }` para el gráfico.
+- `parseMonedaId` / `toInversionResponse` — validación y mapping de las routes (viven acá porque Next no deja exportar helpers desde un `route.ts`).
+
+`computeMovimientos` **espera orden cronológico ascendente** (fecha asc, id asc): cada fila se compara con la anterior. La página ordena antes de llamarla.
+
+**Componentes:** `ResumenInversionCards` (4 tiles: saldo actual, aportado, ganancia, rendimiento — ganancia y rendimiento en verde/rojo según signo) y `EvolucionInversionChart` (`LineChart` de `@mui/x-charts`, que ya era dependencia; **no se renderiza con menos de dos puntos**, no hay curva que dibujar).
 - `dia` — weekday en español parseado de `fecha` como **local** date (split `-` + `new Date(y, m-1, d)` para evitar TZ shift).
 
 **UI** (`src/app/inversiones/page.tsx`):

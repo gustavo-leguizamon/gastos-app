@@ -9,6 +9,7 @@
 | `PATCH /api/gastos/categorias` | Asignación masiva de la **categoría única**. Body `{ gasto_ids: number[], categoria_id: number, action: 'add' \| 'remove' }`. `add` setea `categoriaId`; `remove` la limpia (null), en varios gastos en una transacción. Valida con `parseCategoriaBatch` (`src/lib/gastos-batch.ts`), 400 si el body es inválido. Devuelve `{ ok: true, updated }`. |
 | `PATCH /api/gastos/etiquetas` | Agregar/quitar una **etiqueta** (M2M) en lote. Body `{ gasto_ids: number[], etiqueta_id: number, action: 'add' \| 'remove' }`. `add` → `connect` (idempotente); `remove` → `disconnect` (no-op si no la tenía). Propaga el cambio a los sub-items propagados de tarjeta (por item, porque M2M no soporta `updateMany`). Transacción atómica. Valida con `parseEtiquetaBatch`, 400 si el body es inválido. Devuelve `{ ok: true, updated }`. |
 | `GET/PUT/DELETE /api/gastos/[id]` | Single gasto CRUD |
+| `PATCH /api/gastos/[id]/periodo` | **Mueve el gasto a otro mes.** Body `{ mes, anio, mover_fecha?: boolean }`. Con `mover_fecha` reubica la `fechaVencimiento` conservando el día (recortado al último del mes destino). Endpoint acotado a propósito: no puede pisar montos ni clasificación. Pagos y sub-items viajan con el gasto. 400 body/id inválido, 404 si no existe. Ver `docs/claude/gastos-core.md`. |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |
 | `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
@@ -20,9 +21,16 @@
 | `GET/POST /api/casas` | Houses CRUD |
 | `GET/POST /api/monedas` | Currencies CRUD |
 | `GET/POST /api/tarjetas` | Credit cards CRUD (incluye `marca`, `banco_logo` y `banco_icono` opcionales; `banco_icono` se persiste sólo si pasa `isIconoDataUri`). El GET incluye array `cierres: TarjetaCierre[]` para señalizar tarjetas sin cierre completo del mes actual. |
+| `POST /api/tarjetas/[id]/cierres/generar` | Crea el cierre del período **siguiente** al último cargado, proyectando sus fechas (`fechaProximoCierre` del último = `fechaCierre` del nuevo). 409 si no hay ningún cierre del que partir o si el siguiente ya existe; 404 tarjeta inexistente. Ver `docs/claude/tarjetas.md`. |
 | `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
 | `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
 | `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` < today. Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, banco_logo, banco_icono, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
+| `GET /api/presupuestos` | Topes del período + su ejecución. Params `mes`, `anio`. Devuelve `{ mes, anio, presupuestos, ejecucion, totales }`. Ver `docs/claude/presupuestos.md`. |
+| `POST /api/presupuestos` | Fija el tope de una categoría (upsert por `categoria_id`+`mes`+`anio`). |
+| `DELETE /api/presupuestos/[id]` | Quita el tope (distinto de ponerlo en 0). |
+| `POST /api/presupuestos/copiar` | Copia los topes del mes anterior, sin pisar los ya cargados. 409 si no hay ninguno. |
+| `POST /api/categorias/merge` | Fusiona `{ source_id, target_id }`: reapunta `categoriaId` en gastos y sub-items y borra el origen. |
+| `POST /api/etiquetas/merge` | Fusiona etiquetas (M2M): conecta el destino en cada gasto/sub-item del origen (idempotente) y borra el origen. |
 | `GET/POST /api/categorias` | Categorías CRUD (`PUT/DELETE /api/categorias/[id]`) — categoría **única** (partición). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
 | `GET/POST /api/etiquetas` | Etiquetas CRUD (`PUT/DELETE /api/etiquetas/[id]`) — **corte transversal** (M2M). `GET` incluye `uso` (gastos + sub-items); `DELETE` → 409 si en uso, 404 si no existe. |
 | `GET/PUT /api/settings` | Singleton de configuración global: parámetros del estimado del próximo mes + `casa_default_id` (casa preseleccionada en el alta de gastos; el PUT valida que exista y acepta `null` para limpiarla) |
