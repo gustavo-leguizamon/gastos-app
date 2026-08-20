@@ -54,8 +54,11 @@ model TarjetaCierre {
 // Categoría: partición (una por gasto/item) — responde "¿en qué rubro se fue la plata?".
 // Es la dimensión canónica del reporte por categoría (suma 100%, sin duplicar).
 model Categoria {
+  // Único, igual que `Concepto.nombre`: un duplicado por typo/casing parte el reporte por
+  // categoría en dos sin que nada lo señale. El match case-insensitive lo hace
+  // `resolveCategoria` en los write paths (el índice de Postgres es case-sensitive).
   id     Int         @id @default(autoincrement())
-  nombre String
+  nombre String      @unique
   gastos Gasto[]
   items  GastoItem[]
 }
@@ -64,7 +67,7 @@ model Categoria {
 // (ej. "Viaje", "Deducible", "Compartido"). Migradas desde el viejo M2M de Categoria.
 model Etiqueta {
   id     Int         @id @default(autoincrement())
-  nombre String
+  nombre String      @unique
   gastos Gasto[]     @relation("GastoEtiquetas")
   items  GastoItem[] @relation("GastoItemEtiquetas")
 }
@@ -114,6 +117,14 @@ model Gasto {
   etiquetas Etiqueta[] @relation("GastoEtiquetas")
   pagos     Pago[]
   items     GastoItem[]
+
+  // Casi toda query de la app filtra por período (y muy seguido también por casa):
+  // la grilla de gastos, el resumen, la evolución, los reportes y el cron de
+  // vencimientos. Sin este índice la tabla se recorría entera en cada una.
+  @@index([anio, mes, casaId])
+  // El match entre meses (evolución, estimado del próximo mes, copiar/merge) es por
+  // conceptoId; `Concepto` puede tener muchos gastos y la FK no indexa sola en Postgres.
+  @@index([conceptoId])
 }
 
 model GastoItem {

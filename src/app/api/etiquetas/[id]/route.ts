@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { normalizeNombre } from '@/lib/clasificadores'
 
+// PUT /api/etiquetas/[id] — renombra. 409 ante colisión, espejo de /api/categorias/[id].
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { nombre } = await req.json()
-  const etiqueta = await prisma.etiqueta.update({ where: { id: Number(params.id) }, data: { nombre } })
+  const id = Number(params.id)
+  const { nombre: raw } = await req.json()
+  const nombre = normalizeNombre(raw ?? '')
+  if (!nombre) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
+
+  const colision = await prisma.etiqueta.findFirst({
+    where: { nombre: { equals: nombre, mode: 'insensitive' }, id: { not: id } },
+  })
+  if (colision) {
+    return NextResponse.json(
+      { error: `Ya existe la etiqueta "${colision.nombre}". Fusionalas en vez de renombrar.` },
+      { status: 409 },
+    )
+  }
+
+  const etiqueta = await prisma.etiqueta.update({ where: { id }, data: { nombre } })
   return NextResponse.json(etiqueta)
 }
 

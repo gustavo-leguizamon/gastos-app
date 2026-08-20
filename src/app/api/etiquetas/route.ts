@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { resolveEtiqueta } from '@/lib/clasificadores'
 
 // Etiquetas: corte transversal (M2M) de gastos/ítems. CRUD espejo de /api/categorias.
 // GET /api/etiquetas — lista de etiquetas con su conteo de uso (gastos + sub-items).
@@ -12,8 +13,14 @@ export async function GET() {
   return NextResponse.json(data)
 }
 
+// POST /api/etiquetas — find-or-create case-insensitive, espejo de /api/categorias.
 export async function POST(req: NextRequest) {
   const { nombre } = await req.json()
-  const etiqueta = await prisma.etiqueta.create({ data: { nombre } })
-  return NextResponse.json(etiqueta, { status: 201 })
+  try {
+    const id = await resolveEtiqueta(prisma, nombre ?? '')
+    const etiqueta = await prisma.etiqueta.findUnique({ where: { id } })
+    return NextResponse.json(etiqueta, { status: 201 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Error interno' }, { status: 400 })
+  }
 }

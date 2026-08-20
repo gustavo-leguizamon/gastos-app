@@ -43,6 +43,7 @@ import IconoBancoUpload from '@/components/shared/IconoBancoUpload'
 import { BANCOS } from '@/lib/bancos'
 import BrandLogo from '@/components/shared/BrandLogo'
 import AppSelect from '@/components/shared/AppSelect'
+import ClasificadorManager from '@/components/configuracion/ClasificadorManager'
 import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaBanco, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
@@ -91,37 +92,10 @@ export default function ConfiguracionPage() {
   const [nuevaTarjeta, setNuevaTarjeta] = useState<{ nombre: string; banco: string; marca: TarjetaMarca | ''; banco_logo: TarjetaBanco | ''; banco_icono: string | null }>({ nombre: '', banco: '', marca: '', banco_logo: '', banco_icono: null })
   const [editingTarjeta, setEditingTarjeta] = useState<Tarjeta | null>(null)
 
-  // Categorias
-  const { items: categorias, add: addCategoria, update: updateCategoria, remove: removeCategoria } = useSimpleCrud<Categoria>('/api/categorias')
-  const [nuevoCategoria, setNuevoCategoria] = useState('')
-  const [editingCategoria, setEditingCategoria] = useState<{ id: number; nombre: string } | null>(null)
-
-  // Etiquetas
-  const { items: etiquetas, add: addEtiqueta, update: updateEtiqueta, remove: removeEtiqueta } = useSimpleCrud<Etiqueta>('/api/etiquetas')
-  const [nuevoEtiqueta, setNuevoEtiqueta] = useState('')
-  const [editingEtiqueta, setEditingEtiqueta] = useState<{ id: number; nombre: string } | null>(null)
-
-  const handleAddEtiqueta = async () => {
-    if (!nuevoEtiqueta.trim()) return
-    try { await addEtiqueta({ nombre: nuevoEtiqueta.trim() }); setNuevoEtiqueta(''); toast.success('Etiqueta agregada') }
-    catch { toast.error('Error al agregar etiqueta') }
-  }
-
-  const handleSaveEtiqueta = async () => {
-    if (!editingEtiqueta || !editingEtiqueta.nombre.trim()) return
-    try { await updateEtiqueta(editingEtiqueta.id, { nombre: editingEtiqueta.nombre.trim() }); setEditingEtiqueta(null); toast.success('Etiqueta actualizada') }
-    catch { toast.error('Error al actualizar etiqueta') }
-  }
-
-  const handleRemoveEtiqueta = async (id: number) => {
-    try { await removeEtiqueta(id); toast.success('Etiqueta eliminada') }
-    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar etiqueta') }
-  }
-
-  const handleRemoveCategoria = async (id: number) => {
-    try { await removeCategoria(id); toast.success('Categoría eliminada') }
-    catch (e) { toast.error(e instanceof Error ? e.message : 'Error al eliminar categoría') }
-  }
+  // Categorías y etiquetas: el ABM completo (alta, renombrar, fusionar, borrar) vive en
+  // `ClasificadorManager`, que se usa para los dos ejes. Acá sólo queda la lista y su reload.
+  const { items: categorias, reload: loadCategorias } = useSimpleCrud<Categoria>('/api/categorias')
+  const { items: etiquetas, reload: loadEtiquetas } = useSimpleCrud<Etiqueta>('/api/etiquetas')
 
   const handleRemoveCasa = async (id: number) => {
     try { await removeCasa(id); toast.success('Casa eliminada') }
@@ -164,18 +138,6 @@ export default function ConfiguracionPage() {
     if (!editingMoneda || !editingMoneda.codigo || !editingMoneda.nombre || !editingMoneda.simbolo) return
     try { await updateMoneda(editingMoneda.id, editingMoneda); setEditingMoneda(null); toast.success('Moneda actualizada') }
     catch { toast.error('Error al actualizar moneda') }
-  }
-
-  const handleAddCategoria = async () => {
-    if (!nuevoCategoria.trim()) return
-    try { await addCategoria({ nombre: nuevoCategoria.trim() }); setNuevoCategoria(''); toast.success('Categoría agregada') }
-    catch { toast.error('Error al agregar categoría') }
-  }
-
-  const handleSaveCategoria = async () => {
-    if (!editingCategoria || !editingCategoria.nombre.trim()) return
-    try { await updateCategoria(editingCategoria.id, { nombre: editingCategoria.nombre.trim() }); setEditingCategoria(null); toast.success('Categoría actualizada') }
-    catch { toast.error('Error al actualizar categoría') }
   }
 
   const handleAddTarjeta = async () => {
@@ -332,53 +294,18 @@ export default function ConfiguracionPage() {
               <Typography fontWeight={700} variant="h6">Categorías</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
-                  size="small" fullWidth
-                  label="Ej: Amazon, Supermercado, Combustible"
-                  value={nuevoCategoria}
-                  onChange={e => setNuevoCategoria(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddCategoria()}
-                />
-                <IconButton onClick={handleAddCategoria} color="primary"><AddIcon /></IconButton>
-              </Box>
-              <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
-                {categorias.map(l => (
-                  <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
-                    secondaryAction={
-                      editingCategoria?.id === l.id ? (
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton size="small" color="primary" onClick={handleSaveCategoria}><CheckIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => setEditingCategoria(null)}><CloseIcon fontSize="small" /></IconButton>
-                        </Box>
-                      ) : (
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          <Chip size="small" label={`${l.uso ?? 0} uso${l.uso === 1 ? '' : 's'}`} variant="outlined" sx={{ mr: 0.5 }} />
-                          <IconButton size="small" onClick={() => setEditingCategoria({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <Tooltip title={(l.uso ?? 0) > 0 ? 'En uso: no se puede borrar' : 'Borrar'}>
-                            <span>
-                              <IconButton size="small" disabled={(l.uso ?? 0) > 0} onClick={() => askDelete(l.nombre, () => handleRemoveCategoria(l.id))}><DeleteIcon fontSize="small" /></IconButton>
-                            </span>
-                          </Tooltip>
-                        </Box>
-                      )
-                    }
-                  >
-                    {editingCategoria?.id === l.id ? (
-                      <TextField
-                        size="small" fullWidth autoFocus
-                        value={editingCategoria.nombre}
-                        onChange={e => setEditingCategoria(p => p ? { ...p, nombre: e.target.value } : p)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSaveCategoria(); if (e.key === 'Escape') setEditingCategoria(null) }}
-                        sx={{ mr: 9 }}
-                      />
-                    ) : (
-                      <ListItemText primary={l.nombre} sx={{ pr: 16 }} />
-                    )}
-                  </ListItem>
-                ))}
-              </List>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Partición del gasto: una sola por gasto/sub-ítem. Es el eje del reporte por categoría.
+              </Typography>
+              <ClasificadorManager
+                endpoint="/api/categorias"
+                items={categorias}
+                onReload={loadCategorias}
+                singular="categoría"
+                articulo="la"
+                placeholder="Ej: Amazon, Supermercado, Combustible"
+                onAskDelete={askDelete}
+              />
             </AccordionDetails>
           </Accordion>
         </Grid>
@@ -393,53 +320,15 @@ export default function ConfiguracionPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 Cortes transversales (un gasto puede tener varias). Ej: Viaje, Deducible, Compartido, Extraordinario.
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
-                  size="small" fullWidth
-                  label="Ej: Viaje, Deducible, Compartido"
-                  value={nuevoEtiqueta}
-                  onChange={e => setNuevoEtiqueta(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAddEtiqueta()}
-                />
-                <IconButton onClick={handleAddEtiqueta} color="primary"><AddIcon /></IconButton>
-              </Box>
-              <Divider sx={{ mb: 1 }} />
-              <List dense disablePadding sx={{ maxHeight: 320, overflowY: 'auto' }}>
-                {etiquetas.map(l => (
-                  <ListItem key={l.id} disablePadding sx={{ py: 0.5 }}
-                    secondaryAction={
-                      editingEtiqueta?.id === l.id ? (
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton size="small" color="primary" onClick={handleSaveEtiqueta}><CheckIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" onClick={() => setEditingEtiqueta(null)}><CloseIcon fontSize="small" /></IconButton>
-                        </Box>
-                      ) : (
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          <Chip size="small" label={`${l.uso ?? 0} uso${l.uso === 1 ? '' : 's'}`} variant="outlined" sx={{ mr: 0.5 }} />
-                          <IconButton size="small" onClick={() => setEditingEtiqueta({ id: l.id, nombre: l.nombre })}><EditIcon fontSize="small" /></IconButton>
-                          <Tooltip title={(l.uso ?? 0) > 0 ? 'En uso: no se puede borrar' : 'Borrar'}>
-                            <span>
-                              <IconButton size="small" disabled={(l.uso ?? 0) > 0} onClick={() => askDelete(l.nombre, () => handleRemoveEtiqueta(l.id))}><DeleteIcon fontSize="small" /></IconButton>
-                            </span>
-                          </Tooltip>
-                        </Box>
-                      )
-                    }
-                  >
-                    {editingEtiqueta?.id === l.id ? (
-                      <TextField
-                        size="small" fullWidth autoFocus
-                        value={editingEtiqueta.nombre}
-                        onChange={e => setEditingEtiqueta(p => p ? { ...p, nombre: e.target.value } : p)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEtiqueta(); if (e.key === 'Escape') setEditingEtiqueta(null) }}
-                        sx={{ mr: 9 }}
-                      />
-                    ) : (
-                      <ListItemText primary={l.nombre} sx={{ pr: 16 }} />
-                    )}
-                  </ListItem>
-                ))}
-              </List>
+              <ClasificadorManager
+                endpoint="/api/etiquetas"
+                items={etiquetas}
+                onReload={loadEtiquetas}
+                singular="etiqueta"
+                articulo="la"
+                placeholder="Ej: Viaje, Deducible, Compartido"
+                onAskDelete={askDelete}
+              />
             </AccordionDetails>
           </Accordion>
         </Grid>
