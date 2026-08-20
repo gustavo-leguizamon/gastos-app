@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -22,7 +21,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import { calcularSueldo, alcanzaTeorico, emailPuedeVerSueldos } from '@/lib/sueldos-compute'
+import { calcularSueldo, alcanzaTeorico } from '@/lib/sueldos-compute'
 import type { Sueldo } from '@/lib/types'
 
 
@@ -36,8 +35,7 @@ function todayLocal() {
 }
 
 export default function SueldosPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { status } = useSession()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -52,12 +50,6 @@ export default function SueldosPage() {
   const [toDelete, setToDelete] = useState<Sueldo | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const isAllowed = emailPuedeVerSueldos(session?.user?.email)
-
-  useEffect(() => {
-    if (status === 'authenticated' && !isAllowed) router.replace('/gastos')
-  }, [status, isAllowed, router])
-
   const load = async () => {
     const res = await fetch('/api/sueldos')
     if (!res.ok) return
@@ -65,9 +57,7 @@ export default function SueldosPage() {
     setSueldos(data)
   }
 
-  useEffect(() => {
-    if (isAllowed) load()
-  }, [isAllowed])
+  useEffect(() => { load() }, [])
 
   const resetForm = () => {
     setFecha(todayLocal())
@@ -200,7 +190,6 @@ export default function SueldosPage() {
   ]
 
   if (status === 'loading') return null
-  if (!isAllowed) return null
 
   return (
     <Box>

@@ -1,37 +1,6 @@
-// Parte pura de Sueldos: quién puede verla, a qué período se imputa y el cálculo de
-// Neto/Bruto. Sin imports de next-auth a propósito — `TopBar` es un client component y
-// necesita `emailPuedeVerSueldos`; si eso viviera junto a `getServerSession`, el bundle del
-// browser se llevaría código de servidor puesto.
+// Parte pura de Sueldos: a qué período se imputa un cobro y el cálculo de Neto/Bruto.
 
 import { mesAnioDeFecha } from './ingresos-compute'
-
-/**
- * Emails con acceso a Sueldos, desde `NEXT_PUBLIC_SUELDOS_EMAILS` (coma-separada, mismo
- * formato que `ALLOWED_EMAILS`).
- *
- * Antes era una constante hardcodeada y encima duplicada en `TopBar`: cambiar de cuenta
- * obligaba a tocar código en dos archivos y redeployar.
- *
- * Es `NEXT_PUBLIC_` porque `TopBar` decide en el cliente si muestra el ítem del menú, así
- * que la lista viaja en el bundle. **No es el control de acceso**: eso lo hacen los 403 de
- * las routes (`isSueldosAllowed`, contra la sesión del server) y el `router.replace` de la
- * página. Acá sólo se decide a quién se le muestra el link.
- *
- * Sin la env var no la ve nadie (lista vacía): ante config faltante, la sección con los
- * datos más sensibles se cierra, no se abre.
- */
-export function sueldosEmails(): string[] {
-  return (process.env.NEXT_PUBLIC_SUELDOS_EMAILS ?? '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-}
-
-/** `true` si el email está habilitado para Sueldos. */
-export function emailPuedeVerSueldos(email: string | null | undefined): boolean {
-  if (!email) return false
-  return sueldosEmails().includes(email.trim().toLowerCase())
-}
 
 /**
  * Período (`mes`/`anio`) al que se imputa un sueldo: los del body si vienen, si no derivados

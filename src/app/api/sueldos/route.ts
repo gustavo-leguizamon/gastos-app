@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { isSueldosAllowed, periodoDe } from '@/lib/sueldos-auth'
+import { periodoDe } from '@/lib/sueldos-compute'
 
 function toResponse(s: {
   id: number
@@ -31,13 +31,11 @@ function toResponse(s: {
 }
 
 export async function GET() {
-  if (!(await isSueldosAllowed())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const sueldos = await prisma.sueldo.findMany({ orderBy: [{ anio: 'desc' }, { mes: 'desc' }, { fecha: 'desc' }, { id: 'desc' }] })
   return NextResponse.json(sueldos.map(toResponse))
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isSueldosAllowed())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
   const sueldo = await prisma.sueldo.create({
     data: {

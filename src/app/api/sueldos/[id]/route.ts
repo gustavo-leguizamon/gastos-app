@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { isSueldosAllowed, periodoDe } from '@/lib/sueldos-auth'
+import { periodoDe } from '@/lib/sueldos-compute'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!(await isSueldosAllowed())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
   const s = await prisma.sueldo.update({
     where: { id: Number(params.id) },
@@ -33,7 +32,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!(await isSueldosAllowed())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   await prisma.sueldo.delete({ where: { id: Number(params.id) } })
   return NextResponse.json({ ok: true })
 }

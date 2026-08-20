@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { calcularSueldo, alcanzaTeorico, emailPuedeVerSueldos, periodoDe, FACTOR_NETO_BRUTO } from './sueldos-compute'
+import { describe, it, expect } from 'vitest'
+import { calcularSueldo, alcanzaTeorico, periodoDe, FACTOR_NETO_BRUTO } from './sueldos-compute'
 
 describe('calcularSueldo', () => {
   it('el neto suma el tramo en dólares valuado al MEP', () => {
@@ -45,35 +45,6 @@ describe('alcanzaTeorico', () => {
   it('sin teórico cargado no hay comparación', () => {
     expect(alcanzaTeorico(base)).toBeNull()
     expect(alcanzaTeorico({ ...base, sueldo_teorico: 0 })).toBeNull()
-  })
-})
-
-describe('emailPuedeVerSueldos', () => {
-  const original = process.env.NEXT_PUBLIC_SUELDOS_EMAILS
-  afterEach(() => { process.env.NEXT_PUBLIC_SUELDOS_EMAILS = original })
-
-  it('sin la env var no la ve nadie', () => {
-    delete process.env.NEXT_PUBLIC_SUELDOS_EMAILS
-    expect(emailPuedeVerSueldos('alguien@mail.com')).toBe(false)
-  })
-
-  it('la env var vacía tampoco habilita a nadie', () => {
-    process.env.NEXT_PUBLIC_SUELDOS_EMAILS = '   '
-    expect(emailPuedeVerSueldos('alguien@mail.com')).toBe(false)
-  })
-
-  it('habilita a los de la lista, sin importar mayúsculas ni espacios', () => {
-    process.env.NEXT_PUBLIC_SUELDOS_EMAILS = ' Uno@Mail.com , dos@mail.com '
-    expect(emailPuedeVerSueldos('uno@mail.com')).toBe(true)
-    expect(emailPuedeVerSueldos('  DOS@MAIL.COM ')).toBe(true)
-    expect(emailPuedeVerSueldos('tres@mail.com')).toBe(false)
-  })
-
-  it('sin email no habilita', () => {
-    process.env.NEXT_PUBLIC_SUELDOS_EMAILS = 'uno@mail.com'
-    expect(emailPuedeVerSueldos(null)).toBe(false)
-    expect(emailPuedeVerSueldos(undefined)).toBe(false)
-    expect(emailPuedeVerSueldos('')).toBe(false)
   })
 })
 

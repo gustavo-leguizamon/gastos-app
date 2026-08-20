@@ -17,7 +17,6 @@ Toda la app está detrás de login con Google vía **NextAuth v4** (estrategia J
 - `NEXTAUTH_SECRET` — secreto para firmar JWTs (generar con `openssl rand -base64 32`).
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — credenciales de OAuth 2.0 creadas en Google Cloud Console. Redirect URI autorizado: `<NEXTAUTH_URL>/api/auth/callback/google`.
 - `ALLOWED_EMAILS` — lista coma-separada de emails permitidos (whitelist). Cualquier email fuera de esta lista recibe `AccessDenied` en el callback `signIn`.
-- `NEXT_PUBLIC_SUELDOS_EMAILS` — lista coma-separada de emails con acceso a la sección **Sueldos**. Sin ella la sección no la ve nadie. Es `NEXT_PUBLIC_` porque `TopBar` decide en el cliente si muestra el link, así que **viaja en el bundle**: no es un secreto ni el control de acceso (eso son los 403 de `/api/sueldos*`). Ver `docs/claude/sueldos.md`.
 
 Para agregar un nuevo usuario: editar `ALLOWED_EMAILS` (local + Vercel) y hacer redeploy si está en producción. No hay tabla de usuarios — la whitelist es la única autoridad.
 

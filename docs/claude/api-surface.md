@@ -44,7 +44,7 @@
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos |
 | `PUT/DELETE /api/inversiones/[id]/movimientos/[movId]` | Edit / remove a movimiento |
-| `GET/POST /api/sueldos` | List / create sueldos — **restringido** al email permitido (403 si no) |
+| `GET/POST /api/sueldos` | List / create sueldos. Sin restricción propia: alcanza con estar logueado (ver `docs/claude/sueldos.md`). |
 | `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
 | `GET/POST/DELETE /api/push/subscribe` | Suscripciones Web Push del usuario logueado (email de la sesión). `POST` upsertea por `endpoint` (body `{ endpoint, p256dh, auth }`, 400 si falta alguno); `DELETE` borra la de este browser (body `{ endpoint }`, filtrado también por email); `GET` devuelve `{ subscriptions: n }`. 401 sin sesión. Ver `docs/claude/auth-pwa.md`. |
 | `POST /api/push/test` | Manda una notificación de prueba a todos los devices del usuario logueado. 404 si no hay suscripciones, 500 si faltan las claves VAPID. Borra las suscripciones muertas (404/410). |

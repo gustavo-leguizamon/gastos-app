@@ -1,10 +1,14 @@
 # Sueldos
 
-Sección para registrar los cobros de sueldo del mes. **Acceso restringido** por la env var **`NEXT_PUBLIC_SUELDOS_EMAILS`** (lista coma-separada, mismo formato que `ALLOWED_EMAILS`). El ítem del menú sólo se renderiza en `TopBar` para esos emails, y las API routes verifican la sesión vía `isSueldosAllowed()` (en `src/lib/sueldos-auth.ts`) devolviendo 403 si no coincide.
+Sección para registrar los cobros de sueldo del mes. **Visible para todos los usuarios de la app**, sin restricción propia.
 
-**Sin la env var no la ve nadie** (lista vacía): ante config faltante, la sección con los datos más sensibles se cierra, no se abre. Antes el email estaba hardcodeado en dos archivos (`sueldos-auth.ts` y `TopBar.tsx`) y cambiar de cuenta obligaba a tocar código y redeployar.
+## Acceso: sin gate propio (decisión)
 
-Es `NEXT_PUBLIC_` porque `TopBar` es un client component y decide ahí si muestra el link, así que la lista **viaja en el bundle**. No es un secreto ni el control de acceso: eso siguen siendo los 403 de las routes (que validan contra la sesión del server) y el `router.replace` de la página. La página `/sueldos` además hace `router.replace('/gastos')` si el usuario autenticado no es el permitido.
+La sección **tuvo** un gate por email, primero hardcodeado en dos archivos y después en la env var `NEXT_PUBLIC_SUELDOS_EMAILS`. Se sacó por completo: el ítem aparece en `TopBar` como uno más, la página no redirige y las routes no chequean nada más allá de la sesión.
+
+El acceso queda determinado por **`ALLOWED_EMAILS`**, la whitelist que ya protege *toda* la app vía `middleware.ts` — nadie sin sesión llega a `/api/sueldos`. En una app donde todos los usuarios habilitados comparten gastos, ingresos y presupuestos, un segundo nivel de permisos sólo para sueldos agregaba configuración (una env var más, que además viajaba al bundle por ser `NEXT_PUBLIC_`) sin agregar aislamiento real: los datos ya estaban en la misma base y bajo la misma whitelist.
+
+**Consecuencia a tener presente:** cualquier email de `ALLOWED_EMAILS` ve y edita los sueldos. Si en algún momento hace falta volver a restringir, el lugar es un guard server-side en las routes (`/api/sueldos` y `/api/sueldos/[id]`) — no ocultar el ítem del menú, que nunca fue control de acceso.
 
 ## Modelo (`prisma/schema.prisma`)
 
@@ -33,7 +37,7 @@ Naming convention mismatch habitual: schema camelCase, API/types snake_case (`su
 | `GET/POST /api/sueldos` | Lista (orden por `fecha desc, id desc`) / crea sueldo |
 | `PUT/DELETE /api/sueldos/[id]` | Edita / elimina sueldo |
 
-Todas las routes verifican `isSueldosAllowed()` antes de operar.
+Ninguna route tiene guard propio: el acceso lo determina la sesión, que ya exige `middleware.ts` para toda la app.
 
 ## Campos calculados (en cliente, `src/app/sueldos/page.tsx`)
 
@@ -47,7 +51,7 @@ Todas las routes verifican `isSueldosAllowed()` antes de operar.
 
 Era el único modelo con período que guardaba **sólo `fecha`**, así que cualquier cruce por período tenía que derivar el mes de un string — justo lo que `Gasto` e `Ingreso` evitan a propósito. Ahora tiene `mes`/`anio` explícitos (migración `20260820120000_sueldo_periodo`, backfilleados desde `fecha`), y permite imputar a agosto un sueldo cobrado el 31 de julio.
 
-`periodoDe(body)` (en `sueldos-auth.ts`, re-exportado de `sueldos-compute.ts`) usa el período del body si viene y si no lo deriva de `fecha`. Sin ninguno de los dos marca **1/2000**: un período obviamente incorrecto que salta a la vista, en vez de imputar en silencio al mes actual. Testeado en `sueldos-auth.test.ts`.
+`periodoDe(body)` (`src/lib/sueldos-compute.ts`) usa el período del body si viene y si no lo deriva de `fecha`. Sin ninguno de los dos marca **1/2000**: un período obviamente incorrecto que salta a la vista, en vez de imputar en silencio al mes actual. Testeado en `sueldos-compute.test.ts`.
 
 El `GET` ordena por `anio desc, mes desc, fecha desc, id desc`.
 
