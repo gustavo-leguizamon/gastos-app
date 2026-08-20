@@ -301,12 +301,23 @@ export interface ReporteTipoPago {
   total_ars: number
 }
 
+/** Partición por casa. Misma forma que `ReporteCategoria`. */
+export interface ReporteCasa {
+  id: number | null
+  nombre: string
+  total_ars: number
+}
+
 export interface Reporte {
   kpis: {
     total: number
     promedio_mensual: number
     cantidad_gastos: number
     meses: number
+    /** Total de la ventana anterior del mismo largo. `null` si no se pidió comparación. */
+    total_previo: number | null
+    /** Variación % contra `total_previo`. `null` sin comparación o si el previo fue 0. */
+    variacion_pct: number | null
   }
   por_categoria: ReporteCategoria[]
   por_etiqueta: ReporteCategoria[]
@@ -314,6 +325,7 @@ export interface Reporte {
   top_conceptos: ReporteConcepto[]
   por_tarjeta: ReporteTarjeta[]
   por_tipo_pago: ReporteTipoPago[]
+  por_casa: ReporteCasa[]
 }
 
 export interface FiltrosReporte {

@@ -55,6 +55,12 @@ export interface TarjetaBucket {
   total_ars: number
 }
 
+export interface CasaBucket {
+  id: number | null
+  nombre: string
+  total_ars: number
+}
+
 export interface TipoPagoBucket {
   tipo: 'C' | 'D'
   nombre: string
@@ -67,6 +73,17 @@ export interface ReporteResult {
     promedio_mensual: number
     cantidad_gastos: number
     meses: number
+    /**
+     * Total de la ventana **inmediatamente anterior**, del mismo largo (ej. con "últimos 6"
+     * son los 6 meses previos). `null` cuando el caller no la pidió: los KPIs eran todos
+     * absolutos y un número sin referencia no dice si el mes fue caro o barato.
+     */
+    total_previo: number | null
+    /**
+     * Variación porcentual contra `total_previo`. `null` si no hay comparación o si el
+     * período previo fue 0 — dividir por cero daría un "+∞%" que no informa nada.
+     */
+    variacion_pct: number | null
   }
   por_categoria: CategoriaBucket[]
   por_etiqueta: CategoriaBucket[]
@@ -74,9 +91,18 @@ export interface ReporteResult {
   top_conceptos: ConceptoBucket[]
   por_tarjeta: TarjetaBucket[]
   por_tipo_pago: TipoPagoBucket[]
+  /** Partición por casa. `id: null` = "Sin casa" (no debería darse: `casaId` es obligatorio). */
+  por_casa: CasaBucket[]
 }
 
 const TIPO_PAGO_NOMBRE: Record<'C' | 'D', string> = { C: 'Crédito', D: 'Débito' }
+
+export interface AggregateOpts {
+  /** Límite del ranking de conceptos (default 12). */
+  topConceptos?: number
+  /** Total de la ventana anterior, para los KPIs de comparación. Omitir = sin comparación. */
+  totalPrevio?: number | null
+}
 
 const MAX_MESES = 60
 
@@ -121,6 +147,8 @@ interface Unit {
   anio: number
   tarjetaId: number | null
   tarjetaNombre: string | null
+  casaId: number | null
+  casaNombre: string | null
   tipoPago: 'C' | 'D' | null
   // Índice del gasto que originó la unidad (para contar gastos distintos en el KPI).
   gastoIndex: number
@@ -153,6 +181,8 @@ export function gastosToUnits(gastos: any[]): Unit[] {
     anio: g.anio,
     tarjetaId: g.tarjetaId ?? null,
     tarjetaNombre: g.tarjeta?.nombre ?? null,
+    casaId: g.casaId ?? null,
+    casaNombre: g.casa?.nombre ?? null,
     tipoPago: normTipo(g.tipoPago),
     gastoIndex,
     padre: padreDims(g),
@@ -193,6 +223,8 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
           anio: g.anio,
           tarjetaId: g.tarjetaId ?? null,
           tarjetaNombre: g.tarjeta?.nombre ?? null,
+          casaId: g.casaId ?? null,
+          casaNombre: g.casa?.nombre ?? null,
           tipoPago,
           gastoIndex,
           padre,
@@ -210,6 +242,8 @@ export function gastosToSubitemUnits(gastos: any[]): Unit[] {
         anio: g.anio,
         tarjetaId: g.tarjetaId ?? null,
         tarjetaNombre: g.tarjeta?.nombre ?? null,
+        casaId: g.casaId ?? null,
+        casaNombre: g.casa?.nombre ?? null,
         tipoPago,
         gastoIndex,
         padre,
@@ -263,7 +297,7 @@ function aggregateUnits(
   units: Unit[],
   months: { mes: number; anio: number }[],
   cantidadGastos: number,
-  opts: { topConceptos?: number } = {},
+  opts: AggregateOpts = {},
 ): ReporteResult {
   const topN = opts.topConceptos ?? 12
   const r = (n: number) => Math.round(n * 100) / 100
@@ -282,6 +316,7 @@ function aggregateUnits(
   const etiqMap = new Map<string, CategoriaBucket>()
   const conMap = new Map<number, ConceptoBucket>()
   const tarjMap = new Map<string, TarjetaBucket>()
+  const casaMap = new Map<string, CasaBucket>()
   const tipoMap = new Map<'C' | 'D', TipoPagoBucket>()
   let total = 0
 
@@ -320,6 +355,12 @@ function aggregateUnits(
     te.total_ars += u.monto
     tarjMap.set(tkey, te)
 
+    // Casa: partición (una por gasto). Es un corte que sólo estaba como filtro.
+    const casakey = u.casaId == null ? 'null' : String(u.casaId)
+    const casae = casaMap.get(casakey) ?? { id: u.casaId, nombre: u.casaNombre ?? 'Sin casa', total_ars: 0 }
+    casae.total_ars += u.monto
+    casaMap.set(casakey, casae)
+
     if (u.tipoPago) {
       const pe = tipoMap.get(u.tipoPago) ?? { tipo: u.tipoPago, nombre: TIPO_PAGO_NOMBRE[u.tipoPago], total_ars: 0 }
       pe.total_ars += u.monto
@@ -345,14 +386,22 @@ function aggregateUnits(
   const por_tipo_pago = Array.from(tipoMap.values())
     .map((t) => ({ ...t, total_ars: r(t.total_ars) }))
     .sort((a, b) => b.total_ars - a.total_ars)
+  const por_casa = Array.from(casaMap.values())
+    .map((c) => ({ ...c, total_ars: r(c.total_ars) }))
+    .sort((a, b) => b.total_ars - a.total_ars)
 
   const meses = months.length
+  const totalPrevio = opts.totalPrevio ?? null
   return {
     kpis: {
       total: r(total),
       promedio_mensual: r(meses ? total / meses : 0),
       cantidad_gastos: cantidadGastos,
       meses,
+      total_previo: totalPrevio === null ? null : r(totalPrevio),
+      variacion_pct: totalPrevio === null || totalPrevio === 0
+        ? null
+        : r(((total - totalPrevio) / Math.abs(totalPrevio)) * 100),
     },
     por_categoria,
     por_etiqueta,
@@ -360,6 +409,7 @@ function aggregateUnits(
     top_conceptos,
     por_tarjeta,
     por_tipo_pago,
+    por_casa,
   }
 }
 
@@ -367,7 +417,7 @@ function aggregateUnits(
 export function computeReportes(
   gastos: any[],
   months: { mes: number; anio: number }[],
-  opts: { topConceptos?: number } = {},
+  opts: AggregateOpts = {},
 ): ReporteResult {
   return aggregateUnits(gastosToUnits(gastos), months, gastos.length, opts)
 }
@@ -381,7 +431,7 @@ export function computeReportes(
 export function computeReporteSubitems(
   gastos: any[],
   months: { mes: number; anio: number }[],
-  opts: { topConceptos?: number; filtros?: UnitFilters } = {},
+  opts: AggregateOpts & { filtros?: UnitFilters } = {},
 ): ReporteResult {
   const units = filterUnits(gastosToSubitemUnits(gastos), opts.filtros)
   const cantidadGastos = new Set(units.map((u) => u.gastoIndex)).size

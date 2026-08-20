@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { computeReportes, computeReporteSubitems, enumerateMonths } from '@/lib/reportes-compute'
+import { shiftMonth } from '@/lib/fechas'
 
 // Parsea una lista de ids "1,2,3" a number[] (descarta no numéricos y vacíos).
 function parseIds(raw: string | null): number[] {
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
   const topParam = Number(searchParams.get('top'))
   const incluirTarjetas = searchParams.get('incluir_tarjetas') === 'true'
   const porSubitem = searchParams.get('agrupar') === 'subitem'
+  const comparar = searchParams.get('comparar') === 'true'
 
   const months = enumerateMonths(mesDesde, anioDesde, mesHasta, anioHasta)
 
@@ -77,16 +79,48 @@ export async function GET(req: NextRequest) {
       etiquetas: true,
       concepto: true,
       tarjeta: true,
+      casa: true,
       items: porSubitem ? { include: { categoria: true, etiquetas: true, concepto: true } } : true,
     },
   })
+
+  // Ventana anterior, del mismo largo, para la comparación de los KPIs. Se pide sólo si
+  // `comparar=true`: es una segunda query y no toda vista la necesita (en la de un mes
+  // único, por ejemplo, el gráfico mensual ya no se muestra).
+  let totalPrevio: number | null = null
+  if (comparar && months.length > 0) {
+    const previos = enumerateMonths(
+      shiftMonth(months[0].mes, months[0].anio, -months.length).mes,
+      shiftMonth(months[0].mes, months[0].anio, -months.length).anio,
+      shiftMonth(months[0].mes, months[0].anio, -1).mes,
+      shiftMonth(months[0].mes, months[0].anio, -1).anio,
+    )
+    const gastosPrevios = await prisma.gasto.findMany({
+      where: { ...where, OR: previos.map(({ mes, anio }) => ({ mes, anio })) },
+      include: {
+        categoria: true,
+        etiquetas: true,
+        concepto: true,
+        tarjeta: true,
+        casa: true,
+        items: porSubitem ? { include: { categoria: true, etiquetas: true, concepto: true } } : true,
+      },
+    })
+    // Mismo modo de agregación que la ventana actual: comparar un total por sub-ítem
+    // contra uno a nivel gasto daría una variación inventada.
+    const previo = porSubitem
+      ? computeReporteSubitems(gastosPrevios, previos, { filtros: { categoriaIds, etiquetaIds, conceptoIds } })
+      : computeReportes(gastosPrevios, previos)
+    totalPrevio = previo.kpis.total
+  }
 
   const topConceptos = Number.isFinite(topParam) && topParam > 0 ? Math.min(50, Math.round(topParam)) : 12
   const result = porSubitem
     ? computeReporteSubitems(gastos, months, {
         topConceptos,
+        totalPrevio,
         filtros: { categoriaIds, etiquetaIds, conceptoIds },
       })
-    : computeReportes(gastos, months, { topConceptos })
+    : computeReportes(gastos, months, { topConceptos, totalPrevio })
   return NextResponse.json(result)
 }
