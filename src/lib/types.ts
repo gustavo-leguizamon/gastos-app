@@ -258,6 +258,9 @@ export interface Movimiento {
 export interface Sueldo {
   id: number
   fecha: string
+  /** Período al que se imputa el cobro (explícito, como en `Gasto` e `Ingreso`). */
+  mes: number
+  anio: number
   sueldo_teorico: number
   sueldo_ars: number
   sueldo_usd: number

@@ -14,6 +14,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import DeleteIcon from '@mui/icons-material/Delete'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import CheckIcon from '@mui/icons-material/Check'
 import toast from 'react-hot-toast'
 import AppTextField from '@/components/shared/AppTextField'
@@ -49,6 +50,7 @@ export default function PresupuestosPage() {
   const [nuevaCategoria, setNuevaCategoria] = useState<number | null>(null)
   const [nuevoMonto, setNuevoMonto] = useState('')
   const [aBorrar, setABorrar] = useState<EjecucionPresupuesto | null>(null)
+  const [copiando, setCopiando] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -99,6 +101,27 @@ export default function PresupuestosPage() {
     setABorrar(null)
     toast.success('Presupuesto quitado')
     await load()
+  }
+
+  const handleCopiar = async () => {
+    setCopiando(true)
+    try {
+      const res = await fetch('/api/presupuestos/copiar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mes: filtros.mes, anio: filtros.anio }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d.error ?? 'Error al copiar'); return }
+      toast.success(
+        d.copiados === 0
+          ? 'No había topes nuevos para copiar'
+          : `${d.copiados} tope(s) copiado(s)${d.omitidos ? `, ${d.omitidos} ya estaban` : ''}`,
+      )
+      await load()
+    } finally {
+      setCopiando(false)
+    }
   }
 
   const navegar = (n: number) => {
@@ -185,11 +208,17 @@ export default function PresupuestosPage() {
               Guardar
             </Button>
           </Box>
-          {disponibles.length === 0 && categorias.length > 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Todas las categorías ya tienen presupuesto este mes.
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+            <Typography variant="caption" color="text.secondary">
+              {disponibles.length === 0 && categorias.length > 0
+                ? 'Todas las categorías ya tienen presupuesto este mes.'
+                : 'Los topes se cargan por mes: cambiar uno no toca los meses ya cerrados.'}
             </Typography>
-          )}
+            {/* Los presupuestos se repiten mes a mes; sin esto habría que re-tipearlos todos. */}
+            <Button size="small" startIcon={<ContentCopyIcon />} onClick={handleCopiar} disabled={copiando}>
+              Copiar del mes anterior
+            </Button>
+          </Box>
         </CardContent>
       </Card>
 

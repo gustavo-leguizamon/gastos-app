@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { isSueldosAllowed } from '@/lib/sueldos-auth'
+import { isSueldosAllowed, periodoDe } from '@/lib/sueldos-auth'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   if (!(await isSueldosAllowed())) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -9,6 +9,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     where: { id: Number(params.id) },
     data: {
       fecha: body.fecha,
+      ...periodoDe(body),
       sueldoTeorico: Number(body.sueldo_teorico ?? 0),
       sueldoArs: Number(body.sueldo_ars ?? 0),
       sueldoUsd: Number(body.sueldo_usd ?? 0),
@@ -19,6 +20,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({
     id: s.id,
     fecha: s.fecha,
+    mes: s.mes,
+    anio: s.anio,
     sueldo_teorico: s.sueldoTeorico,
     sueldo_ars: s.sueldoArs,
     sueldo_usd: s.sueldoUsd,

@@ -26,10 +26,9 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import PaidIcon from '@mui/icons-material/Paid'
 import BarChartIcon from '@mui/icons-material/BarChart'
+import { emailPuedeVerSueldos } from '@/lib/sueldos-compute'
 import SavingsIcon from '@mui/icons-material/Savings'
 import PaymentsIcon from '@mui/icons-material/Payments'
-
-const SUELDOS_ALLOWED_EMAIL = 'gustavoleguizamn@gmail.com'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
@@ -49,7 +48,7 @@ export default function TopBar() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { data: session } = useSession()
 
-  const canSeeSueldos = session?.user?.email?.toLowerCase() === SUELDOS_ALLOWED_EMAIL
+  const canSeeSueldos = emailPuedeVerSueldos(session?.user?.email)
   // Inserta Sueldos justo antes de Configuración (último item), preservando el resto.
   const navItems = canSeeSueldos ? [...NAV.slice(0, -1), SUELDOS_ITEM, NAV[NAV.length - 1]] : NAV
 
