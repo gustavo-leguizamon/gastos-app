@@ -29,6 +29,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
@@ -46,6 +47,7 @@ import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
 import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
+import MoverGastoDialog from './MoverGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
 import { matchBusqueda } from '@/lib/gastos-filtro'
@@ -162,6 +164,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
   const [evolucionGasto, setEvolucionGasto] = useState<Gasto | null>(null)
+  const [moverGasto, setMoverGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
   const [sortModel, setSortModel] = useState<GridSortModel>([])
   const [selectionMode, setSelectionMode] = useState(false)
@@ -1165,6 +1168,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Copiar a otro mes</ListItemText>
         </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) setMoverGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><DriveFileMoveIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Mover a otro mes</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => { if (menuAnchor) setEvolucionGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
           <ListItemIcon><ShowChartIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Evolución mensual</ListItemText>
@@ -1234,6 +1241,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         mes={filtros.mes}
         anio={filtros.anio}
         onClose={() => setEvolucionGasto(null)}
+      />
+
+      <MoverGastoDialog
+        gasto={moverGasto}
+        onClose={() => setMoverGasto(null)}
+        // Refresh global: el gasto sale del mes que se está mirando, así que la grilla y
+        // las cards del resumen quedan desactualizadas si sólo se recarga la fila.
+        onMoved={onDeleted}
       />
     </>
   )
