@@ -22,6 +22,12 @@ export interface ResumenResult {
   total_restante_neto: number
   total_pagado: number
   pagar_hoy: number
+  /**
+   * Lo que ya venció y sigue impago, **dentro del mes consultado** (el resumen sólo
+   * carga ese mes, igual que todas las demás cards). El push diario mira además el mes
+   * anterior, para que un atraso no desaparezca al cambiar de mes.
+   */
+  total_vencido: number
   total_proximo_mes: number
   /** Suma de los ingresos cargados para el mes (varias entradas, ver `Ingreso`). */
   total_ingresos: number
@@ -128,6 +134,7 @@ export function computeResumen(
   let total_tarjetas = 0
   let total_pasajes = 0
   let total_debito = 0
+  let total_vencido = 0
 
   for (const g of gastos) {
     if (!g.confirmado && g.items.length === 0) continue
@@ -148,11 +155,20 @@ export function computeResumen(
     if (vencePorGasto(g.esTarjeta, g.items.length)) {
       // Gasto sin sub-items (o resumen de tarjeta): vence por su propia fechaVencimiento.
       if (g.fechaVencimiento === today) pagar_hoy += restante
+      else if (g.fechaVencimiento < today && restante > 0) total_vencido += restante
     } else {
       // Gasto con sub-items: sólo cuentan los sub-items marcados "incluir en vencimiento" cuya fecha sea hoy.
       pagar_hoy += g.items
         .filter((i: any) => i.incluyeEnVencimiento && i.fecha === today)
         .reduce((s: number, i: any) => s + i.monto, 0)
+      // Los sub-items pasados sólo cuentan como vencidos si el gasto padre sigue con saldo:
+      // un sub-item no tiene estado de pago propio, así que el restante del padre es el único
+      // indicio de que todavía hay algo que pagar (ver `vencimientosPendientes`).
+      if (restante > 0) {
+        total_vencido += g.items
+          .filter((i: any) => i.incluyeEnVencimiento && i.fecha && i.fecha < today)
+          .reduce((s: number, i: any) => s + i.monto, 0)
+      }
     }
   }
 
@@ -193,6 +209,7 @@ export function computeResumen(
     total_restante_neto: r(total_restante - total_pasajes),
     total_pagado: r(total_pagado),
     pagar_hoy: r(pagar_hoy),
+    total_vencido: r(total_vencido),
     total_proximo_mes: r(total_proximo_mes),
     total_ingresos: ahorro.total_ingresos,
     total_debito: r(total_debito),

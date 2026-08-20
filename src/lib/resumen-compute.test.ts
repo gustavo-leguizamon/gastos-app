@@ -156,6 +156,67 @@ describe('computeResumen — pagar_hoy', () => {
   })
 })
 
+describe('computeResumen — total_vencido', () => {
+  it('cuenta el restante de un gasto cuya fecha ya pasó', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 1000, fechaVencimiento: '2026-06-05', pagos: [{ monto: 300 }] })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_vencido).toBe(700)
+  })
+
+  it('no cuenta lo que vence hoy (eso es pagar_hoy) ni lo que vence más adelante', () => {
+    const r = computeResumen(
+      [
+        makeGasto({ totalMoneda: 1000, fechaVencimiento: TODAY }),
+        makeGasto({ totalMoneda: 500, fechaVencimiento: '2026-06-20' }),
+      ],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_vencido).toBe(0)
+    expect(r.pagar_hoy).toBe(1000)
+  })
+
+  it('un gasto vencido pero saldado no cuenta', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 1000, fechaVencimiento: '2026-06-05', pagos: [{ monto: 1000 }] })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_vencido).toBe(0)
+  })
+
+  it('resumen de tarjeta vencido cuenta por su propio total, no por sus consumos', () => {
+    const r = computeResumen(
+      [makeGasto({
+        esTarjeta: true,
+        totalMoneda: 1000,
+        fechaVencimiento: '2026-06-01',
+        items: [{ conceptoId: 30, monto: 600, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: '2026-05-20' }],
+      })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.total_vencido).toBe(1000)
+  })
+
+  it('sub-items pasados cuentan sólo si el gasto padre sigue con saldo', () => {
+    const items = [
+      { conceptoId: 20, monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: true, fecha: '2026-06-01' },
+      { conceptoId: 21, monto: 900, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: '2026-06-01' },
+    ]
+    const conSaldo = computeResumen(
+      [makeGasto({ totalMoneda: 1000, fechaVencimiento: TODAY, items })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(conSaldo.total_vencido).toBe(100)
+
+    const saldado = computeResumen(
+      [makeGasto({ totalMoneda: 1000, fechaVencimiento: TODAY, items, pagos: [{ monto: 1000 }] })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(saldado.total_vencido).toBe(0)
+  })
+})
+
 describe('computeResumen — estimado próximo mes', () => {
   it('sin meses previos: el estimado es el monto del mes actual', () => {
     const r = computeResumen(

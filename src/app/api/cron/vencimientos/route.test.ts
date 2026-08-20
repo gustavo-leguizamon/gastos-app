@@ -94,17 +94,35 @@ describe('GET /api/cron/vencimientos', () => {
     expect(mp.gasto.findMany).not.toHaveBeenCalled()
   })
 
-  it('consulta el mes/año de la fecha resuelta', async () => {
+  it('consulta el mes/año de la fecha resuelta y también el mes anterior', async () => {
     await GET(req(`today=${HOY}`))
-    expect(mp.gasto.findMany.mock.calls[0][0].where).toEqual({ mes: 8, anio: 2026 })
+    expect(mp.gasto.findMany.mock.calls[0][0].where).toEqual({
+      OR: [{ mes: 8, anio: 2026 }, { mes: 7, anio: 2026 }],
+    })
+  })
+
+  it('el mes anterior cruza el año en enero', async () => {
+    await GET(req('today=2026-01-15'))
+    expect(mp.gasto.findMany.mock.calls[0][0].where).toEqual({
+      OR: [{ mes: 1, anio: 2026 }, { mes: 12, anio: 2025 }],
+    })
   })
 
   it('sin vencimientos no manda push', async () => {
     mp.gasto.findMany.mockResolvedValue([rawGasto({ fechaVencimiento: '2026-08-20' })])
     const res = await GET(req(`today=${HOY}`))
-    expect(await res.json()).toEqual({ ok: true, today: HOY, vencimientos: 0, enviadas: 0 })
+    expect(await res.json()).toEqual({ ok: true, today: HOY, vencimientos: 0, vencidos: 0, enviadas: 0 })
     expect(mockSend).not.toHaveBeenCalled()
     expect(mp.pushSubscription.findMany).not.toHaveBeenCalled()
+  })
+
+  it('un gasto atrasado e impago dispara el push aunque no venza nada hoy', async () => {
+    mp.gasto.findMany.mockResolvedValue([rawGasto({ fechaVencimiento: '2026-08-10' })])
+    const res = await GET(req(`today=${HOY}&dry=1`))
+    const body = await res.json()
+    expect(body.vencimientos).toBe(1)
+    expect(body.vencidos).toBe(1)
+    expect(body.payload.title).toContain('Vencido hace 4 días')
   })
 
   it('manda el push con el payload de los vencimientos del día', async () => {

@@ -15,6 +15,7 @@ import TodayIcon from '@mui/icons-material/Today'
 import EventRepeatIcon from '@mui/icons-material/EventRepeat'
 import PaymentsIcon from '@mui/icons-material/Payments'
 import SavingsIcon from '@mui/icons-material/Savings'
+import ReportProblemIcon from '@mui/icons-material/ReportProblem'
 import IngresosDialog from '@/components/ingresos/IngresosDialog'
 import type { Resumen, FiltrosGastos } from '@/lib/types'
 
@@ -22,7 +23,17 @@ function formatARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
 }
 
-const CARDS = [
+type CardDef = {
+  key: keyof Resumen
+  label: string
+  icon: JSX.Element
+  color: string
+  bg: string
+  /** La card no se renderiza cuando el valor es 0 (evita ocupar lugar sin decir nada). */
+  soloSiHayValor?: boolean
+}
+
+const CARDS: CardDef[] = [
   {
     key: 'total_gastos' as const,
     label: 'Total Gastos',
@@ -50,6 +61,16 @@ const CARDS = [
     icon: <TodayIcon />,
     color: '#ef4444',
     bg: 'rgba(239,68,68,0.12)',
+  },
+  // Lo que ya venció y sigue impago. Sólo aparece cuando hay algo atrasado: en un mes al día
+  // una card en cero sería ruido, y cuando aparece tiene que llamar la atención.
+  {
+    key: 'total_vencido' as const,
+    label: 'Vencido',
+    icon: <ReportProblemIcon />,
+    color: '#dc2626',
+    bg: 'rgba(220,38,38,0.12)',
+    soloSiHayValor: true,
   },
   {
     key: 'total_proximo_mes' as const,
@@ -86,6 +107,7 @@ const RESUMEN_VACIO: Resumen = {
   total_restante_neto: 0,
   total_pagado: 0,
   pagar_hoy: 0,
+  total_vencido: 0,
   total_proximo_mes: 0,
   total_ingresos: 0,
   total_debito: 0,
@@ -125,7 +147,7 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
   return (
     <>
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {CARDS.map((card) => {
+        {CARDS.filter((card) => !card.soloSiHayValor || resumen[card.key] !== 0).map((card) => {
           const esIngresos = card.key === 'total_ingresos'
           const esAhorro = card.key === 'total_ahorro'
           const color = esAhorro && hayIngresos ? ahorroColor : card.color
@@ -166,6 +188,13 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
                       Cargá los ingresos del mes para verlo
                     </Typography>
                   )}
+                </Box>
+              )}
+              {card.key === 'total_vencido' && (
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Pasó la fecha y sigue impago, dentro de este mes
+                  </Typography>
                 </Box>
               )}
               {card.key === 'total_restante' && resumen.total_pasajes > 0 && (

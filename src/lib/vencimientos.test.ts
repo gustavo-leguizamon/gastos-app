@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vencePorGasto, vencimientosDelDia } from './vencimientos'
+import { vencePorGasto, vencimientosDelDia, vencimientosPendientes, sumVencimientos } from './vencimientos'
 import type { GastoVencimientoLike, ItemVencimientoLike } from './vencimientos'
 
 const HOY = '2026-08-14'
@@ -54,7 +54,7 @@ describe('vencimientosDelDia', () => {
   it('devuelve el restante del gasto que vence hoy', () => {
     const out = vencimientosDelDia([gasto({ total_pagado: 400 })], HOY)
     expect(out).toEqual([
-      { key: 'g-1', tipo: 'gasto', descripcion: 'Luz', casa_nombre: 'Casa', monto: 600 },
+      { key: 'g-1', tipo: 'gasto', descripcion: 'Luz', casa_nombre: 'Casa', monto: 600, estado: 'hoy', fecha: HOY, dias_atraso: 0 },
     ])
   })
 
@@ -94,7 +94,7 @@ describe('vencimientosDelDia', () => {
       ],
     })], HOY)
     expect(out).toEqual([
-      { key: 'i-11', tipo: 'subitem', descripcion: 'Cuota', parent: 'Luz', casa_nombre: 'Casa', monto: 300 },
+      { key: 'i-11', tipo: 'subitem', descripcion: 'Cuota', parent: 'Luz', casa_nombre: 'Casa', monto: 300, estado: 'hoy', fecha: HOY, dias_atraso: 0 },
     ])
   })
 
@@ -115,7 +115,7 @@ describe('vencimientosDelDia', () => {
       items: [item({ id: 20, monto: 5000, incluye_en_vencimiento: false })],
     })], HOY)
     expect(out).toEqual([
-      { key: 'g-7', tipo: 'gasto', descripcion: 'Visa', casa_nombre: 'Casa', monto: 5000 },
+      { key: 'g-7', tipo: 'gasto', descripcion: 'Visa', casa_nombre: 'Casa', monto: 5000, estado: 'hoy', fecha: HOY, dias_atraso: 0 },
     ])
   })
 
@@ -128,5 +128,100 @@ describe('vencimientosDelDia', () => {
     expect(vencimientosDelDia([], HOY)).toEqual([])
     expect(vencimientosDelDia(null, HOY)).toEqual([])
     expect(vencimientosDelDia([gasto({ items: null })], HOY)).toHaveLength(1)
+  })
+})
+
+describe('vencimientosPendientes', () => {
+  it('marca como vencido lo que ya pasó de fecha y sigue impago', () => {
+    const out = vencimientosPendientes([gasto({ fecha_vencimiento: '2026-08-10' })], HOY)
+    expect(out).toHaveLength(1)
+    expect(out[0].estado).toBe('vencido')
+    expect(out[0].dias_atraso).toBe(4)
+    expect(out[0].monto).toBe(1000)
+  })
+
+  it('lo de hoy queda con estado hoy y sin atraso', () => {
+    const out = vencimientosPendientes([gasto()], HOY)
+    expect(out[0].estado).toBe('hoy')
+    expect(out[0].dias_atraso).toBe(0)
+  })
+
+  it('no incluye lo que todavía no venció', () => {
+    expect(vencimientosPendientes([gasto({ fecha_vencimiento: '2026-08-20' })], HOY)).toEqual([])
+  })
+
+  it('un gasto vencido pero saldado no aparece', () => {
+    const out = vencimientosPendientes(
+      [gasto({ fecha_vencimiento: '2026-08-01', total_pagado: 1000 })],
+      HOY,
+    )
+    expect(out).toEqual([])
+  })
+
+  it('ordena del más viejo al más nuevo', () => {
+    const out = vencimientosPendientes(
+      [
+        gasto({ id: 1, fecha_vencimiento: HOY }),
+        gasto({ id: 2, fecha_vencimiento: '2026-08-01' }),
+        gasto({ id: 3, fecha_vencimiento: '2026-08-10' }),
+      ],
+      HOY,
+    )
+    expect(out.map(v => v.fecha)).toEqual(['2026-08-01', '2026-08-10', HOY])
+  })
+
+  it('sub-item pasado cuenta si el gasto padre sigue con saldo', () => {
+    const out = vencimientosPendientes(
+      [gasto({ total_ars: 1000, items: [item({ fecha: '2026-08-05', monto: 300 })] })],
+      HOY,
+    )
+    expect(out).toHaveLength(1)
+    expect(out[0].tipo).toBe('subitem')
+    expect(out[0].estado).toBe('vencido')
+    expect(out[0].dias_atraso).toBe(9)
+  })
+
+  it('sub-item pasado NO cuenta si el gasto padre ya está saldado', () => {
+    const out = vencimientosPendientes(
+      [gasto({ total_ars: 1000, total_pagado: 1000, items: [item({ fecha: '2026-08-05' })] })],
+      HOY,
+    )
+    expect(out).toEqual([])
+  })
+
+  it('sub-item de hoy cuenta aunque el padre esté saldado (comportamiento histórico)', () => {
+    const out = vencimientosPendientes(
+      [gasto({ total_ars: 1000, total_pagado: 1000, items: [item({ fecha: HOY })] })],
+      HOY,
+    )
+    expect(out).toHaveLength(1)
+    expect(out[0].estado).toBe('hoy')
+  })
+
+  it('sub-item sin fecha se ignora', () => {
+    expect(vencimientosPendientes([gasto({ items: [item({ fecha: null })] })], HOY)).toEqual([])
+  })
+
+  it('vencimientosDelDia sigue devolviendo sólo los de hoy', () => {
+    const gastos = [
+      gasto({ id: 1, fecha_vencimiento: HOY }),
+      gasto({ id: 2, fecha_vencimiento: '2026-08-01' }),
+    ]
+    expect(vencimientosDelDia(gastos, HOY)).toHaveLength(1)
+    expect(vencimientosPendientes(gastos, HOY)).toHaveLength(2)
+  })
+})
+
+describe('sumVencimientos', () => {
+  it('suma los montos y redondea a dos decimales', () => {
+    const out = vencimientosPendientes(
+      [gasto({ id: 1, total_ars: 100.111 }), gasto({ id: 2, total_ars: 200.222 })],
+      HOY,
+    )
+    expect(sumVencimientos(out)).toBe(300.33)
+  })
+
+  it('lista vacía suma 0', () => {
+    expect(sumVencimientos([])).toBe(0)
   })
 })

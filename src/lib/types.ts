@@ -197,6 +197,8 @@ export interface Resumen {
   total_restante_neto: number
   total_pagado: number
   pagar_hoy: number
+  /** Lo que ya venció y sigue impago dentro del mes consultado. */
+  total_vencido: number
   total_proximo_mes: number
   /** Suma de los ingresos cargados para el mes. */
   total_ingresos: number
