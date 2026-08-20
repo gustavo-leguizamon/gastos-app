@@ -38,6 +38,7 @@ import BancoLogo from '@/components/shared/BancoLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import BulkAccionesBar from './BulkAccionesBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
+import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -47,6 +48,7 @@ import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
+import { matchBusqueda } from '@/lib/gastos-filtro'
 import type { Gasto, GastoItem, FiltrosGastos, Tarjeta } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -55,6 +57,22 @@ function fmtARS(n: number) {
 
 function fmtNum(n: number, simbolo: string) {
   return `${simbolo} ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}`
+}
+
+/**
+ * Icono de nota al lado de la descripción. Las notas se cargaban en el form pero no se
+ * veían en ningún lado: había que abrir a editar el gasto para saber que existían. El
+ * tooltip muestra el texto completo, con los saltos de línea respetados.
+ */
+function NotasIcon({ notas }: { notas?: string | null }) {
+  if (!notas?.trim()) return null
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-wrap' }}>{notas}</span>}>
+      <StickyNote2OutlinedIcon
+        sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0, cursor: 'help' }}
+      />
+    </Tooltip>
+  )
 }
 
 /**
@@ -434,7 +452,12 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             <Typography variant="body2" color="text.secondary" noWrap>{value}</Typography>
           </Box>
         )
-        return value
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <Typography variant="body2" noWrap>{value}</Typography>
+            <NotasIcon notas={row.notas} />
+          </Box>
+        )
       },
     },
     {
@@ -693,13 +716,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     if (estadoPago === 'saldado') return g.total_restante <= 0 && g.confirmado
     if (estadoPago === 'pendiente') return g.total_restante > 0 || !g.confirmado
     return true
-  }).filter(g => {
-    if (!busqueda.trim()) return true
-    const q = busqueda.toLowerCase()
-    return g.descripcion.toLowerCase().includes(q)
-      || (g.categoria?.nombre.toLowerCase().includes(q) ?? false)
-      || (g.etiquetas ?? []).some(c => c.nombre.toLowerCase().includes(q))
-  }).filter(g => {
+  }).filter(g => matchBusqueda(g, busqueda)).filter(g => {
     if (!fecha) return true
     return g.fecha_vencimiento === fecha
   }).filter(g => {
@@ -854,6 +871,20 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 )}
                 <CategoriasCell categorias={g.etiquetas} prefix="🏷️ " />
               </Box>
+              {/* En mobile la nota se muestra en texto: un tooltip sobre un icono chico
+                  no se puede abrir cómodamente con el dedo. */}
+              {g.notas?.trim() && (
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}>
+                  <StickyNote2OutlinedIcon sx={{ fontSize: 13, color: 'text.disabled', flexShrink: 0, mt: '2px' }} />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {g.notas}
+                  </Typography>
+                </Box>
+              )}
             </Box>
             <IconButton
               size="small"
