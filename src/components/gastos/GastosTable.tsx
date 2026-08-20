@@ -34,6 +34,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import BrandLogo from '@/components/shared/BrandLogo'
 import BancoLogo from '@/components/shared/BancoLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
@@ -51,6 +52,9 @@ import MoverGastoDialog from './MoverGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
 import { matchBusqueda } from '@/lib/gastos-filtro'
+import { gastosACsv, subitemsACsv, aplanarSubitems } from '@/lib/csv-export'
+import { descargarCsv } from '@/lib/csv-descargar'
+import { nombreArchivo } from '@/lib/csv'
 import type { Gasto, GastoItem, FiltrosGastos, Tarjeta } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -171,6 +175,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [tarjetaIconos, setTarjetaIconos] = useState<Record<number, string>>({})
+  const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null)
 
   const sortGastos = (rows: Gasto[]) => {
     if (sortModel.length === 0) return rows
@@ -742,6 +747,21 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
   const toggleAll = (checked: boolean) => setSelectedIds(checked ? new Set(filteredIds) : new Set())
 
+  const cantSubitems = aplanarSubitems(gastosFiltrados).length
+
+  // Se exporta `gastosFiltrados`, no `gastos`: el CSV tiene que traer exactamente lo que
+  // está en pantalla, con la búsqueda y los filtros ya aplicados.
+  const exportar = (que: 'gastos' | 'subitems') => {
+    const sufijo = `${filtros.anio}-${String(filtros.mes).padStart(2, '0')}`
+    if (que === 'gastos') {
+      descargarCsv(nombreArchivo('gastos', sufijo), gastosACsv(gastosFiltrados))
+      toast.success(`${gastosFiltrados.length} gastos exportados`)
+    } else {
+      descargarCsv(nombreArchivo('sub-items', sufijo), subitemsACsv(gastosFiltrados))
+      toast.success(`${cantSubitems} sub-ítems exportados`)
+    }
+  }
+
   // Agrupar por casa
   const groups = gastosFiltrados.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
     const key = String(g.casa_id ?? 'sin-casa')
@@ -1076,7 +1096,15 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           onCancel={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
         />
       ) : (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
+          <Button
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={(e) => setExportAnchor(e.currentTarget)}
+            disabled={gastosFiltrados.length === 0}
+          >
+            Exportar
+          </Button>
           <Button
             size="small"
             startIcon={<ChecklistIcon />}
@@ -1086,6 +1114,26 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           </Button>
         </Box>
       )}
+
+      {/* Exporta lo que está en pantalla (filtros ya aplicados), no todo el mes: el CSV
+          tiene que coincidir con lo que el usuario está viendo. */}
+      <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+        <MenuItem onClick={() => { exportar('gastos'); setExportAnchor(null) }}>
+          <ListItemText
+            primary="Gastos"
+            secondary={`${gastosFiltrados.length} fila${gastosFiltrados.length === 1 ? '' : 's'}`}
+          />
+        </MenuItem>
+        <MenuItem
+          onClick={() => { exportar('subitems'); setExportAnchor(null) }}
+          disabled={cantSubitems === 0}
+        >
+          <ListItemText
+            primary="Sub-ítems"
+            secondary={cantSubitems === 0 ? 'No hay sub-ítems' : `${cantSubitems} fila${cantSubitems === 1 ? '' : 's'}`}
+          />
+        </MenuItem>
+      </Menu>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 } }}>
         {groupEntries.map(({ nombre, rows }) => {

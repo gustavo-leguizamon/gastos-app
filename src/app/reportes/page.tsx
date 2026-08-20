@@ -13,6 +13,13 @@ import ReporteCategoriaChart from '@/components/reportes/ReporteCategoriaChart'
 import ReporteMensualChart from '@/components/reportes/ReporteMensualChart'
 import ReporteConceptosChart from '@/components/reportes/ReporteConceptosChart'
 import ReporteTarjetaChart from '@/components/reportes/ReporteTarjetaChart'
+import ReporteCasaChart from '@/components/reportes/ReporteCasaChart'
+import Button from '@mui/material/Button'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
+import toast from 'react-hot-toast'
+import { reporteACsv } from '@/lib/csv-export'
+import { descargarCsv } from '@/lib/csv-descargar'
+import { nombreArchivo } from '@/lib/csv'
 import ReporteTipoPagoChart from '@/components/reportes/ReporteTipoPagoChart'
 import ReporteEtiquetaChart from '@/components/reportes/ReporteEtiquetaChart'
 import type { FiltrosReporte, Reporte, Casa, Categoria, Etiqueta, Tarjeta, Concepto } from '@/lib/types'
@@ -72,6 +79,9 @@ function buildParams(f: FiltrosReporte, incluirTarjetas: boolean, porSubitems: b
   if (f.concepto_ids.length) p.set('concepto_ids', f.concepto_ids.join(','))
   if (incluirTarjetas) p.set('incluir_tarjetas', 'true')
   if (porSubitems) p.set('agrupar', 'subitem')
+  // La comparación cuesta una segunda query; se pide siempre porque el KPI de total sin
+  // referencia no dice si el período fue caro o barato.
+  p.set('comparar', 'true')
   return p.toString()
 }
 
@@ -136,11 +146,29 @@ export default function ReportesPage() {
 
   const sinDatos = reporte && reporte.kpis.cantidad_gastos === 0
 
+  const handleExportar = () => {
+    if (!reporte) return
+    descargarCsv(nombreArchivo('reporte', `${vista}-${rangoLabel}`), reporteACsv(reporte))
+    toast.success('Reporte exportado')
+  }
+
   return (
     <Box sx={{ pb: { xs: 6, sm: 8 } }}>
-      <Box sx={{ mb: { xs: 1.5, sm: 2 } }}>
-        <Typography variant="h5" fontWeight={700}>Reportes</Typography>
-        <Typography variant="body2" color="text.secondary">{rangoLabel}</Typography>
+      <Box sx={{ mb: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="h5" fontWeight={700}>Reportes</Typography>
+          <Typography variant="body2" color="text.secondary">{rangoLabel}</Typography>
+        </Box>
+        {/* Exporta el reporte tal como está en pantalla: mismo período, mismos filtros,
+            misma vista, una tabla por dimensión. No se re-consulta nada. */}
+        <Button
+          size="small"
+          startIcon={<FileDownloadIcon />}
+          disabled={!reporte || !!sinDatos}
+          onClick={handleExportar}
+        >
+          Exportar
+        </Button>
       </Box>
 
       <Tabs
@@ -197,6 +225,8 @@ export default function ReportesPage() {
               )}
               <ReporteTarjetaChart data={reporte.por_tarjeta} />
               {!vistaActual.mesUnico && <ReporteTipoPagoChart data={reporte.por_tipo_pago} />}
+              {/* Sólo con más de una casa: con una sola el gráfico repetiría el total. */}
+              {reporte.por_casa.length > 1 && <ReporteCasaChart data={reporte.por_casa} />}
               <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
                 <ReporteEtiquetaChart data={reporte.por_etiqueta} />
               </Box>
