@@ -12,8 +12,9 @@ model Moneda {
   codigo   String    @unique
   nombre   String
   simbolo  String
-  gastos   Gasto[]
-  ingresos Ingreso[]
+  gastos      Gasto[]
+  ingresos    Ingreso[]
+  inversiones Inversion[]
 }
 
 model Casa {
@@ -54,17 +55,43 @@ model TarjetaCierre {
 // Categoría: partición (una por gasto/item) — responde "¿en qué rubro se fue la plata?".
 // Es la dimensión canónica del reporte por categoría (suma 100%, sin duplicar).
 model Categoria {
+  // Único, igual que `Concepto.nombre`: un duplicado por typo/casing parte el reporte por
+  // categoría en dos sin que nada lo señale. El match case-insensitive lo hace
+  // `resolveCategoria` en los write paths (el índice de Postgres es case-sensitive).
   id     Int         @id @default(autoincrement())
-  nombre String
+  nombre String      @unique
   gastos Gasto[]
   items  GastoItem[]
+  presupuestos Presupuesto[]
+}
+
+/// Tope de gasto mensual de una categoría. La app mostraba montos absolutos pero nada contra
+/// qué compararlos: no había forma de responder "¿me pasé en Comida este mes?".
+///
+/// Es por (categoría, mes, año) y no un default que se arrastra, para que cambiar el
+/// presupuesto de un mes no reescriba la historia de los meses ya cerrados. La **ausencia de
+/// fila significa "sin presupuesto"**, que no es lo mismo que un presupuesto en 0 (ese sí
+/// dice "acá no se gasta nada" y cualquier gasto lo excede).
+model Presupuesto {
+  id          Int      @id @default(autoincrement())
+  categoriaId Int
+  mes         Int
+  anio        Int
+  monto       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaId, mes, anio])
+  @@index([anio, mes])
 }
 
 // Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito
 // (ej. "Viaje", "Deducible", "Compartido"). Migradas desde el viejo M2M de Categoria.
 model Etiqueta {
   id     Int         @id @default(autoincrement())
-  nombre String
+  nombre String      @unique
   gastos Gasto[]     @relation("GastoEtiquetas")
   items  GastoItem[] @relation("GastoItemEtiquetas")
 }
@@ -114,6 +141,14 @@ model Gasto {
   etiquetas Etiqueta[] @relation("GastoEtiquetas")
   pagos     Pago[]
   items     GastoItem[]
+
+  // Casi toda query de la app filtra por período (y muy seguido también por casa):
+  // la grilla de gastos, el resumen, la evolución, los reportes y el cron de
+  // vencimientos. Sin este índice la tabla se recorría entera en cada una.
+  @@index([anio, mes, casaId])
+  // El match entre meses (evolución, estimado del próximo mes, copiar/merge) es por
+  // conceptoId; `Concepto` puede tener muchos gastos y la FK no indexa sola en Postgres.
+  @@index([conceptoId])
 }
 
 model GastoItem {
@@ -166,7 +201,13 @@ model Ingreso {
 model Inversion {
   id          Int          @id @default(autoincrement())
   nombre      String
+  /// Moneda en la que están expresados los montos de sus movimientos. Null = ARS, que es
+  /// el comportamiento histórico (antes de que la inversión tuviera moneda todo se cargaba
+  /// como número pelado). No hay tipo de cambio: una inversión en USD se sigue en USD, no
+  /// se convierte — mezclar cotizaciones inventaría un rendimiento que no ocurrió.
+  monedaId    Int?
   createdAt   DateTime     @default(now())
+  moneda      Moneda?      @relation(fields: [monedaId], references: [id])
   movimientos Movimiento[]
 }
 
@@ -196,6 +237,11 @@ model Settings {
 model Sueldo {
   id             Int      @id @default(autoincrement())
   fecha          String
+  /// Período al que se imputa el cobro. Explícitos, misma convención que `Gasto` e `Ingreso`:
+  /// permiten imputar a agosto un sueldo cobrado el 31 de julio, y hacen que cruzar ingresos
+  /// con gastos por período no dependa de derivar el mes de una fecha.
+  mes            Int
+  anio           Int
   sueldoTeorico  Float    @default(0)
   sueldoArs      Float    @default(0)
   sueldoUsd      Float    @default(0)
@@ -203,6 +249,8 @@ model Sueldo {
   cotizacionMep  Float    @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([anio, mes])
 }
 
 model Pago {

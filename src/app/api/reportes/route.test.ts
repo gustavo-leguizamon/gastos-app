@@ -153,3 +153,43 @@ describe('GET /api/reportes', () => {
     ]))
   })
 })
+
+describe('GET /api/reportes — comparación con el período anterior', () => {
+  it('sin comparar=true hace una sola query y no informa previo', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([])
+    const res = await GET(url('mes_desde=5&anio_desde=2026&mes_hasta=6&anio_hasta=2026'))
+    const body = await res.json()
+    expect(mockPrisma.gasto.findMany).toHaveBeenCalledTimes(1)
+    expect(body.kpis.total_previo).toBeNull()
+  })
+
+  it('con comparar=true consulta la ventana previa del mismo largo', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([])
+    await GET(url('mes_desde=5&anio_desde=2026&mes_hasta=6&anio_hasta=2026&comparar=true'))
+
+    expect(mockPrisma.gasto.findMany).toHaveBeenCalledTimes(2)
+    // La ventana actual es may-jun 2026 (2 meses) → la previa es mar-abr 2026.
+    expect(mockPrisma.gasto.findMany.mock.calls[1][0].where.OR).toEqual([
+      { mes: 3, anio: 2026 },
+      { mes: 4, anio: 2026 },
+    ])
+  })
+
+  it('la ventana previa cruza el año', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([])
+    await GET(url('mes_desde=1&anio_desde=2026&mes_hasta=2&anio_hasta=2026&comparar=true'))
+    expect(mockPrisma.gasto.findMany.mock.calls[1][0].where.OR).toEqual([
+      { mes: 11, anio: 2025 },
+      { mes: 12, anio: 2025 },
+    ])
+  })
+
+  it('la ventana previa conserva el resto de los filtros', async () => {
+    mockPrisma.gasto.findMany.mockResolvedValue([])
+    await GET(url('mes_desde=6&anio_desde=2026&mes_hasta=6&anio_hasta=2026&comparar=true&casa_id=3&tipo_pago=C'))
+    const wherePrevio = mockPrisma.gasto.findMany.mock.calls[1][0].where
+    expect(wherePrevio.casaId).toBe(3)
+    expect(wherePrevio.tipoPago).toBe('C')
+    expect(wherePrevio.esTarjeta).toBe(false)
+  })
+})

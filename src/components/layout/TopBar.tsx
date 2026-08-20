@@ -26,19 +26,18 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import PaidIcon from '@mui/icons-material/Paid'
 import BarChartIcon from '@mui/icons-material/BarChart'
+import SavingsIcon from '@mui/icons-material/Savings'
 import PaymentsIcon from '@mui/icons-material/Payments'
-
-const SUELDOS_ALLOWED_EMAIL = 'gustavoleguizamn@gmail.com'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
   { label: 'Ingresos', href: '/ingresos', icon: <PaymentsIcon fontSize="small" /> },
+  { label: 'Presupuestos', href: '/presupuestos', icon: <SavingsIcon fontSize="small" /> },
   { label: 'Reportes', href: '/reportes', icon: <BarChartIcon fontSize="small" /> },
   { label: 'Inversiones', href: '/inversiones', icon: <TrendingUpIcon fontSize="small" /> },
+  { label: 'Sueldos', href: '/sueldos', icon: <PaidIcon fontSize="small" /> },
   { label: 'Configuración', href: '/configuracion', icon: <SettingsIcon fontSize="small" /> },
 ]
-
-const SUELDOS_ITEM = { label: 'Sueldos', href: '/sueldos', icon: <PaidIcon fontSize="small" /> }
 
 export default function TopBar() {
   const pathname = usePathname()
@@ -47,9 +46,7 @@ export default function TopBar() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { data: session } = useSession()
 
-  const canSeeSueldos = session?.user?.email?.toLowerCase() === SUELDOS_ALLOWED_EMAIL
-  // Inserta Sueldos justo antes de Configuración (último item), preservando el resto.
-  const navItems = canSeeSueldos ? [...NAV.slice(0, -1), SUELDOS_ITEM, NAV[NAV.length - 1]] : NAV
+  const navItems = NAV
 
   return (
     <>

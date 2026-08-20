@@ -36,6 +36,31 @@ export function shiftMonth(mes: number, anio: number, n: number): { mes: number;
 }
 
 /**
+ * Días completos entre dos fechas `YYYY-MM-DD` (`hasta - desde`). Negativo si
+ * `hasta` es anterior a `desde`, `0` si son el mismo día.
+ *
+ * Parsea los componentes a mano y construye la fecha en UTC a mediodía: `new Date(str)`
+ * interpretaría el string como UTC y correría el día en timezones detrás de UTC, y armarlo
+ * como fecha local haría que un cambio de horario de verano en el medio devuelva 0.5 días.
+ * Devuelve `null` si alguna de las dos no tiene formato válido.
+ */
+export function diasEntre(desde: string, hasta: string): number | null {
+  const a = parseYMD(desde)
+  const b = parseYMD(hasta)
+  if (a === null || b === null) return null
+  return Math.round((b - a) / 86_400_000)
+}
+
+/** Timestamp UTC del mediodía de una fecha `YYYY-MM-DD`, o `null` si no es válida. */
+function parseYMD(fecha: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha ?? '')
+  if (!m) return null
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  return Date.UTC(y, mo - 1, d, 12)
+}
+
+/**
  * Dada la fecha de un pago (`YYYY-MM-DD`) y el día de cierre de la tarjeta (1-31),
  * devuelve el `(mes, anio)` del resumen de tarjeta al que corresponde el pago.
  *

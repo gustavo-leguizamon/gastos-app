@@ -29,15 +29,18 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
+import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import BrandLogo from '@/components/shared/BrandLogo'
 import BancoLogo from '@/components/shared/BancoLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import BulkAccionesBar from './BulkAccionesBar'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
+import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined'
 import toast from 'react-hot-toast'
 import { useGastosStore } from '@/store/gastosStore'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -45,8 +48,13 @@ import PagoDialog from './PagoDialog'
 import GastoItemDialog from './GastoItemDialog'
 import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
+import MoverGastoDialog from './MoverGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
+import { matchBusqueda } from '@/lib/gastos-filtro'
+import { gastosACsv, subitemsACsv, aplanarSubitems } from '@/lib/csv-export'
+import { descargarCsv } from '@/lib/csv-descargar'
+import { nombreArchivo } from '@/lib/csv'
 import type { Gasto, GastoItem, FiltrosGastos, Tarjeta } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -55,6 +63,22 @@ function fmtARS(n: number) {
 
 function fmtNum(n: number, simbolo: string) {
   return `${simbolo} ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}`
+}
+
+/**
+ * Icono de nota al lado de la descripción. Las notas se cargaban en el form pero no se
+ * veían en ningún lado: había que abrir a editar el gasto para saber que existían. El
+ * tooltip muestra el texto completo, con los saltos de línea respetados.
+ */
+function NotasIcon({ notas }: { notas?: string | null }) {
+  if (!notas?.trim()) return null
+  return (
+    <Tooltip title={<span style={{ whiteSpace: 'pre-wrap' }}>{notas}</span>}>
+      <StickyNote2OutlinedIcon
+        sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0, cursor: 'help' }}
+      />
+    </Tooltip>
+  )
 }
 
 /**
@@ -144,12 +168,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const [copiarGasto, setCopiarGasto] = useState<Gasto | null>(null)
   const [evolucionGasto, setEvolucionGasto] = useState<Gasto | null>(null)
+  const [moverGasto, setMoverGasto] = useState<Gasto | null>(null)
   const [selectedGastoId, setSelectedGastoId] = useState<number | null>(null)
   const [sortModel, setSortModel] = useState<GridSortModel>([])
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [tarjetaIconos, setTarjetaIconos] = useState<Record<number, string>>({})
+  const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null)
 
   const sortGastos = (rows: Gasto[]) => {
     if (sortModel.length === 0) return rows
@@ -434,7 +460,12 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             <Typography variant="body2" color="text.secondary" noWrap>{value}</Typography>
           </Box>
         )
-        return value
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+            <Typography variant="body2" noWrap>{value}</Typography>
+            <NotasIcon notas={row.notas} />
+          </Box>
+        )
       },
     },
     {
@@ -693,13 +724,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
     if (estadoPago === 'saldado') return g.total_restante <= 0 && g.confirmado
     if (estadoPago === 'pendiente') return g.total_restante > 0 || !g.confirmado
     return true
-  }).filter(g => {
-    if (!busqueda.trim()) return true
-    const q = busqueda.toLowerCase()
-    return g.descripcion.toLowerCase().includes(q)
-      || (g.categoria?.nombre.toLowerCase().includes(q) ?? false)
-      || (g.etiquetas ?? []).some(c => c.nombre.toLowerCase().includes(q))
-  }).filter(g => {
+  }).filter(g => matchBusqueda(g, busqueda)).filter(g => {
     if (!fecha) return true
     return g.fecha_vencimiento === fecha
   }).filter(g => {
@@ -721,6 +746,21 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const filteredIds = gastosFiltrados.map(g => g.id)
   const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
   const toggleAll = (checked: boolean) => setSelectedIds(checked ? new Set(filteredIds) : new Set())
+
+  const cantSubitems = aplanarSubitems(gastosFiltrados).length
+
+  // Se exporta `gastosFiltrados`, no `gastos`: el CSV tiene que traer exactamente lo que
+  // está en pantalla, con la búsqueda y los filtros ya aplicados.
+  const exportar = (que: 'gastos' | 'subitems') => {
+    const sufijo = `${filtros.anio}-${String(filtros.mes).padStart(2, '0')}`
+    if (que === 'gastos') {
+      descargarCsv(nombreArchivo('gastos', sufijo), gastosACsv(gastosFiltrados))
+      toast.success(`${gastosFiltrados.length} gastos exportados`)
+    } else {
+      descargarCsv(nombreArchivo('sub-items', sufijo), subitemsACsv(gastosFiltrados))
+      toast.success(`${cantSubitems} sub-ítems exportados`)
+    }
+  }
 
   // Agrupar por casa
   const groups = gastosFiltrados.reduce<Record<string, { nombre: string; rows: Gasto[] }>>((acc, g) => {
@@ -854,6 +894,20 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                 )}
                 <CategoriasCell categorias={g.etiquetas} prefix="🏷️ " />
               </Box>
+              {/* En mobile la nota se muestra en texto: un tooltip sobre un icono chico
+                  no se puede abrir cómodamente con el dedo. */}
+              {g.notas?.trim() && (
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, mt: 0.5 }}>
+                  <StickyNote2OutlinedIcon sx={{ fontSize: 13, color: 'text.disabled', flexShrink: 0, mt: '2px' }} />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {g.notas}
+                  </Typography>
+                </Box>
+              )}
             </Box>
             <IconButton
               size="small"
@@ -1042,7 +1096,15 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           onCancel={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
         />
       ) : (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
+          <Button
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={(e) => setExportAnchor(e.currentTarget)}
+            disabled={gastosFiltrados.length === 0}
+          >
+            Exportar
+          </Button>
           <Button
             size="small"
             startIcon={<ChecklistIcon />}
@@ -1052,6 +1114,26 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           </Button>
         </Box>
       )}
+
+      {/* Exporta lo que está en pantalla (filtros ya aplicados), no todo el mes: el CSV
+          tiene que coincidir con lo que el usuario está viendo. */}
+      <Menu anchorEl={exportAnchor} open={!!exportAnchor} onClose={() => setExportAnchor(null)}>
+        <MenuItem onClick={() => { exportar('gastos'); setExportAnchor(null) }}>
+          <ListItemText
+            primary="Gastos"
+            secondary={`${gastosFiltrados.length} fila${gastosFiltrados.length === 1 ? '' : 's'}`}
+          />
+        </MenuItem>
+        <MenuItem
+          onClick={() => { exportar('subitems'); setExportAnchor(null) }}
+          disabled={cantSubitems === 0}
+        >
+          <ListItemText
+            primary="Sub-ítems"
+            secondary={cantSubitems === 0 ? 'No hay sub-ítems' : `${cantSubitems} fila${cantSubitems === 1 ? '' : 's'}`}
+          />
+        </MenuItem>
+      </Menu>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 } }}>
         {groupEntries.map(({ nombre, rows }) => {
@@ -1134,6 +1216,10 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Copiar a otro mes</ListItemText>
         </MenuItem>
+        <MenuItem onClick={() => { if (menuAnchor) setMoverGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
+          <ListItemIcon><DriveFileMoveIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Mover a otro mes</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => { if (menuAnchor) setEvolucionGasto(menuAnchor.gasto); setMenuAnchor(null) }}>
           <ListItemIcon><ShowChartIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Evolución mensual</ListItemText>
@@ -1203,6 +1289,14 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         mes={filtros.mes}
         anio={filtros.anio}
         onClose={() => setEvolucionGasto(null)}
+      />
+
+      <MoverGastoDialog
+        gasto={moverGasto}
+        onClose={() => setMoverGasto(null)}
+        // Refresh global: el gasto sale del mes que se está mirando, así que la grilla y
+        // las cards del resumen quedan desactualizadas si sólo se recarga la fila.
+        onMoved={onDeleted}
       />
     </>
   )

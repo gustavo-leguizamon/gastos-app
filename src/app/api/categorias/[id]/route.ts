@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { normalizeNombre } from '@/lib/clasificadores'
 
+// PUT /api/categorias/[id] — renombra. Rechaza con 409 si el nombre ya lo usa otra categoría
+// (case-insensitive): renombrar encima de una existente crearía el duplicado que la unicidad
+// del schema evita, y el camino correcto para juntarlas es el merge.
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { nombre } = await req.json()
-  const categoria = await prisma.categoria.update({ where: { id: Number(params.id) }, data: { nombre } })
+  const id = Number(params.id)
+  const { nombre: raw } = await req.json()
+  const nombre = normalizeNombre(raw ?? '')
+  if (!nombre) return NextResponse.json({ error: 'El nombre es requerido' }, { status: 400 })
+
+  const colision = await prisma.categoria.findFirst({
+    where: { nombre: { equals: nombre, mode: 'insensitive' }, id: { not: id } },
+  })
+  if (colision) {
+    return NextResponse.json(
+      { error: `Ya existe la categoría "${colision.nombre}". Fusionalas en vez de renombrar.` },
+      { status: 409 },
+    )
+  }
+
+  const categoria = await prisma.categoria.update({ where: { id }, data: { nombre } })
   return NextResponse.json(categoria)
 }
 

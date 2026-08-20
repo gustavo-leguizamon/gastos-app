@@ -197,6 +197,8 @@ export interface Resumen {
   total_restante_neto: number
   total_pagado: number
   pagar_hoy: number
+  /** Lo que ya venció y sigue impago dentro del mes consultado. */
+  total_vencido: number
   total_proximo_mes: number
   /** Suma de los ingresos cargados para el mes. */
   total_ingresos: number
@@ -237,6 +239,10 @@ export interface Ingreso {
 export interface Inversion {
   id: number
   nombre: string
+  /** Moneda de los montos de sus movimientos. `null` = sin declarar, se muestra como ARS. */
+  moneda_id: number | null
+  moneda_codigo: string | null
+  moneda_simbolo: string | null
   created_at: string
 }
 
@@ -252,6 +258,9 @@ export interface Movimiento {
 export interface Sueldo {
   id: number
   fecha: string
+  /** Período al que se imputa el cobro (explícito, como en `Gasto` e `Ingreso`). */
+  mes: number
+  anio: number
   sueldo_teorico: number
   sueldo_ars: number
   sueldo_usd: number
@@ -299,12 +308,23 @@ export interface ReporteTipoPago {
   total_ars: number
 }
 
+/** Partición por casa. Misma forma que `ReporteCategoria`. */
+export interface ReporteCasa {
+  id: number | null
+  nombre: string
+  total_ars: number
+}
+
 export interface Reporte {
   kpis: {
     total: number
     promedio_mensual: number
     cantidad_gastos: number
     meses: number
+    /** Total de la ventana anterior del mismo largo. `null` si no se pidió comparación. */
+    total_previo: number | null
+    /** Variación % contra `total_previo`. `null` sin comparación o si el previo fue 0. */
+    variacion_pct: number | null
   }
   por_categoria: ReporteCategoria[]
   por_etiqueta: ReporteCategoria[]
@@ -312,6 +332,7 @@ export interface Reporte {
   top_conceptos: ReporteConcepto[]
   por_tarjeta: ReporteTarjeta[]
   por_tipo_pago: ReporteTipoPago[]
+  por_casa: ReporteCasa[]
 }
 
 export interface FiltrosReporte {
@@ -325,4 +346,47 @@ export interface FiltrosReporte {
   etiqueta_ids: number[]
   tarjeta_ids: number[]
   concepto_ids: number[]
+}
+
+/** Tope mensual de una categoría. La ausencia de fila = "sin presupuesto" (no es un 0). */
+export interface Presupuesto {
+  id: number
+  categoria_id: number
+  categoria_nombre: string | null
+  mes: number
+  anio: number
+  monto: number
+}
+
+export type EstadoPresupuesto = 'ok' | 'cerca' | 'excedido'
+
+/** Una categoría con su tope (si tiene) y lo que se lleva gastado del período. */
+export interface EjecucionPresupuesto {
+  categoria_id: number
+  categoria_nombre: string
+  /** `null` cuando la categoría tiene gasto pero no tiene tope cargado. */
+  monto: number | null
+  gastado: number
+  restante: number | null
+  consumido_pct: number | null
+  estado: EstadoPresupuesto
+}
+
+export interface TotalesPresupuesto {
+  presupuestado: number
+  /** Sólo lo gastado en categorías **con** tope, para que sea comparable con el total. */
+  gastado: number
+  /** Lo gastado en categorías sin tope, informado aparte. */
+  sin_presupuesto: number
+  restante: number
+  consumido_pct: number | null
+  excedidas: number
+}
+
+export interface PresupuestosResponse {
+  mes: number
+  anio: number
+  presupuestos: Presupuesto[]
+  ejecucion: EjecucionPresupuesto[]
+  totales: TotalesPresupuesto
 }

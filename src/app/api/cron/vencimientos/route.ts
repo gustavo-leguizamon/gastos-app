@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
-import { vencimientosDelDia } from '@/lib/vencimientos'
+import { vencimientosPendientes } from '@/lib/vencimientos'
 import { buildVencimientosPush } from '@/lib/push-payload'
 import { sendPushToAll, vapidConfigured } from '@/lib/push'
-import { fechaEnTimeZone } from '@/lib/fechas'
+import { fechaEnTimeZone, shiftMonth } from '@/lib/fechas'
 
 /**
  * `GET /api/cron/vencimientos` — job diario que manda el push de los vencimientos del día.
@@ -53,23 +53,27 @@ export async function GET(req: NextRequest) {
   const dry = searchParams.get('dry') === '1'
 
   const [anio, mes] = today.split('-').map(Number)
+  const prev = shiftMonth(mes, anio, -1)
 
-  // Los vencimientos del día sólo pueden estar en gastos del mes/año corriente:
-  // `mes`/`anio` son explícitos en cada gasto y las fechas de vencimiento caen dentro.
+  // Se miran el mes corriente y el anterior. El corriente trae los vencimientos de hoy;
+  // el anterior existe para que un atraso de fin de mes no desaparezca el día 1 sólo
+  // porque cambió el período — que era justamente el agujero del aviso "sólo hoy".
   const gastos = await prisma.gasto.findMany({
-    where: { mes, anio },
+    where: { OR: [{ mes, anio }, { mes: prev.mes, anio: prev.anio }] },
     include: INCLUDE,
     orderBy: [{ fechaVencimiento: 'asc' }, { id: 'asc' }],
   })
 
-  const pendientes = vencimientosDelDia(gastos.map(toGastoResponse), today)
+  const pendientes = vencimientosPendientes(gastos.map(toGastoResponse), today)
   const payload = buildVencimientosPush(pendientes)
 
+  const vencidos = pendientes.filter(v => v.estado === 'vencido').length
+
   if (!payload) {
-    return NextResponse.json({ ok: true, today, vencimientos: 0, enviadas: 0 })
+    return NextResponse.json({ ok: true, today, vencimientos: 0, vencidos: 0, enviadas: 0 })
   }
   if (dry) {
-    return NextResponse.json({ ok: true, today, vencimientos: pendientes.length, dry: true, payload })
+    return NextResponse.json({ ok: true, today, vencimientos: pendientes.length, vencidos, dry: true, payload })
   }
   if (!vapidConfigured()) {
     return NextResponse.json({ error: 'Faltan las claves VAPID en el servidor' }, { status: 500 })
@@ -89,6 +93,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     today,
     vencimientos: pendientes.length,
+    vencidos,
     enviadas: results.filter(r => r.ok).length,
     eliminadas: gone.length,
     errores: results.filter(r => !r.ok && !r.gone).map(r => r.error),

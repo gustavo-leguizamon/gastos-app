@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -22,9 +21,9 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { calcularSueldo, alcanzaTeorico } from '@/lib/sueldos-compute'
 import type { Sueldo } from '@/lib/types'
 
-const ALLOWED_EMAIL = 'gustavoleguizamn@gmail.com'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -36,8 +35,7 @@ function todayLocal() {
 }
 
 export default function SueldosPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { status } = useSession()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -52,12 +50,6 @@ export default function SueldosPage() {
   const [toDelete, setToDelete] = useState<Sueldo | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const isAllowed = session?.user?.email?.toLowerCase() === ALLOWED_EMAIL
-
-  useEffect(() => {
-    if (status === 'authenticated' && !isAllowed) router.replace('/gastos')
-  }, [status, isAllowed, router])
-
   const load = async () => {
     const res = await fetch('/api/sueldos')
     if (!res.ok) return
@@ -65,9 +57,7 @@ export default function SueldosPage() {
     setSueldos(data)
   }
 
-  useEffect(() => {
-    if (isAllowed) load()
-  }, [isAllowed])
+  useEffect(() => { load() }, [])
 
   const resetForm = () => {
     setFecha(todayLocal())
@@ -137,14 +127,17 @@ export default function SueldosPage() {
 
   const rows = useMemo(() => {
     return sueldos.map((s) => {
-      const neto = s.sueldo_ars + s.sueldo_usd * s.cotizacion_mep
-      const bruto = neto / 0.83
+      const { neto, bruto } = calcularSueldo(s)
       return { ...s, neto, bruto, _raw: s }
     })
   }, [sueldos])
 
-  const brutoColor = (row: { bruto: number; sueldo_teorico: number }) =>
-    row.sueldo_teorico > 0 && row.bruto >= row.sueldo_teorico ? 'success.main' : 'error.main'
+  // `alcanzaTeorico` devuelve null sin teórico cargado: ahí no hay nada que comparar y el
+  // monto va en el color de texto normal, en vez de pintarse de rojo por defecto.
+  const brutoColor = (row: Sueldo) => {
+    const ok = alcanzaTeorico(row)
+    return ok === null ? 'text.primary' : ok ? 'success.main' : 'error.main'
+  }
 
   const columns: GridColDef[] = [
     { field: 'fecha', headerName: 'Fecha', width: 130 },
@@ -197,7 +190,6 @@ export default function SueldosPage() {
   ]
 
   if (status === 'loading') return null
-  if (!isAllowed) return null
 
   return (
     <Box>
@@ -247,7 +239,7 @@ export default function SueldosPage() {
             </Card>
           ) : (
             rows.map((row) => {
-              const color = row.sueldo_teorico > 0 && row.bruto >= row.sueldo_teorico ? 'success.main' : 'error.main'
+              const color = brutoColor(row)
               return (
                 <Card key={row.id} variant="outlined">
                   <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>

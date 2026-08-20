@@ -387,3 +387,91 @@ describe('computeReporteSubitems — filtros a nivel sub-ítem', () => {
     expect(r.kpis.total).toBe(1000)
   })
 })
+
+describe('computeReportes — por_casa', () => {
+  const MESES = [{ mes: 6, anio: 2026 }]
+
+  it('particiona el total por casa', () => {
+    const r = computeReportes([
+      gasto({ casaId: 1, casa: { nombre: 'Casa' }, totalMoneda: 1000 }),
+      gasto({ casaId: 1, casa: { nombre: 'Casa' }, totalMoneda: 500 }),
+      gasto({ casaId: 2, casa: { nombre: 'Depto' }, totalMoneda: 300 }),
+    ], MESES)
+
+    expect(r.por_casa).toEqual([
+      { id: 1, nombre: 'Casa', total_ars: 1500 },
+      { id: 2, nombre: 'Depto', total_ars: 300 },
+    ])
+  })
+
+  it('la suma de por_casa es el total (es partición, no cobertura)', () => {
+    const r = computeReportes([
+      gasto({ casaId: 1, casa: { nombre: 'Casa' }, totalMoneda: 1000 }),
+      gasto({ casaId: 2, casa: { nombre: 'Depto' }, totalMoneda: 300 }),
+    ], MESES)
+    expect(r.por_casa.reduce((s, c) => s + c.total_ars, 0)).toBe(r.kpis.total)
+  })
+
+  it('ordena de mayor a menor', () => {
+    const r = computeReportes([
+      gasto({ casaId: 1, casa: { nombre: 'Casa' }, totalMoneda: 100 }),
+      gasto({ casaId: 2, casa: { nombre: 'Depto' }, totalMoneda: 900 }),
+    ], MESES)
+    expect(r.por_casa.map(c => c.nombre)).toEqual(['Depto', 'Casa'])
+  })
+
+  it('un gasto sin casa cae en "Sin casa"', () => {
+    const r = computeReportes([gasto({ casaId: null, casa: null, totalMoneda: 100 })], MESES)
+    expect(r.por_casa).toEqual([{ id: null, nombre: 'Sin casa', total_ars: 100 }])
+  })
+
+  it('en el desglose por sub-ítems la casa es la del gasto padre', () => {
+    const r = computeReporteSubitems([
+      gasto({
+        casaId: 1, casa: { nombre: 'Casa' }, totalMoneda: 1000,
+        items: [
+          { conceptoId: 5, concepto: { nombre: 'A' }, monto: 600, incluyeEnTotal: true, categoriaId: null, categoria: null, etiquetas: [] },
+          { conceptoId: 6, concepto: { nombre: 'B' }, monto: 400, incluyeEnTotal: true, categoriaId: null, categoria: null, etiquetas: [] },
+        ],
+      }),
+    ], MESES)
+    expect(r.por_casa).toEqual([{ id: 1, nombre: 'Casa', total_ars: 1000 }])
+  })
+})
+
+describe('computeReportes — comparación con el período anterior', () => {
+  const MESES = [{ mes: 6, anio: 2026 }]
+
+  it('sin totalPrevio los KPIs de comparación son null', () => {
+    const r = computeReportes([gasto({ totalMoneda: 1000 })], MESES)
+    expect(r.kpis.total_previo).toBeNull()
+    expect(r.kpis.variacion_pct).toBeNull()
+  })
+
+  it('calcula la variación porcentual', () => {
+    const r = computeReportes([gasto({ totalMoneda: 1500 })], MESES, { totalPrevio: 1000 })
+    expect(r.kpis.total_previo).toBe(1000)
+    expect(r.kpis.variacion_pct).toBe(50)
+  })
+
+  it('la baja da negativo', () => {
+    const r = computeReportes([gasto({ totalMoneda: 800 })], MESES, { totalPrevio: 1000 })
+    expect(r.kpis.variacion_pct).toBe(-20)
+  })
+
+  it('un período previo en cero no divide por cero', () => {
+    const r = computeReportes([gasto({ totalMoneda: 1000 })], MESES, { totalPrevio: 0 })
+    expect(r.kpis.total_previo).toBe(0)
+    expect(r.kpis.variacion_pct).toBeNull()
+  })
+
+  it('usa el valor absoluto del previo, así un previo negativo no invierte el signo', () => {
+    const r = computeReportes([gasto({ totalMoneda: 500 })], MESES, { totalPrevio: -1000 })
+    expect(r.kpis.variacion_pct).toBe(150)
+  })
+
+  it('sin cambios da 0', () => {
+    const r = computeReportes([gasto({ totalMoneda: 1000 })], MESES, { totalPrevio: 1000 })
+    expect(r.kpis.variacion_pct).toBe(0)
+  })
+})

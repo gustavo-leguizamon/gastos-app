@@ -122,3 +122,20 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 **Estética unificada con `/configuracion`:** ambos usan `BrandLogo` con dimensiones idénticas (44x32) y el mismo wrapper (borde + `bgcolor` tintados con `marcaColor(t.marca)`). Helper `marcaColor` exportado desde `TarjetaLogo.tsx`.
 
 Si no hay matches, el componente no renderiza. Refresca con `refreshKey` del store.
+
+
+## Generar el cierre del próximo mes
+
+Los `TarjetaCierre` se cargaban a mano mes por mes, aunque el dato para derivarlos ya estuviera guardado: **`fechaProximoCierre` de un período es la `fechaCierre` del siguiente**. Olvidarse no es cosmético — sin el cierre del mes, `POST /api/gastos/[id]/pagos` responde **400** y la propagación del pago a la tarjeta se rompe.
+
+**`src/lib/cierres.ts`** (puro, testeado en `cierres.test.ts`):
+
+| Función | Qué hace |
+|---|---|
+| `addMeses(fecha, n)` | Suma meses a un `YYYY-MM-DD` conservando el día, recortado al último del mes destino (31/1 + 1 mes → 28 o 29/2). `null` si la fecha no es válida. |
+| `ultimoCierre(cierres)` | El de mayor `(anio, mes)`. No confía en el orden de entrada. |
+| `generarSiguienteCierre(ultimo)` | Proyecta el período siguiente: `fechaCierre` = `fechaProximoCierre` del último (o `fechaCierre + 1 mes` si no está cargada); vencimiento y próximo cierre se corren un mes. |
+
+Todo sale **nullable**: si el último cierre está incompleto, el generado también lo está y se completa a mano. Es preferible a inventar una fecha.
+
+**`POST /api/tarjetas/[id]/cierres/generar`** crea la fila. 409 si la tarjeta no tiene ningún cierre del que partir, y 409 (vía el unique `(tarjetaId, mes, anio)`, `P2002`) si el siguiente ya estaba cargado. En la UI es el botón **"Generar próximo"** de `TarjetaCierres`; las fechas quedan editables, porque el generado es un **borrador con la proyección**, no un dato firme.

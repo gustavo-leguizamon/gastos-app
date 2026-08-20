@@ -16,6 +16,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import Tooltip from '@mui/material/Tooltip'
 import Divider from '@mui/material/Divider'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -46,6 +48,7 @@ export default function TarjetaCierres({ tarjetaId, onCierresChange }: { tarjeta
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<TarjetaCierre | null>(null)
+  const [generando, setGenerando] = useState(false)
 
   const load = () =>
     fetch(`/api/tarjetas/${tarjetaId}/cierres`)
@@ -118,8 +121,33 @@ export default function TarjetaCierres({ tarjetaId, onCierresChange }: { tarjeta
     }
   }
 
+  // Genera el cierre del período siguiente proyectando las fechas del último. El backend
+  // decide (409 si no hay de dónde partir o si el siguiente ya existe); acá sólo se avisa.
+  const handleGenerar = async () => {
+    setGenerando(true)
+    try {
+      const res = await fetch(`/api/tarjetas/${tarjetaId}/cierres/generar`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(data.error ?? 'Error al generar el cierre'); return }
+      toast.success(`Cierre de ${MESES[data.mes - 1]} ${data.anio} generado — revisá las fechas`)
+      await load()
+      onCierresChange?.()
+    } finally {
+      setGenerando(false)
+    }
+  }
+
   return (
     <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+        <Tooltip title="Crea el cierre del mes siguiente al último cargado, proyectando sus fechas">
+          <span>
+            <Button size="small" startIcon={<AutoAwesomeIcon />} onClick={handleGenerar} disabled={generando}>
+              Generar próximo
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
       <Accordion
         expanded={formOpen}
         onChange={(_, exp) => setFormOpen(exp)}

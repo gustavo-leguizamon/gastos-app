@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres, fechaEnTimeZone, TZ_ARGENTINA } from './fechas'
+import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres, fechaEnTimeZone, diasEntre, TZ_ARGENTINA } from './fechas'
 
 describe('fechaEnTimeZone', () => {
   it('formatea como YYYY-MM-DD', () => {
@@ -115,5 +115,43 @@ describe('resolvePeriodoTarjetaByCierres', () => {
   it('ignora el orden de entrada de los cierres (los ordena por fecha)', () => {
     const desordenado = [visa[2], visa[0], visa[1]]
     expect(resolvePeriodoTarjetaByCierres('2026-06-26', desordenado)).toEqual({ mes: 7, anio: 2026 })
+  })
+})
+
+describe('diasEntre', () => {
+  it('cuenta los días entre dos fechas del mismo mes', () => {
+    expect(diasEntre('2026-08-10', '2026-08-14')).toBe(4)
+  })
+
+  it('la misma fecha da 0', () => {
+    expect(diasEntre('2026-08-14', '2026-08-14')).toBe(0)
+  })
+
+  it('es negativo si `hasta` es anterior', () => {
+    expect(diasEntre('2026-08-14', '2026-08-10')).toBe(-4)
+  })
+
+  it('cruza meses y años', () => {
+    expect(diasEntre('2026-07-30', '2026-08-02')).toBe(3)
+    expect(diasEntre('2025-12-30', '2026-01-02')).toBe(3)
+  })
+
+  it('cuenta el 29 de febrero de un año bisiesto', () => {
+    expect(diasEntre('2024-02-28', '2024-03-01')).toBe(2)
+    expect(diasEntre('2026-02-28', '2026-03-01')).toBe(1)
+  })
+
+  it('no se corre por el cambio de horario de verano', () => {
+    // Marzo/noviembre son los meses donde otros timezones cambian de hora: si la fecha se
+    // construyera como local, alguna de estas diferencias daría 0.958 o 1.04 días.
+    expect(diasEntre('2026-03-08', '2026-03-09')).toBe(1)
+    expect(diasEntre('2026-11-01', '2026-11-02')).toBe(1)
+  })
+
+  it('devuelve null con formato o rangos inválidos', () => {
+    expect(diasEntre('14/08/2026', '2026-08-14')).toBeNull()
+    expect(diasEntre('2026-08-14', '')).toBeNull()
+    expect(diasEntre('2026-13-01', '2026-08-14')).toBeNull()
+    expect(diasEntre('2026-08-00', '2026-08-14')).toBeNull()
   })
 })
