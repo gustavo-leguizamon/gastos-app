@@ -12,8 +12,9 @@ model Moneda {
   codigo   String    @unique
   nombre   String
   simbolo  String
-  gastos   Gasto[]
-  ingresos Ingreso[]
+  gastos      Gasto[]
+  ingresos    Ingreso[]
+  inversiones Inversion[]
 }
 
 model Casa {
@@ -177,7 +178,13 @@ model Ingreso {
 model Inversion {
   id          Int          @id @default(autoincrement())
   nombre      String
+  /// Moneda en la que están expresados los montos de sus movimientos. Null = ARS, que es
+  /// el comportamiento histórico (antes de que la inversión tuviera moneda todo se cargaba
+  /// como número pelado). No hay tipo de cambio: una inversión en USD se sigue en USD, no
+  /// se convierte — mezclar cotizaciones inventaría un rendimiento que no ocurrió.
+  monedaId    Int?
   createdAt   DateTime     @default(now())
+  moneda      Moneda?      @relation(fields: [monedaId], references: [id])
   movimientos Movimiento[]
 }
 

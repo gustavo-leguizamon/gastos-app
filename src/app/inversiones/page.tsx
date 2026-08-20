@@ -26,7 +26,11 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import CloseIcon from '@mui/icons-material/Close'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import type { Inversion, Movimiento } from '@/lib/types'
+import { computeMovimientos, resumenInversion, serieEvolucion } from '@/lib/inversiones-compute'
+import ResumenInversionCards from '@/components/inversiones/ResumenInversionCards'
+import EvolucionInversionChart from '@/components/inversiones/EvolucionInversionChart'
+import AppSelect from '@/components/shared/AppSelect'
+import type { Inversion, Movimiento, Moneda } from '@/lib/types'
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -50,6 +54,8 @@ export default function InversionesPage() {
   const [saving, setSaving] = useState(false)
 
   const [invDialogOpen, setInvDialogOpen] = useState(false)
+  const [invMonedaId, setInvMonedaId] = useState<number | null>(null)
+  const [monedas, setMonedas] = useState<Moneda[]>([])
   const [invDialogMode, setInvDialogMode] = useState<'create' | 'edit'>('create')
   const [invName, setInvName] = useState('')
   const [invToDelete, setInvToDelete] = useState<Inversion | null>(null)
@@ -74,6 +80,8 @@ export default function InversionesPage() {
   }
 
   useEffect(() => { loadInversiones() }, [])
+  // Las monedas son para el select del alta/edición de la inversión.
+  useEffect(() => { fetch('/api/monedas').then(r => r.json()).then(setMonedas).catch(() => {}) }, [])
   useEffect(() => { if (activeId !== null) loadMovimientos(activeId) }, [activeId])
 
   const resetForm = () => {
@@ -162,6 +170,7 @@ export default function InversionesPage() {
   const openCreateInversion = () => {
     setInvDialogMode('create')
     setInvName('')
+    setInvMonedaId(null)
     setInvDialogOpen(true)
   }
 
@@ -170,6 +179,7 @@ export default function InversionesPage() {
     if (!inv) return
     setInvDialogMode('edit')
     setInvName(inv.nombre)
+    setInvMonedaId(inv.moneda_id)
     setInvDialogOpen(true)
   }
 
@@ -180,7 +190,7 @@ export default function InversionesPage() {
         const res = await fetch('/api/inversiones', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre: invName.trim() }),
+          body: JSON.stringify({ nombre: invName.trim(), moneda_id: invMonedaId }),
         })
         if (!res.ok) throw new Error()
         const created: Inversion = await res.json()
@@ -192,7 +202,7 @@ export default function InversionesPage() {
         const res = await fetch(`/api/inversiones/${activeId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nombre: invName.trim() }),
+          body: JSON.stringify({ nombre: invName.trim(), moneda_id: invMonedaId }),
         })
         if (!res.ok) throw new Error()
         toast.success('Inversión actualizada')
@@ -218,28 +228,34 @@ export default function InversionesPage() {
     }
   }
 
-  const rows = useMemo(() => {
-    const sorted = [...movimientos].sort((a, b) => {
+  // El cálculo vive en `inversiones-compute` (puro y testeado); acá sólo se ordena.
+  // `computeMovimientos` espera orden cronológico ascendente: cada fila mira la anterior.
+  const ordenados = useMemo(() => {
+    return [...movimientos].sort((a, b) => {
       if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
       return a.id - b.id
     })
-    let prevActualizado: number | null = null
-    const ascRows = sorted.map((mov) => {
-      const actualizado = mov.monto_actual + mov.movimiento
-      const cambio = prevActualizado === null ? null : actualizado - prevActualizado
-      prevActualizado = actualizado
-      return {
-        id: mov.id,
-        fecha: mov.fecha,
-        monto_actual: mov.monto_actual,
-        movimiento: mov.movimiento,
-        monto_actualizado: actualizado,
-        cambio,
-        _raw: mov,
-      }
-    })
-    return ascRows.reverse()
   }, [movimientos])
+
+  const resumen = useMemo(() => resumenInversion(ordenados), [ordenados])
+  const serie = useMemo(() => serieEvolucion(ordenados), [ordenados])
+
+  const rows = useMemo(() => {
+    const ascRows = computeMovimientos(ordenados).map((mov) => ({
+      id: mov.id,
+      fecha: mov.fecha,
+      monto_actual: mov.monto_actual,
+      movimiento: mov.movimiento,
+      monto_actualizado: mov.monto_actualizado,
+      cambio: mov.cambio,
+      ganancia: mov.ganancia,
+      rendimiento_pct: mov.rendimiento_pct,
+      _raw: mov,
+    }))
+    // El DataGrid free ordena por una sola columna: pre-reversear mantiene el desempate
+    // por id descendente dentro de la misma fecha.
+    return ascRows.reverse()
+  }, [ordenados])
 
   const columns: GridColDef[] = [
     { field: 'fecha', headerName: 'Fecha', width: 130 },
@@ -303,6 +319,9 @@ export default function InversionesPage() {
   ]
 
   const activeInversion = inversiones.find(i => i.id === activeId) || null
+  // Sin moneda declarada se muestra `$`: es lo que se venía asumiendo antes de que la
+  // inversión tuviera moneda.
+  const simboloMoneda = activeInversion?.moneda_simbolo ?? '$'
 
   return (
     <Box>
@@ -343,6 +362,9 @@ export default function InversionesPage() {
         </CardContent></Card>
       ) : (
         <>
+          <ResumenInversionCards resumen={resumen} simbolo={simboloMoneda} />
+          <EvolucionInversionChart serie={serie} simbolo={simboloMoneda} />
+
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -451,7 +473,7 @@ export default function InversionesPage() {
       )}
 
       <Dialog open={invDialogOpen} onClose={() => setInvDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle fontWeight={700}>{invDialogMode === 'create' ? 'Nueva inversión' : 'Renombrar inversión'}</DialogTitle>
+        <DialogTitle fontWeight={700}>{invDialogMode === 'create' ? 'Nueva inversión' : 'Editar inversión'}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -459,9 +481,21 @@ export default function InversionesPage() {
             label="Nombre"
             value={invName}
             onChange={(e) => setInvName(e.target.value)}
-            sx={{ mt: 1 }}
+            sx={{ mt: 1, mb: 2 }}
             onKeyDown={(e) => { if (e.key === 'Enter') submitInversion() }}
           />
+          <AppSelect
+            label="Moneda"
+            options={monedas.map(m => ({ value: m.id, label: `${m.codigo} — ${m.nombre}` }))}
+            value={invMonedaId}
+            onChange={(v) => setInvMonedaId(v == null ? null : Number(v))}
+            emptyLabel="Sin especificar (pesos)"
+            fullWidth
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            Los montos se siguen en esta moneda; no se convierten a pesos. Convertir mezclaría
+            la variación del tipo de cambio con el rendimiento real.
+          </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setInvDialogOpen(false)}>Cancelar</Button>

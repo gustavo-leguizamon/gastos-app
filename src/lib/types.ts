@@ -239,6 +239,10 @@ export interface Ingreso {
 export interface Inversion {
   id: number
   nombre: string
+  /** Moneda de los montos de sus movimientos. `null` = sin declarar, se muestra como ARS. */
+  moneda_id: number | null
+  moneda_codigo: string | null
+  moneda_simbolo: string | null
   created_at: string
 }
 
