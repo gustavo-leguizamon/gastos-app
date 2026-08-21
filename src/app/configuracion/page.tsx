@@ -44,6 +44,7 @@ import { BANCOS } from '@/lib/bancos'
 import BrandLogo from '@/components/shared/BrandLogo'
 import AppSelect from '@/components/shared/AppSelect'
 import ClasificadorManager from '@/components/configuracion/ClasificadorManager'
+import EtiquetasPorCategoria from '@/components/configuracion/EtiquetasPorCategoria'
 import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaBanco, TarjetaMarca } from '@/lib/types'
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
@@ -329,6 +330,18 @@ export default function ConfiguracionPage() {
                 placeholder="Ej: Viaje, Deducible, Compartido"
                 onAskDelete={askDelete}
               />
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+
+        {/* Etiquetas por categoría — qué ofrece el form, derivado del histórico + excepciones */}
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={700} variant="h6">Etiquetas por categoría</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <EtiquetasPorCategoria categorias={categorias} etiquetas={etiquetas} />
             </AccordionDetails>
           </Accordion>
         </Grid>

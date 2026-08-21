@@ -7,6 +7,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import { gastoFormSchema } from '@/lib/gasto-form-schema'
 import { normalizeNombre } from '@/lib/conceptos'
 import { parseCuotas, formatCuotas } from '@/lib/cuotas'
+import { etiquetasSugeridas, type SugerenciasEtiquetas } from '@/lib/etiquetas-sugeridas'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
 import Autocomplete from '@mui/material/Autocomplete'
@@ -57,6 +58,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
+  // Qué etiquetas destacar según la categoría elegida. Se pide una vez: el mapa cubre todas las
+  // categorías, así que cambiar de categoría no dispara otro fetch.
+  const [sugerencias, setSugerencias] = useState<SugerenciasEtiquetas | null>(null)
   const [conceptos, setConceptos] = useState<Concepto[]>([])
   // Cuotas en un solo campo ("3/12"); el schema sigue recibiendo el par de números.
   const [cuotasTexto, setCuotasTexto] = useState(() => formatCuotas(gasto?.cuota_actual, gasto?.cuotas_totales))
@@ -106,12 +110,15 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       fetch('/api/etiquetas').then(r => r.json()).catch(() => []),
       fetch('/api/conceptos').then(r => r.json()).catch(() => []),
       fetch('/api/settings').then(r => r.json()).catch(() => null),
-    ]).then(([c, m, t, l, e, cc, s]) => {
+      // Si falla, `sugerencias` queda en null y el multiselect ofrece todas las etiquetas.
+      fetch('/api/etiquetas/sugeridas').then(r => r.json()).catch(() => null),
+    ]).then(([c, m, t, l, e, cc, s, sug]) => {
       setCasas(c)
       setMonedas(m)
       setTarjetas(t)
       setCategorias(l)
       setEtiquetas(Array.isArray(e) ? e : [])
+      setSugerencias(sug && typeof sug === 'object' ? sug : null)
       setConceptos(Array.isArray(cc) ? cc : [])
       if (!gasto) {
         // Casa por defecto configurada; si no hay, se autocompleta cuando existe una sola casa.
@@ -132,6 +139,13 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const esTarjeta = watch('es_tarjeta')
   const tarjetaId = watch('tarjeta_id')
   const pagadoCompleto = watch('pagado_completo')
+  const categoriaId = watch('categoria_id')
+
+  // Etiquetas a destacar para la categoría elegida (`null` = sin criterio, se muestran todas).
+  const etiquetasDestacadas = useMemo(
+    () => etiquetasSugeridas(sugerencias, categoriaId),
+    [sugerencias, categoriaId],
+  )
 
   const monedaSeleccionada = useMemo(() => monedas.find(m => m.id === monedaId), [monedas, monedaId])
   const esARS = monedaSeleccionada?.codigo === 'ARS'
@@ -527,7 +541,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                   />
                 </Grid>
 
-                {/* Etiquetas (varias — corte transversal) */}
+                {/* Etiquetas (varias — corte transversal), recortadas según la categoría */}
                 <Grid item xs={12} sm={6}>
                   <Controller
                     name="etiqueta_ids"
@@ -541,6 +555,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                         fullWidth
                         placeholder="Sin etiquetas"
                         onCreate={crearEtiqueta}
+                        destacadas={etiquetasDestacadas}
                       />
                     )}
                   />

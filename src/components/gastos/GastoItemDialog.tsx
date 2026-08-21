@@ -34,6 +34,7 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
 import { sumItemsTotal } from '@/lib/subitems-total'
+import { etiquetasSugeridas, type SugerenciasEtiquetas } from '@/lib/etiquetas-sugeridas'
 import type { Gasto, GastoItem, Categoria, Etiqueta } from '@/lib/types'
 
 function fmtARS(n: number) {
@@ -73,6 +74,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
+  // Etiquetas a destacar por categoría (ver `src/lib/etiquetas-sugeridas.ts`). El sub-item tiene
+  // su propia categoría, así que el recorte se calcula por fila y no se hereda del gasto padre.
+  const [sugerencias, setSugerencias] = useState<SugerenciasEtiquetas | null>(null)
   const [descripciones, setDescripciones] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -85,6 +89,8 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   useEffect(() => {
     fetch('/api/categorias').then(r => r.json()).then(setCategorias)
     fetch('/api/etiquetas').then(r => r.json()).then(d => setEtiquetas(Array.isArray(d) ? d : [])).catch(() => {})
+    // Si falla queda en null y el multiselect ofrece todas las etiquetas.
+    fetch('/api/etiquetas/sugeridas').then(r => r.json()).then(d => setSugerencias(d && typeof d === 'object' ? d : null)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -312,6 +318,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         fullWidth
         placeholder="Sin etiquetas"
         onCreate={crearEtiqueta}
+        destacadas={etiquetasSugeridas(sugerencias, categoriaId)}
       />
       <Box sx={{ display: 'flex', gap: 2 }}>
         <AppToggle
@@ -473,6 +480,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                       fullWidth
                       placeholder="Sin etiquetas"
                       onCreate={crearEtiqueta}
+                      destacadas={etiquetasSugeridas(sugerencias, editing.categoria_id ?? null)}
                     />
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <AppToggle
