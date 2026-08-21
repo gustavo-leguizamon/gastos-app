@@ -63,6 +63,7 @@ model Categoria {
   gastos Gasto[]
   items  GastoItem[]
   presupuestos Presupuesto[]
+  reglasEtiquetas CategoriaEtiquetaRegla[]
 }
 
 /// Tope de gasto mensual de una categoría. La app mostraba montos absolutos pero nada contra
@@ -94,6 +95,35 @@ model Etiqueta {
   nombre String      @unique
   gastos Gasto[]     @relation("GastoEtiquetas")
   items  GastoItem[] @relation("GastoItemEtiquetas")
+  reglas CategoriaEtiquetaRegla[]
+}
+
+/// Corrección manual de qué etiquetas ofrece el form para una categoría.
+///
+/// La lista base **no** se guarda: se deriva del histórico (`src/lib/etiquetas-sugeridas.ts`),
+/// porque una whitelist completa mantenida a mano obligaría a declarar las etiquetas
+/// transversales —`Mercado Libre`, `Mercado Pago`, `PedidosYa`— en casi todas las categorías, y
+/// la que se olvide termina retipeada como variante del mismo nombre. Esta tabla es sólo la
+/// capa de excepciones sobre eso: **la ausencia de fila es el caso normal**.
+///
+/// `modo`: `'fijar'` = ofrecerla en esta categoría aunque el histórico no la respalde (sirve
+/// para la categoría nueva, que arranca sin datos); `'excluir'` = no ofrecerla nunca acá, ni
+/// siquiera si es transversal o si ya se usó (un uso puntual mal clasificado no tiene por qué
+/// contaminar la lista para siempre). Excluir gana sobre fijar y sobre el histórico.
+///
+/// `onDelete: Cascade` en las dos puntas: una regla sobre una categoría o etiqueta borrada no
+/// significa nada, y no cuenta como "uso" que impida borrarlas.
+model CategoriaEtiquetaRegla {
+  id          Int      @id @default(autoincrement())
+  categoriaId Int
+  etiquetaId  Int
+  modo        String
+  createdAt   DateTime @default(now())
+
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  etiqueta  Etiqueta  @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@unique([categoriaId, etiquetaId])
 }
 
 // Concepto: entidad canónica del "qué" de un gasto/sub-item (ej: Netflix, Luz, Expensas).
