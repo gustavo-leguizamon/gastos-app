@@ -67,3 +67,38 @@ describe('gastoFormSchema — pisos que se mantienen', () => {
     await expect(validate({ descripcion: '' })).rejects.toThrow('Requerido')
   })
 })
+
+describe('gastoFormSchema — propina', () => {
+  it('sin cargar nada default a 0 y modo "aparte"', async () => {
+    const out = await validate({})
+    expect(out.propina).toBe(0)
+    expect(out.propina_modo).toBe('aparte')
+  })
+
+  it('un campo vacío (NaN al castear) cuenta como sin propina, no como error', async () => {
+    const out = await validate({ propina: '' })
+    expect(out.propina).toBe(0)
+  })
+
+  it('acepta negativos, como el resto de los montos', async () => {
+    expect((await validate({ propina: -300 })).propina).toBe(-300)
+  })
+
+  it('acepta los dos modos y rechaza cualquier otro', async () => {
+    expect((await validate({ propina_modo: 'incluida' })).propina_modo).toBe('incluida')
+    await expect(validate({ propina_modo: 'mitad' })).rejects.toThrow()
+  })
+})
+
+describe('gastoFormSchema — clasificación propia de la propina', () => {
+  it('default: sin categoría y etiquetas en null (= heredar las del gasto)', async () => {
+    const out = await validate({})
+    expect(out.propina_categoria_id).toBeNull()
+    expect(out.propina_etiqueta_ids).toBeNull()
+  })
+
+  it('distingue el vacío explícito del "sin tocar"', async () => {
+    expect((await validate({ propina_etiqueta_ids: [] })).propina_etiqueta_ids).toEqual([])
+    expect((await validate({ propina_etiqueta_ids: [8, 9] })).propina_etiqueta_ids).toEqual([8, 9])
+  })
+})

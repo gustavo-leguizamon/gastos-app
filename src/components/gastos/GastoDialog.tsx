@@ -12,6 +12,7 @@ import { useTheme } from '@mui/material/styles'
 import toast from 'react-hot-toast'
 import GastoForm from './GastoForm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { aplicarPropina } from '@/lib/propina'
 import type { Gasto, GastoFormData, FiltrosGastos } from '@/lib/types'
 
 interface Props {
@@ -37,36 +38,61 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
     if (!loading) setConfirmClose(true)
   }
 
+  /**
+   * Crea un gasto y, si corresponde, su pago inicial: con "pagado completo" por el total del
+   * gasto en ARS; si no, por `total_pagado` cuando es distinto de cero. Se acepta cualquier
+   * monto no nulo (incluye negativos, ej. devoluciones) para que propague el sub-item a la
+   * tarjeta. Un pago fallido no tumba el alta: el gasto ya existe, se avisa y sigue.
+   */
+  const crearGastoConPago = async (data: GastoFormData, etiquetaError: string) => {
+    const res = await fetch('/api/gastos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('Error al guardar')
+
+    const totalArs = Number(data.total_moneda) * Number(data.tipo_cambio || 1)
+    const montoPago = data.pagado_completo ? totalArs : Number(data.total_pagado)
+    if (montoPago === 0) return
+
+    const nuevo = await res.json()
+    try {
+      const pagoRes = await fetch(`/api/gastos/${nuevo.id}/pagos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: data.fecha_vencimiento, monto: montoPago }),
+      })
+      if (!pagoRes.ok) {
+        const msg = await pagoRes.json().then(d => d?.error).catch(() => null)
+        toast.error(msg || etiquetaError)
+      }
+    } catch {
+      toast.error(etiquetaError)
+    }
+  }
+
   const handleSubmit = async (data: GastoFormData) => {
     setLoading(true)
     try {
-      const url = gasto ? `/api/gastos/${gasto.id}` : '/api/gastos'
-      const method = gasto ? 'PUT' : 'POST'
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) throw new Error('Error al guardar')
-      // Al crear: si "pagado completo" → registrar pago por el total del gasto en ARS; si no, si total_pagado != 0 → registrar ese monto.
-      // Se acepta cualquier monto distinto de cero (incluye negativos, ej. devoluciones) para que propague el sub-item a la tarjeta.
-      if (!gasto) {
-        const totalArs = Number(data.total_moneda) * Number(data.tipo_cambio || 1)
-        const montoPago = data.pagado_completo ? totalArs : Number(data.total_pagado)
-        if (montoPago !== 0) {
-          const nuevo = await res.json()
+      if (gasto) {
+        const res = await fetch(`/api/gastos/${gasto.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        if (!res.ok) throw new Error('Error al guardar')
+      } else {
+        // La propina se carga en el mismo form pero se persiste como un gasto aparte.
+        const { principal, propina } = aplicarPropina(data)
+        await crearGastoConPago(principal, 'Gasto creado, pero falló la creación del pago inicial')
+        if (propina) {
+          // Los dos POST no son atómicos. Si el segundo falla, el principal ya quedó
+          // guardado: se avisa y se sigue en vez de perder la carga entera.
           try {
-            const pagoRes = await fetch(`/api/gastos/${nuevo.id}/pagos`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fecha: data.fecha_vencimiento, monto: montoPago }),
-            })
-            if (!pagoRes.ok) {
-              const msg = await pagoRes.json().then(d => d?.error).catch(() => null)
-              toast.error(msg || 'Gasto creado, pero falló la creación del pago inicial')
-            }
+            await crearGastoConPago(propina, 'Propina creada, pero falló la creación de su pago')
           } catch {
-            toast.error('Gasto creado, pero falló la creación del pago inicial')
+            toast.error('Gasto creado, pero falló el gasto de la propina — cargala aparte')
           }
         }
       }
