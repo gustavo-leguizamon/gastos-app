@@ -52,6 +52,8 @@ interface AppMultiSelectProps {
    * de más acá cuesta datos sucios, no un click.
    */
   destacadas?: AppMultiSelectValue[] | null
+  /** Texto de ayuda debajo del campo, igual que en `AppSelect`. */
+  helperText?: string
 }
 
 const filter = createFilterOptions<CreatableOption>()
@@ -67,6 +69,7 @@ export default function AppMultiSelect({
   placeholder,
   onCreate,
   destacadas,
+  helperText,
 }: AppMultiSelectProps) {
   const [verTodas, setVerTodas] = useState(false)
 
@@ -167,6 +170,7 @@ export default function AppMultiSelect({
           label={label}
           size={size}
           placeholder={selected.length === 0 ? placeholder : undefined}
+          helperText={helperText}
         />
       )}
     />

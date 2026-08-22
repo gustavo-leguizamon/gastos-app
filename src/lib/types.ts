@@ -1,3 +1,7 @@
+// `ModoPropina` vive en `propina.ts` (junto a la lógica que lo interpreta). El import es
+// sólo de tipo: se borra al compilar, así que no genera ciclo con ese módulo.
+import type { ModoPropina } from './propina'
+
 export interface Moneda {
   id: number
   codigo: string
@@ -159,6 +163,23 @@ export interface GastoFormData {
   etiqueta_ids: number[]
   es_tarjeta: boolean
   pagado_completo?: boolean
+  /**
+   * Propina cargada junto al gasto, en la moneda del gasto. Campo sólo del form: no se
+   * persiste en `Gasto`, el alta lo convierte en un segundo gasto. Ver `src/lib/propina.ts`.
+   */
+  propina?: number
+  /** Si `propina` viene incluida en `total_moneda` o se suma encima. */
+  propina_modo?: ModoPropina
+  /**
+   * Categoría del gasto de propina, editable aparte de la del gasto. Arranca en `Propinas`
+   * (`resolveCategoriaPropina`). También sólo del form.
+   */
+  propina_categoria_id?: number | null
+  /**
+   * Etiquetas del gasto de propina. `null` = heredar las del gasto de origen; cualquier
+   * valor explícito (incluido `[]`) gana. También sólo del form.
+   */
+  propina_etiqueta_ids?: number[] | null
 }
 
 export interface Settings {

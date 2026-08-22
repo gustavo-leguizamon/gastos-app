@@ -36,4 +36,12 @@ export const gastoFormSchema = yup.object({
   etiqueta_ids: yup.array().of(yup.number()).default([]),
   es_tarjeta: yup.boolean().required().default(false),
   pagado_completo: yup.boolean().required().default(false),
+  // Propina cargada junto al gasto: sale como un segundo gasto, no se persiste acá.
+  // Admite negativos como el resto de los montos; 0 (o vacío) = sin propina.
+  propina: yup.number().transform(v => (Number.isNaN(v) ? 0 : v)).default(0),
+  propina_modo: yup.string().oneOf(['aparte', 'incluida']).default('aparte'),
+  // Clasificación propia del gasto de propina. `propina_etiqueta_ids` en null = heredar las
+  // del gasto; `[]` es un vacío explícito y no hereda.
+  propina_categoria_id: yup.number().nullable().default(null),
+  propina_etiqueta_ids: yup.array().of(yup.number()).nullable().default(null),
 })

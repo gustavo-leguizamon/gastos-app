@@ -224,7 +224,7 @@ Las flechas ‹ › navegan mes a mes (con wraparound de año). Además, el labe
 
 El form está optimizado para cargar rápido: los campos con default correcto en la mayoría de las cargas están colapsados y el primer campo es el que dispara el autofill.
 
-**Área principal** — sólo lo que se tipea en toda carga, en este orden: `descripcion` (con `autoFocus` en alta) + `total_moneda` → `tipo_cambio` + "Total en ARS" (sólo si la moneda no es ARS) → `fecha_vencimiento` + **Medio de pago**.
+**Área principal** — sólo lo que se tipea en toda carga, en este orden: `descripcion` (con `autoFocus` en alta) + `total_moneda` → **propina** (colapsada, sólo en alta de un gasto común — ver [Propina como gasto aparte](#propina-como-gasto-aparte)) → `tipo_cambio` + "Total en ARS" (sólo si la moneda no es ARS) → `fecha_vencimiento` + **Medio de pago**.
 
 **Acordeón "Más opciones"** (`defaultExpanded` sólo en edición), en filas de dos: `categoria_id` + `etiqueta_ids` → `casa_id` + `moneda_id` → `pagado_completo` (fila propia) → `total_pagado` + cuotas → `notas` → `pasaje_mes_siguiente` + `prestamo_a_otro` (edición) → `confirmado` → `es_tarjeta`. El orden está armado para que los `sm={6}` queden emparejados y no sobre ninguno suelto: por eso `moneda_id` sube al lado de `casa_id` y las cuotas bajan al lado de `total_pagado` (cuando `pagado_completo` está marcado, `total_pagado` se oculta y las cuotas quedan solas en la fila).
 
@@ -233,7 +233,7 @@ Todos estos campos están acá porque el autofill los llena (categoría/etiqueta
 **Medio de pago (colapsa `tipo_pago` + `tarjeta_id`)**: un `AppSelect` con "Débito / Efectivo" + una opción por tarjeta. Elegir tarjeta setea `tipo_pago='C'` + `tarjeta_id`; elegir débito setea `'D'` + `null`. Ambos `setValue` van con `shouldDirty: true` para que el autofill no los pise después. Las opciones de tarjeta llevan `render` (logo + nombre en el dropdown) y **`adornment`** (logo al lado del valor ya seleccionado, como `startAdornment` del input) — ver `AppSelect` en `docs/claude/inversiones-shared.md`.
 **Excepción `es_tarjeta`**: en un resumen de tarjeta se renderizan los **dos controles separados** (toggle C/D + select de tarjeta), porque ahí la tarjeta es opcional y puede convivir con `tipo_pago='D'` — combinación no representable en el control unificado.
 
-**"Guardar y cargar otro"** (`GastoDialog`, sólo en alta): guarda, deja el diálogo abierto e incrementa `resetSignal`, prop que `GastoForm` observa para hacer `reset()` conservando el contexto de carga (fecha, casa, medio de pago, moneda) y limpiando `descripcion`, montos, categoría/etiquetas, cuotas y notas (`confirmado` y `pagado_completo` vuelven a `true`). Refocusea descripción vía `descripcionRef`.
+**"Guardar y cargar otro"** (`GastoDialog`, sólo en alta): guarda, deja el diálogo abierto e incrementa `resetSignal`, prop que `GastoForm` observa para hacer `reset()` conservando el contexto de carga (fecha, casa, medio de pago, moneda) y limpiando `descripcion`, montos, categoría/etiquetas, cuotas, notas y la propina (`confirmado` y `pagado_completo` vuelven a `true`; el bloque de propina se cierra). Refocusea descripción vía `descripcionRef`.
 
 ## Valores por defecto del alta
 
@@ -263,6 +263,42 @@ Reglas del autofill:
   - En edición no se renderiza; pagos por `PagoDialog`.
 - **Pasaje / Préstamo**: solo en edición (`isEditing = !!gasto`).
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (Yup `when('tipo_pago', { is: 'C', ... })`). La UI oculta "Sin especificar" y el label pierde "(opcional)". Sin tarjeta → `FormHelperText` "Seleccioná una tarjeta". `tipo_pago === 'D'` sigue siendo opcional.
+
+## Propina como gasto aparte
+
+Hay gastos que llevan propina y se registran como **dos gastos individuales** (el consumo y la propina). Cargarlos por separado obliga a repetir todo el contexto y, cuando la propina viene incluida en lo pagado, a hacer la resta a mano — que es donde se cuelan los errores y donde después no queda rastro de por qué el monto no cierra con el ticket.
+
+El form permite cargar los dos de una sola vez. **Se siguen persistiendo como dos `Gasto` independientes**: no hay campo nuevo en Prisma ni ruta nueva, sólo dos `POST /api/gastos` desde `GastoDialog`. `propina` y `propina_modo` viven en `GastoFormData` pero no se persisten (como `pagado_completo`).
+
+**Módulo puro**: `src/lib/propina.ts` (`splitPropina`, `buildPropinaGasto`, `aplicarPropina`, `CONCEPTO_PROPINA`, `MODO_PROPINA_DEFAULT`), testeado en `propina.test.ts`.
+
+**Los dos modos** (`propina_modo`):
+
+| Modo | Qué es el total tipeado | Gasto principal | Gasto de propina |
+|---|---|---|---|
+| `aparte` (default) | el consumo | el total tipeado, intacto | la propina, encima |
+| `incluida` | lo que se pagó, propina adentro | total − propina | la propina |
+
+`splitPropina` redondea a centavos: en `incluida` el total sale de una resta de floats (100.10 − 33.37 daría 66.73000000000002). Con montos de dos decimales las dos partes reconstruyen exactamente lo tipeado. Sin propina (0, vacío o `NaN`) devuelve `null` y se crea un solo gasto, como siempre.
+
+**Identidad del gasto de propina** — concepto fijo `"Propina"` (`CONCEPTO_PROPINA`), resuelto por el find-or-create de siempre. Todas las propinas comparten `conceptoId`, así agregan como **una sola unidad** en evolución, estimado del próximo mes y top conceptos de reportes. La trazabilidad va en las **notas**: `Propina de Cena` (visibles en la grilla — ver [Notas visibles](#notas-visibles-y-búsqueda-ampliada)). Si la descripción de origen ya es "Propina", no se escribe nota.
+
+**Categoría y etiquetas son propias del gasto de propina y se editan dentro del bloque** (`propina_categoria_id`, `propina_etiqueta_ids` — también sólo del form):
+
+- **Categoría**: arranca en `CATEGORIA_PROPINA` (`'Propinas'`), que `resolveCategoriaPropina` busca en las categorías **ya cargadas** por el form — sin request extra, con el mismo match case-insensitive + `normalizeNombre` que el resto de los clasificadores. La preselección se hace **al abrir el bloque** y no pisa una elección previa. Si no existe esa categoría, el select queda en "Sin categoría" y se ve (no se crea nada en silencio). `propina_categoria_id` manda siempre: **nunca** cae a la categoría del gasto de origen, porque la categoría es la partición del reporte y heredar el rubro (Restaurantes, Peluquería) volvería la propina invisible como gasto propio.
+- **Etiquetas**: `null` = **heredar** las del gasto de origen, que es lo útil por default (una etiqueta como "salida" aplica igual a la propina). El multiselect muestra las del gasto mientras esté en `null` (con helper "Heredadas del gasto") y sigue en vivo hasta que se toque algo. Cualquier valor explícito gana, **incluido `[]`**: un vacío a mano es "sin etiquetas", no "sin tocar". Las destacadas se recalculan con la categoría **de la propina**, no la del gasto.
+
+**Qué hereda y qué no:**
+
+- **Hereda**: `fecha_vencimiento`, `casa_id`, `tipo_pago` + `tarjeta_id`, `moneda_id`, `tipo_cambio`, `mes`/`anio`, `confirmado` y `pagado_completo`.
+- **No hereda** cuotas (una propina no se financia), `pasaje_mes_siguiente` ni `prestamo_a_otro` (ajustes del gasto de origen), y nunca es `es_tarjeta`.
+- **`total_pagado` va en 0**: un pago parcial tipeado a mano es del gasto principal; duplicarlo inventaría plata pagada. Con `pagado_completo` cada gasto genera su propio pago por su propio total, y si el medio es crédito **cada uno propaga su sub-item al resumen de la tarjeta**, sin código extra.
+
+**UI** (`GastoForm`) — fila propia debajo de `total_moneda`, colapsada detrás de un botón `+ Propina` porque es ocasional y no debe meter ruido en cada carga. Abierta: monto (en la moneda del gasto) + `ToggleButtonGroup` **Aparte / Incluida** + una `X` que la quita y resetea todo el bloque; debajo, **Categoría de la propina** + **Etiquetas de la propina** (`AppSelect`/`AppMultiSelect`, con alta inline como los del gasto). Al final, un **preview en vivo** con los dos montos exactos y **la categoría en la que va a caer la propina**, calculado con la **misma** `splitPropina` que usa el submit — el preview no puede mostrar una cosa y guardar otra, y es lo que hace que el usuario no dependa de interpretar el label del toggle. Si en `incluida` la propina supera al total, el preview pasa a `warning.main` y avisa, **sin bloquear** (los negativos son válidos en toda la app).
+
+**Sólo en alta y sólo en gastos comunes** (`permitePropina = !isEditing && !esTarjeta`): editando ya son dos gastos separados que se editan por su cuenta, y un resumen de tarjeta no lleva propina. `aplicarPropina` repite la guarda de `es_tarjeta` del lado puro, porque esconder el bloque no borra lo ya tipeado.
+
+**Atomicidad**: los dos `POST` no son atómicos. Si falla el de la propina, el principal ya quedó guardado — se avisa con un toast ("…falló el gasto de la propina — cargala aparte") y se sigue, mismo criterio que ya usaba el pago inicial. `crearGastoConPago` en `GastoDialog` centraliza "crear gasto + su pago" para no duplicar ese flujo entre el principal y la propina.
 
 ## Conceptos
 

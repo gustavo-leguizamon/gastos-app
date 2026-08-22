@@ -8,6 +8,10 @@ import { gastoFormSchema } from '@/lib/gasto-form-schema'
 import { normalizeNombre } from '@/lib/conceptos'
 import { parseCuotas, formatCuotas } from '@/lib/cuotas'
 import { etiquetasSugeridas, type SugerenciasEtiquetas } from '@/lib/etiquetas-sugeridas'
+import {
+  splitPropina, resolveCategoriaPropina,
+  CONCEPTO_PROPINA, CATEGORIA_PROPINA, MODO_PROPINA_DEFAULT,
+} from '@/lib/propina'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
 import Autocomplete from '@mui/material/Autocomplete'
@@ -22,6 +26,10 @@ import AccordionSummary from '@mui/material/AccordionSummary'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import AddIcon from '@mui/icons-material/Add'
+import CloseIcon from '@mui/icons-material/Close'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
@@ -69,6 +77,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const [autofill, setAutofill] = useState<{ mes: number; anio: number; campos: CampoAutofill[] } | null>(null)
   // Sólo se evalúa al salir del campo descripción, para no titilar mientras se tipea.
   const [conceptoNuevo, setConceptoNuevo] = useState(false)
+  // La propina es ocasional: el bloque arranca cerrado para no meter ruido en cada carga.
+  const [propinaAbierta, setPropinaAbierta] = useState(false)
   const descripcionRef = useRef<HTMLInputElement | null>(null)
   const now = new Date()
 
@@ -98,6 +108,10 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       etiqueta_ids: gasto?.etiqueta_ids ?? [],
       es_tarjeta: gasto?.es_tarjeta ?? false,
       pagado_completo: true,
+      propina: 0,
+      propina_modo: MODO_PROPINA_DEFAULT,
+      propina_categoria_id: null,
+      propina_etiqueta_ids: null,
     },
   })
 
@@ -140,6 +154,12 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const tarjetaId = watch('tarjeta_id')
   const pagadoCompleto = watch('pagado_completo')
   const categoriaId = watch('categoria_id')
+  const propina = watch('propina')
+  const propinaModo = watch('propina_modo')
+  const propinaCategoriaId = watch('propina_categoria_id')
+  const propinaEtiquetaIds = watch('propina_etiqueta_ids')
+  const etiquetaIds = watch('etiqueta_ids')
+  const descripcion = watch('descripcion')
 
   // Etiquetas a destacar para la categoría elegida (`null` = sin criterio, se muestran todas).
   const etiquetasDestacadas = useMemo(
@@ -150,6 +170,29 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const monedaSeleccionada = useMemo(() => monedas.find(m => m.id === monedaId), [monedas, monedaId])
   const esARS = monedaSeleccionada?.codigo === 'ARS'
   const totalARS = (totalMoneda || 0) * (esARS ? 1 : (tipoCambio || 1))
+
+  // La propina sólo aplica al alta de un gasto común: editando ya son dos gastos separados,
+  // y el resumen de una tarjeta no lleva propina.
+  const permitePropina = !isEditing && !esTarjeta
+
+  // Misma función que usa el submit para partir el monto: el preview no puede mostrar
+  // una cosa y guardar otra.
+  const propinaSplit = useMemo(
+    () => (permitePropina ? splitPropina(totalMoneda, propina, propinaModo ?? MODO_PROPINA_DEFAULT) : null),
+    [permitePropina, totalMoneda, propina, propinaModo],
+  )
+  const fmtMonto = (n: number) =>
+    `${monedaSeleccionada?.simbolo ?? '$'} ${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`
+  // Categoría con la que arranca el bloque de propina, resuelta de la lista ya cargada (sin
+  // request extra). Es sólo el default: el select de adentro se puede cambiar.
+  const categoriaPropinaId = useMemo(() => resolveCategoriaPropina(categorias), [categorias])
+  // Nombre de la categoría efectivamente elegida, para que el preview diga dónde va a caer.
+  const nombreCategoriaPropina = categorias.find(c => c.id === propinaCategoriaId)?.nombre ?? null
+  // Propina mayor que el total: en "incluida" el gasto queda del signo contrario al tipeado,
+  // que casi siempre es un typo. Se avisa, no se bloquea (los negativos son válidos acá).
+  const propinaDesborda =
+    !!propinaSplit && propinaModo === 'incluida' &&
+    (totalMoneda || 0) !== 0 && Math.sign(propinaSplit.total_gasto) === -Math.sign(totalMoneda || 0)
 
   // Sugerencias de descripción: los conceptos más usados primero (el autocomplete filtra igual al tipear).
   const opcionesDescripcion = useMemo(
@@ -181,7 +224,12 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       cuotas_totales: null,
       confirmado: true,
       pagado_completo: true,
+      propina: 0,
+      propina_modo: MODO_PROPINA_DEFAULT,
+      propina_categoria_id: null,
+      propina_etiqueta_ids: null,
     })
+    setPropinaAbierta(false)
     setCuotasTexto('')
     setCuotasError(null)
     setAutofill(null)
@@ -412,6 +460,142 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             )}
           />
         </Grid>
+
+        {/*
+          Propina: se carga acá pero se guarda como un segundo gasto independiente, heredando
+          todo el contexto de este (ver `src/lib/propina.ts`). Arranca colapsada porque es
+          ocasional, y el preview muestra los dos montos exactos antes de guardar — así el
+          usuario no depende de interpretar "Aparte"/"Incluida" para saber qué se registra.
+        */}
+        {permitePropina && (
+          <Grid item xs={12}>
+            {!propinaAbierta ? (
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                // Al abrir se preselecciona la categoría "Propinas"; si el usuario ya eligió
+                // otra (cerró y volvió a abrir), no se la pisa.
+                onClick={() => {
+                  if (getValues('propina_categoria_id') == null) setValue('propina_categoria_id', categoriaPropinaId)
+                  setPropinaAbierta(true)
+                }}
+                sx={{ ml: -1 }}
+              >
+                Propina
+              </Button>
+            ) : (
+              <>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+                  <Controller
+                    name="propina"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        autoFocus
+                        label={`Propina (${monedaSeleccionada?.codigo ?? 'moneda'})`}
+                        type="number"
+                        size="small"
+                        inputProps={{ step: 0.01 }}
+                        sx={{ width: 190 }}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="propina_modo"
+                    control={control}
+                    render={({ field }) => (
+                      <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={field.value ?? MODO_PROPINA_DEFAULT}
+                        onChange={(_, v) => { if (v) field.onChange(v) }}
+                      >
+                        <ToggleButton value="aparte" sx={{ px: 2 }}>Aparte</ToggleButton>
+                        <ToggleButton value="incluida" sx={{ px: 2 }}>Incluida</ToggleButton>
+                      </ToggleButtonGroup>
+                    )}
+                  />
+                  <IconButton
+                    size="small"
+                    aria-label="Quitar propina"
+                    onClick={() => {
+                      setValue('propina', 0)
+                      setValue('propina_modo', MODO_PROPINA_DEFAULT)
+                      setValue('propina_categoria_id', null)
+                      setValue('propina_etiqueta_ids', null)
+                      setPropinaAbierta(false)
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+
+                {/*
+                  Clasificación propia de la propina: arranca en la categoría "Propinas" y con
+                  las etiquetas del gasto, pero se edita acá sin tocar las del gasto de origen.
+                */}
+                <Grid container spacing={2} sx={{ mt: 0 }}>
+                  <Grid item xs={12} sm={6}>
+                    <Controller
+                      name="propina_categoria_id"
+                      control={control}
+                      render={({ field }) => (
+                        <AppSelect
+                          label="Categoría de la propina"
+                          options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+                          value={field.value ?? null}
+                          onChange={(v) => field.onChange(v == null ? null : Number(v))}
+                          fullWidth
+                          emptyLabel="Sin categoría"
+                          onCreate={crearCategoria}
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Controller
+                      name="propina_etiqueta_ids"
+                      control={control}
+                      render={({ field }) => (
+                        <AppMultiSelect
+                          label="Etiquetas de la propina"
+                          options={etiquetas.map(e => ({ value: e.id, label: e.nombre }))}
+                          // `null` = todavía sin tocar: se muestran (y se guardan) las del
+                          // gasto, que siguen en vivo hasta que se edite algo acá.
+                          value={field.value ?? etiquetaIds ?? []}
+                          onChange={(v) => field.onChange(v.map(Number))}
+                          fullWidth
+                          placeholder="Sin etiquetas"
+                          onCreate={crearEtiqueta}
+                          destacadas={etiquetasSugeridas(sugerencias, propinaCategoriaId ?? null)}
+                          helperText={propinaEtiquetaIds == null ? 'Heredadas del gasto' : undefined}
+                        />
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Typography
+                  variant="caption"
+                  color={propinaDesborda ? 'warning.main' : 'text.secondary'}
+                  sx={{ display: 'block', mt: 1 }}
+                >
+                  {propinaSplit ? (
+                    <>
+                      Se crean 2 gastos: «{descripcion?.trim() || 'el gasto'}» {fmtMonto(propinaSplit.total_gasto)}
+                      {' + '}«{CONCEPTO_PROPINA}» {fmtMonto(propinaSplit.total_propina)}
+                      {nombreCategoriaPropina ? ` en «${nombreCategoriaPropina}»` : ' sin categoría'}.
+                      {propinaDesborda && ' La propina supera al total, revisá el monto.'}
+                    </>
+                  ) : (
+                    'Con la propina en 0 se crea un solo gasto, como siempre.'
+                  )}
+                </Typography>
+              </>
+            )}
+          </Grid>
+        )}
 
         {/* Tipo cambio + total ARS — sólo si la moneda no es ARS */}
         {!esARS && (
