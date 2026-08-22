@@ -89,11 +89,12 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `rend
 - `value: (string | number)[]` + `onChange(values)` — controlado.
 - `onCreate?: (nombre) => Promise<{value,label} | null>` — igual que en `AppSelect`: habilita crear tipeando ("Agregar «X»"). Sin `onCreate`, comportamiento idéntico al anterior.
 - `destacadas?: (string | number)[] | null` — subconjunto a mostrar mientras el usuario no tipea nada: se ven sólo esas opciones (más las ya seleccionadas) y una fila **"Ver todas (N)"** al pie que levanta el recorte. `null`/`undefined` = sin recorte, comportamiento idéntico al anterior. El recorte es **blando**: al tipear se busca sobre **todas** las opciones, porque si la búsqueda lo respetara una opción existente pero oculta no aparecería y —con `onCreate`— se ofrecería "Agregar «X»", creando un duplicado del mismo nombre. El "Ver todas" vuelve a colapsar cuando cambia el set de `destacadas` (se depende de los ids serializados, no de la identidad del array, porque el padre suele armarlo inline). Único uso hoy: etiquetas recortadas por la categoría del gasto (ver [gastos-core](gastos-core.md#etiquetas-sugeridas-por-categoría)).
+- `helperText?: string` — texto de ayuda debajo del campo, igual que en `AppSelect`. Passthrough al `TextField` del `renderInput`. Se agregó para el bloque de propina de `GastoForm`, que lo usa para avisar "Heredadas del gasto" mientras las etiquetas de la propina siguen a las del gasto (ver [gastos-core](gastos-core.md#propina-como-gasto-aparte)).
 - `size`, `fullWidth`, `sx`, `placeholder` — passthrough.
 
 Las filas sintéticas (`__create` de `onCreate`, `__expand` de `destacadas`) se inyectan en `filterOptions` y se interceptan en `onChange`: no son valores, así que no entran al `onChange` del padre.
 
-Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas con `onCreate` + `destacadas`), `GastoItemDialog` (Etiquetas con `onCreate` + `destacadas`, en alta y en edición inline), `EtiquetasPorCategoria` (las dos listas de reglas del ABM), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos), `FiltrosGastos` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`).
+Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas del gasto y **Etiquetas de la propina**, las dos con `onCreate` + `destacadas`), `GastoItemDialog` (Etiquetas con `onCreate` + `destacadas`, en alta y en edición inline), `EtiquetasPorCategoria` (las dos listas de reglas del ABM), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos), `FiltrosGastos` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`).
 
 ## CategoriasCell
 
