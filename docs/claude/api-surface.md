@@ -1,5 +1,18 @@
 # API surface
 
+## Prerender: cuándo hace falta `force-dynamic` (regla obligatoria)
+
+Next **prerenderiza en el build** toda route que exporte **sólo `GET`** y cuyo `GET` **no reciba `req`**: sin request no hay nada dinámico que mirar, así que la ejecuta al compilar y sirve ese resultado para siempre. En una route que consulta la DB eso falla de dos formas, las dos en silencio:
+
+1. **Devuelve el snapshot del deploy.** `/api/items/descripciones` servía los conceptos congelados al momento de compilar: uno creado después no aparecía en el autocompletado de sub-items hasta el próximo deploy.
+2. **Rompe cualquier build sin `DATABASE_URL`** — el de preview en Vercel, que venía en rojo desde varios PRs atrás mientras producción pasaba.
+
+Ni el type-check ni los tests de la propia route lo detectan. **Si agregás una route de sólo `GET` que toca Prisma, poné `export const dynamic = 'force-dynamic'`.** Basta con que la route exporte además un `POST`/`PUT`/`DELETE`, o que el `GET` reciba `req`, para que Next ya la trate como dinámica y no haga falta.
+
+Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre las 53 routes y falla si alguna cae en el caso sin declararlo. Hoy la regla aplica a `etiquetas/sugeridas`, `gastos/descripciones` e `items/descripciones`.
+
+## Routes
+
 | Route | Purpose |
 |---|---|
 | `GET/POST /api/gastos` | List (with filters) / create gastos |
@@ -36,8 +49,8 @@
 | `GET /api/etiquetas/sugeridas` | Qué etiquetas ofrecer según la categoría, derivado del histórico. Devuelve `{ transversales: number[], por_categoria: Record<categoriaId, number[]>, reglas: {categoria_id,etiqueta_id,modo}[] }` (sólo ids, mapa completo — el form lo pide una vez). Excluye los gastos `esTarjeta`. `force-dynamic` (si no, Next la prerenderiza y queda congelada en el build). Ver [gastos-core](gastos-core.md#etiquetas-sugeridas-por-categoría). |
 | `GET/PUT /api/categorias/[id]/etiquetas` | Excepciones manuales de qué etiquetas ofrece el form para esa categoría (`CategoriaEtiquetaRegla`). `PUT` con `{ fijar: number[], excluir: number[] }` **reemplaza todas** las reglas de la categoría (listas vacías = volver a lo derivado); 400 body inválido o etiqueta fijada y excluida a la vez, 404 categoría o etiqueta inexistente. |
 | `GET/PUT /api/settings` | Singleton de configuración global: parámetros del estimado del próximo mes + `casa_default_id` (casa preseleccionada en el alta de gastos; el PUT valida que exista y acepta `null` para limpiarla) |
-| `GET /api/gastos/descripciones` | Nombres de `Concepto` (para autocompletar descripciones). |
-| `GET /api/items/descripciones` | Alias — devuelve lo mismo que `/api/gastos/descripciones`. `?parent=...` se acepta pero se ignora. |
+| `GET /api/gastos/descripciones` | Nombres de `Concepto` (para autocompletar descripciones). `force-dynamic`. Hoy **ningún componente la consume** (`GastoForm` usa `/api/conceptos`). |
+| `GET /api/items/descripciones` | Alias — devuelve lo mismo que `/api/gastos/descripciones`. `?parent=...` se acepta pero se ignora. `force-dynamic`. La consume `GastoItemDialog`. |
 | `GET/POST /api/conceptos` | Lista de conceptos con conteo de uso / crear (find-or-create por nombre). |
 | `PATCH/DELETE /api/conceptos/[id]` | Renombrar (409 si colisiona con otro) / borrar (409 si está en uso). |
 | `POST /api/conceptos/merge` | Fusiona `{ source_id, target_id }`: reasigna gastos+items al destino y borra el origen. |
