@@ -117,9 +117,12 @@ Hay dos capas de tests:
 | `presupuestos/route.ts` y `presupuestos/copiar/route.ts` | `where` por período, exclusión de `esTarjeta`, ejecución cruzada en el response, upsert sobre el unique, y copia del mes anterior sin pisar lo cargado. | `presupuestos/route.test.ts`, `presupuestos/copiar/route.test.ts` |
 | `push/subscribe/route.ts` | Upsert por `endpoint` con el email de la sesión normalizado, 401 sin sesión, 400 con body incompleto o campos no-string, DELETE filtrado por `endpoint` + `email`, GET con el conteo. `next-auth` mockeado. | `push/subscribe/route.test.ts` |
 
+**3. Guard estructural del prerender** — `src/app/api/prerender-guard.test.ts` recorre las 53 routes y exige `export const dynamic` en las que exportan **sólo `GET`** con un `GET` que **no recibe `req`**: Next las prerenderiza en el build, así que devuelven el snapshot del deploy y rompen cualquier build sin `DATABASE_URL` (el de preview en Vercel). No mockea nada — lee los archivos. Ver `docs/claude/api-surface.md` → Prerender.
+
 **Al agregar o cambiar comportamiento, agregá tests** (regla obligatoria, igual que la doc):
 - Lógica de cálculo en un route handler → extraela a una función pura en `src/lib/` (sin imports de Prisma/Next) y testeala.
 - Route nueva o cambio de mapping/filtros → test con `vi.mock('@/lib/db')` siguiendo los existentes.
+- Route de sólo `GET` sin `req` que toca Prisma → `export const dynamic = 'force-dynamic'` (el guard de arriba lo exige).
 - Criterio: si la lógica puede romperse silenciosamente en un cambio futuro, debe tener test.
 
 **Pre-commit:** el hook `.githooks/pre-commit` corre `npm run test:run` y aborta el commit si algún test falla. Se activa solo tras `npm install` (script `prepare` → `git config core.hooksPath .githooks`). Para activarlo manualmente: `git config core.hooksPath .githooks`. Para saltearlo en un commit puntual (no recomendado): `git commit --no-verify`.
