@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { parseDescripcionMovimiento, toMovimientoResponse } from '@/lib/inversiones-compute'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string; movId: string } }) {
   const body = await req.json()
@@ -9,16 +10,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
       fecha: body.fecha,
       montoActual: Number(body.monto_actual),
       movimiento: Number(body.movimiento ?? 0),
+      descripcion: parseDescripcionMovimiento(body.descripcion),
     },
   })
-  return NextResponse.json({
-    id: mov.id,
-    inversion_id: mov.inversionId,
-    fecha: mov.fecha,
-    monto_actual: mov.montoActual,
-    movimiento: mov.movimiento,
-    created_at: mov.createdAt.toISOString(),
-  })
+  return NextResponse.json(toMovimientoResponse(mov))
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string; movId: string } }) {

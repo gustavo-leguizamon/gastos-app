@@ -49,6 +49,7 @@ export default function InversionesPage() {
   const [fecha, setFecha] = useState(todayLocal())
   const [montoActual, setMontoActual] = useState('')
   const [movimientoMonto, setMovimientoMonto] = useState('')
+  const [descripcion, setDescripcion] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [toDelete, setToDelete] = useState<Movimiento | null>(null)
   const [saving, setSaving] = useState(false)
@@ -88,6 +89,7 @@ export default function InversionesPage() {
     setFecha(todayLocal())
     setMontoActual('')
     setMovimientoMonto('')
+    setDescripcion('')
     setEditingId(null)
   }
 
@@ -125,6 +127,8 @@ export default function InversionesPage() {
       fecha,
       monto_actual: montoActualResolved,
       movimiento: movimientoMonto === '' ? 0 : Number(movimientoMonto),
+      // El trim y el "vacío → null" los hace la route (`parseDescripcionMovimiento`).
+      descripcion,
     }
     setSaving(true)
     try {
@@ -152,6 +156,7 @@ export default function InversionesPage() {
     setFecha(mov.fecha)
     setMontoActual(String(mov.monto_actual))
     setMovimientoMonto(String(mov.movimiento))
+    setDescripcion(mov.descripcion ?? '')
   }
 
   const onDeleteMov = async () => {
@@ -246,6 +251,7 @@ export default function InversionesPage() {
       fecha: mov.fecha,
       monto_actual: mov.monto_actual,
       movimiento: mov.movimiento,
+      descripcion: mov.descripcion ?? '',
       monto_actualizado: mov.monto_actualizado,
       cambio: mov.cambio,
       ganancia: mov.ganancia,
@@ -274,6 +280,20 @@ export default function InversionesPage() {
     },
     { field: 'monto_actual', headerName: 'Monto actual', width: 160, type: 'number', valueFormatter: (value: number) => fmtARS(value) },
     { field: 'movimiento', headerName: 'Movimiento', width: 160, type: 'number', valueFormatter: (value: number) => fmtARS(value) },
+    {
+      field: 'descripcion',
+      headerName: 'Descripción',
+      width: 220,
+      renderCell: (params) => {
+        const v = params.value as string
+        if (!v) return <Typography variant="body2" color="text.disabled">—</Typography>
+        return (
+          <Tooltip title={v}>
+            <Typography variant="body2" noWrap>{v}</Typography>
+          </Tooltip>
+        )
+      },
+    },
     {
       field: 'monto_actualizado',
       headerName: 'Monto actualizado',
@@ -389,6 +409,14 @@ export default function InversionesPage() {
                 <AppDateField label="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
                 <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <TextField label="Movimiento" type="number" value={movimientoMonto} onChange={(e) => setMovimientoMonto(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
+                <TextField
+                  label="Descripción"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  size="small"
+                  placeholder="Por qué se cargó (opcional)"
+                  sx={{ minWidth: { xs: 'auto', sm: 240 }, flexGrow: { sm: 1 } }}
+                />
                 <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={saving}>
                   {editingId ? 'Guardar' : 'Agregar'}
                 </Button>
@@ -417,9 +445,12 @@ export default function InversionesPage() {
                     <Card key={row.id} variant="outlined">
                       <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 1 }}>
-                          <Box>
+                          <Box sx={{ minWidth: 0 }}>
                             <Typography variant="body2" fontWeight={600}>{row.fecha}</Typography>
                             <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>{dayName}</Typography>
+                            {row.descripcion && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{row.descripcion}</Typography>
+                            )}
                           </Box>
                           <Box sx={{ display: 'flex' }}>
                             <IconButton size="small" onClick={() => onEdit(row._raw)}>

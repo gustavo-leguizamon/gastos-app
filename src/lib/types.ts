@@ -273,6 +273,8 @@ export interface Movimiento {
   fecha: string
   monto_actual: number
   movimiento: number
+  /** Motivo del movimiento, texto libre. `null` = no se aclaró. */
+  descripcion: string | null
   created_at: string
 }
 

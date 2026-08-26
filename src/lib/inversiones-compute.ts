@@ -106,6 +106,31 @@ export function parseMonedaId(valor: any): number | null {
 }
 
 /**
+ * Normaliza la descripción de un movimiento (el "por qué se cargó"). Trimea y devuelve
+ * `null` para cualquier cosa que no sea texto con contenido — incluido el string vacío que
+ * manda el input cuando el usuario no escribió nada. `null` es "no lo aclaró", que es
+ * distinto de haber guardado `""`.
+ */
+export function parseDescripcionMovimiento(valor: any): string | null {
+  if (typeof valor !== 'string') return null
+  const t = valor.trim()
+  return t === '' ? null : t
+}
+
+/** Mapping camelCase→snake_case de un `Movimiento` de Prisma. Compartido por las dos routes. */
+export function toMovimientoResponse(row: any) {
+  return {
+    id: row.id,
+    inversion_id: row.inversionId,
+    fecha: row.fecha,
+    monto_actual: row.montoActual,
+    movimiento: row.movimiento,
+    descripcion: row.descripcion ?? null,
+    created_at: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+  }
+}
+
+/**
  * Mapping camelCase→snake_case de una `Inversion` de Prisma (con `moneda` incluida).
  * Vive en `lib` y no en el `route.ts` porque Next rechaza en build cualquier export de un
  * `route.ts` que no sea un método HTTP, y las dos routes necesitan el mismo mapper.
