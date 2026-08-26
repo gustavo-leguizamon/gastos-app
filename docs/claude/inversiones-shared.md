@@ -6,9 +6,11 @@ Sección standalone (`/inversiones`, desde `TopBar`) para tracking de balance sn
 
 **Two-level model:**
 - `Inversion` (parent): `id`, `nombre`, `createdAt`. ABM inline en la página.
-- `Movimiento` (child): `id`, `inversionId`, `fecha`, `montoActual`, `movimiento`, `createdAt`. `onDelete: Cascade`.
+- `Movimiento` (child): `id`, `inversionId`, `fecha`, `montoActual`, `movimiento`, `descripcion`, `createdAt`. `onDelete: Cascade`.
 
-Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
+Responses snake_case (`monto_actual`, `movimiento`, `descripcion`, `inversion_id`).
+
+**Descripción del movimiento:** texto libre opcional con el motivo de la carga ("aporte mensual", "retiro para el auto", "rescate parcial") — un depósito o retiro se veía sólo como un número, sin nada que dijera por qué. **Nullable y sin backfill** (migración `20260826100000_movimiento_descripcion`): los movimientos ya cargados no tienen motivo y no hay ninguno que inventarles. Las dos routes normalizan el body con `parseDescripcionMovimiento` — trimea y manda `null` para vacío/espacios/no-string, así vaciar el campo en la edición **borra** la descripción en vez de guardar `""` (`null` = "no lo aclaró", que es distinto de un texto vacío). No participa de ningún cálculo.
 
 **Moneda:** `Inversion.monedaId` es **nullable y sin backfill** — `null` significa "sin moneda declarada" y se muestra como pesos, que es lo que se venía asumiendo; poner ARS a la fuerza en las existentes afirmaría algo que nadie declaró. **No hay `tipoCambio`** como en `Gasto`/`Ingreso` a propósito: una inversión en dólares se sigue en dólares. Convertir a ARS con la cotización de hoy mezclaría la variación del tipo de cambio con el rendimiento real. Se elige en el diálogo de alta/edición (migración `20260820100000_inversion_moneda`).
 
@@ -20,7 +22,7 @@ Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
 - `rendimiento_pct` — `ganancia` sobre el saldo previo. `null` si el previo era 0.
 - `resumenInversion(movimientos)` → `{ saldo_actual, aportado, ganancia_total, rendimiento_pct, cantidad }`. El rendimiento total se mide sobre el **capital expuesto** (primer saldo + aportes posteriores), **no** sobre el saldo final: ese saldo ya incluye la ganancia y subestimaría el rendimiento de una inversión que creció.
 - `serieEvolucion(movimientos)` → puntos `{ fecha, saldo }` para el gráfico.
-- `parseMonedaId` / `toInversionResponse` — validación y mapping de las routes (viven acá porque Next no deja exportar helpers desde un `route.ts`).
+- `parseMonedaId` / `toInversionResponse` / `parseDescripcionMovimiento` / `toMovimientoResponse` — validación y mapping de las routes (viven acá porque Next no deja exportar helpers desde un `route.ts`).
 
 `computeMovimientos` **espera orden cronológico ascendente** (fecha asc, id asc): cada fila se compara con la anterior. La página ordena antes de llamarla.
 
@@ -29,9 +31,9 @@ Responses snake_case (`monto_actual`, `movimiento`, `inversion_id`).
 
 **UI** (`src/app/inversiones/page.tsx`):
 - Tabs arriba, una por inversion. A la derecha: edit/delete icons sobre el tab activo; **+** abre dialog de create.
-- Form debajo de tabs (Fecha / Monto actual / Movimiento) hace create/edit (Editar carga valores; "Cancelar" sale del modo edit). El campo "Movimiento" (antes "Monto extra") representa depósito (positivo) o retiro (negativo) aplicado sobre `monto_actual`.
+- Form debajo de tabs (Fecha / Monto actual / Movimiento / **Descripción**) hace create/edit (Editar carga valores; "Cancelar" sale del modo edit). El campo "Movimiento" (antes "Monto extra") representa depósito (positivo) o retiro (negativo) aplicado sobre `monto_actual`.
 - **Fallback de Monto actual:** si el usuario deja "Monto actual" vacío pero llena "Movimiento", el form resuelve `monto_actual` al del movimiento más reciente (sort fecha desc, id desc; excluyendo la fila en edición). Caso de uso: registrar un depósito/retiro sin re-chequear el balance. Si no hay movimientos previos o ambos campos están vacíos, error.
-- DataGrid debajo. **Default sort: `fecha` desc, luego `id` desc.** Como el DataGrid free solo soporta single-column sort, el tiebreaker `id` se implementa pre-reverseando el array (después de computar `cambio` en asc) para que stable sort por `fecha desc` mantenga ties en `id desc`. El cómputo de `cambio` corre siempre en asc internamente (en el memo `rows`), independiente del sort visual.
+- DataGrid debajo, con columna **Descripción** (`—` cuando está vacía, `Tooltip` + `noWrap` para los textos largos; en mobile va bajo la fecha en la card, y sólo si existe). **Default sort: `fecha` desc, luego `id` desc.** Como el DataGrid free solo soporta single-column sort, el tiebreaker `id` se implementa pre-reverseando el array (después de computar `cambio` en asc) para que stable sort por `fecha desc` mantenga ties en `id desc`. El cómputo de `cambio` corre siempre en asc internamente (en el memo `rows`), independiente del sort visual.
 - Sin inversiones, empty-state card con prompt al **+**.
 
 **Migración:** `prisma/migrate-inversiones.sql` (archival).

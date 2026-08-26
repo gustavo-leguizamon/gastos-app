@@ -247,6 +247,10 @@ model Movimiento {
   fecha       String
   montoActual Float
   movimiento  Float    @default(0)
+  /// Texto libre opcional: por qué se cargó el movimiento ("aporte mensual", "retiro para
+  /// el auto", "rescate parcial"). Nullable y sin default — los movimientos ya cargados no
+  /// tienen motivo y no hay ninguno que inventarles; `null` es "no lo aclaró", no "vacío".
+  descripcion String?
   createdAt   DateTime @default(now())
 
   inversion Inversion @relation(fields: [inversionId], references: [id], onDelete: Cascade)

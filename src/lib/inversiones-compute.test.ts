@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { computeMovimientos, resumenInversion, serieEvolucion, parseMonedaId, toInversionResponse } from './inversiones-compute'
+import {
+  computeMovimientos,
+  resumenInversion,
+  serieEvolucion,
+  parseMonedaId,
+  toInversionResponse,
+  parseDescripcionMovimiento,
+  toMovimientoResponse,
+} from './inversiones-compute'
 import type { Movimiento } from './types'
 
 function mov(over: Partial<Movimiento> = {}): Movimiento {
@@ -9,6 +17,7 @@ function mov(over: Partial<Movimiento> = {}): Movimiento {
     fecha: '2026-01-01',
     monto_actual: 1000,
     movimiento: 0,
+    descripcion: null,
     created_at: '',
     ...over,
   }
@@ -211,5 +220,48 @@ describe('toInversionResponse', () => {
     const r = toInversionResponse({ id: 1, nombre: 'X', monedaId: null, moneda: null, createdAt: new Date() })
     expect(r.moneda_id).toBeNull()
     expect(r.moneda_codigo).toBeNull()
+  })
+})
+
+describe('parseDescripcionMovimiento', () => {
+  it('trimea el texto', () => {
+    expect(parseDescripcionMovimiento('  aporte mensual  ')).toBe('aporte mensual')
+  })
+
+  it('el string vacío (o de sólo espacios) es "no lo aclaró", no ""', () => {
+    expect(parseDescripcionMovimiento('')).toBeNull()
+    expect(parseDescripcionMovimiento('   ')).toBeNull()
+  })
+
+  it('lo que no es texto es null', () => {
+    for (const v of [null, undefined, 0, 123, {}, []]) {
+      expect(parseDescripcionMovimiento(v)).toBeNull()
+    }
+  })
+})
+
+describe('toMovimientoResponse', () => {
+  it('mapea a snake_case con la descripción', () => {
+    const fecha = new Date('2026-08-26T10:00:00Z')
+    expect(toMovimientoResponse({
+      id: 7, inversionId: 3, fecha: '2026-08-26', montoActual: 1500,
+      movimiento: 500, descripcion: 'aporte mensual', createdAt: fecha,
+    })).toEqual({
+      id: 7,
+      inversion_id: 3,
+      fecha: '2026-08-26',
+      monto_actual: 1500,
+      movimiento: 500,
+      descripcion: 'aporte mensual',
+      created_at: fecha.toISOString(),
+    })
+  })
+
+  it('un movimiento viejo sin descripción sale en null', () => {
+    const r = toMovimientoResponse({
+      id: 1, inversionId: 1, fecha: '2026-01-01', montoActual: 1000,
+      movimiento: 0, descripcion: null, createdAt: new Date(),
+    })
+    expect(r.descripcion).toBeNull()
   })
 })
