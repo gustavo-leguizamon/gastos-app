@@ -52,6 +52,14 @@ npx prisma db seed            # Seed initial data (currencies, default house)
 
 **Important:** After any `prisma/schema.prisma` change, the dev server must be stopped before running `npx prisma generate` — the running server holds a lock on the Windows DLL.
 
+## Flujo de ramas (regla obligatoria)
+
+Tres ramas de larga vida: **`dev`** (integración) → **`qas`** (testing) → **`main`** (producción). Todo el trabajo nuevo va en ramas cortas (`feature/*`, `fix/*`, `chore/*`) que **parten de `dev`** y vuelven a `dev` vía PR; después se promueve `dev → qas` y se releasea `qas → main`, siempre por PR. Nunca se commitea ni pushea directo a las tres ramas de larga vida.
+
+- Reglas completas, nombres de rama, formato de commit y flujo de hotfix: **skill `git`** (`.claude/skills/git/SKILL.md`). Tiene precedencia sobre cualquier skill de git de la organización.
+- **Deploys:** `vercel.json` → `git.deploymentEnabled` deja desplegar solo `qas` (preview) y `main` (producción); el resto de las ramas no consume builds. El cron de vencimientos corre únicamente en producción.
+- **CI:** `.github/workflows/ci.yml` corre `npm run test:run` + `npm run build` en cada PR y push a `dev`, `qas` y `main`. El build usa un `DATABASE_URL` dummy — si falla ahí, algo se está prerenderizando contra la DB (ver el guard de prerender en Testing).
+
 ## Testing (regla obligatoria)
 
 El proyecto usa **Vitest** (`vitest@0.34`, pin obligado por Node 16 — versiones 1.x+ requieren Node 18/20+). Config en `vitest.config.ts` (alias `@` → `src` definido a mano, sin `vite-tsconfig-paths` porque rompe con el require ESM bajo Node 16). Los tests viven junto al código en `src/**/*.test.ts`.
