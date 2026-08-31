@@ -13,7 +13,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { useState } from 'react'
 import { useGastosStore } from '@/store/gastosStore'
 import ResumenCards from '@/components/gastos/ResumenCards'
-import TarjetasCerradas from '@/components/gastos/TarjetasCerradas'
+import ProximosCierres from '@/components/gastos/ProximosCierres'
 import FiltrosGastos from '@/components/gastos/FiltrosGastos'
 import GastosTable from '@/components/gastos/GastosTable'
 import GastoDialog from '@/components/gastos/GastoDialog'
@@ -64,7 +64,7 @@ export default function GastosPage() {
       </Box>
 
       <ResumenCards filtros={filtros} refreshKey={refreshKey} />
-      <TarjetasCerradas filtros={filtros} refreshKey={refreshKey} />
+      <ProximosCierres filtros={filtros} refreshKey={refreshKey} />
       <FiltrosGastos filtros={filtros} setFiltros={setFiltros} estadoPago={estadoPago} setEstadoPago={setEstadoPago} busqueda={busqueda} setBusqueda={setBusqueda} fecha={fecha} setFecha={setFecha} categoriaIds={categoriaIds} setCategoriaIds={setCategoriaIds} etiquetaIds={etiquetaIds} setEtiquetaIds={setEtiquetaIds} tarjetaIds={tarjetaIds} setTarjetaIds={setTarjetaIds} />
       <GastosTable
         filtros={filtros}

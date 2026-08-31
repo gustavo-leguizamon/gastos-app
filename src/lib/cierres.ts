@@ -4,7 +4,7 @@
 // de cargarlo no es cosmético — sin cierre del mes, `POST /api/gastos/[id]/pagos` responde
 // 400 y la propagación del pago a la tarjeta se rompe.
 
-import { shiftMonth } from './fechas'
+import { diasEntre, shiftMonth } from './fechas'
 import { ultimoDiaDelMes } from './mover-periodo'
 
 /** Forma mínima de un cierre para poder proyectar el siguiente. */
@@ -69,4 +69,47 @@ export function ultimoCierre<T extends { mes: number; anio: number }>(cierres: T
   return cierres.reduce((max, c) =>
     c.anio > max.anio || (c.anio === max.anio && c.mes > max.mes) ? c : max,
   )
+}
+
+/**
+ * Estado del ciclo de una tarjeta respecto de `today`:
+ * - `cerrado`: el próximo cierre ya pasó — el resumen del período está cerrado.
+ * - `abierto`: todavía no cerró (el día del cierre cuenta como abierto, igual que el
+ *   filtro `fechaProximoCierre < today` que tenía la sección antes de mostrar las abiertas).
+ * - `sin_fecha`: no hay `fechaProximoCierre` cargada, así que no se puede decir nada.
+ */
+export type EstadoCiclo = 'cerrado' | 'abierto' | 'sin_fecha'
+
+export interface CicloTarjeta {
+  estado: EstadoCiclo
+  /** Días completos de hoy al próximo cierre. `0` = cierra hoy, negativo = ya cerró. */
+  dias: number | null
+  /** Fracción `0..1` del ciclo `fechaCierre → fechaProximoCierre` ya transcurrida. */
+  progreso: number | null
+}
+
+/**
+ * Cuánto le falta a una tarjeta para cerrar, para poder mostrar juntas las que ya cerraron
+ * y las que no. El ciclo que se mide es `fechaCierre → fechaProximoCierre`: el que va
+ * acumulando los consumos del resumen que viene.
+ *
+ * `progreso` queda en `null` cuando el cierre está incompleto o las fechas no forman un
+ * intervalo válido (`fechaProximoCierre <= fechaCierre`) — un cierre a medio cargar no
+ * habilita a inventar una barra, pero `dias` sigue siendo utilizable si hay próximo cierre.
+ */
+export function estadoCiclo(
+  cierre: { fechaCierre: string | null; fechaProximoCierre: string | null } | null | undefined,
+  today: string,
+): CicloTarjeta {
+  const dias = cierre?.fechaProximoCierre ? diasEntre(today, cierre.fechaProximoCierre) : null
+  if (dias === null) return { estado: 'sin_fecha', dias: null, progreso: null }
+
+  const total = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, cierre.fechaProximoCierre!) : null
+  const transcurrido = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, today) : null
+  const progreso =
+    total !== null && total > 0 && transcurrido !== null
+      ? Math.min(1, Math.max(0, transcurrido / total))
+      : null
+
+  return { estado: dias < 0 ? 'cerrado' : 'abierto', dias, progreso }
 }
