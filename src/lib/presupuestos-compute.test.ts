@@ -43,7 +43,13 @@ describe('parsePresupuestoBody', () => {
 describe('toPresupuestoResponse', () => {
   it('mapea a snake_case con el nombre de la categoría', () => {
     expect(toPresupuestoResponse({ id: 3, categoriaId: 1, mes: 6, anio: 2026, monto: 5000, categoria: { nombre: 'Comida' } }))
-      .toEqual({ id: 3, categoria_id: 1, categoria_nombre: 'Comida', mes: 6, anio: 2026, monto: 5000 })
+      .toEqual({ id: 3, categoria_id: 1, categoria_nombre: 'Comida', mes: 6, anio: 2026, monto: 5000, fijado: false })
+  })
+
+  it('expone fijado, que es lo que el reparto automático no toca', () => {
+    expect(toPresupuestoResponse({ id: 3, categoriaId: 1, mes: 6, anio: 2026, monto: 5000, fijado: true }).fijado).toBe(true)
+    // Las filas anteriores a la columna no traen el campo: no puede quedar `undefined`.
+    expect(toPresupuestoResponse({ id: 3, categoriaId: 1, mes: 6, anio: 2026, monto: 5000 }).fijado).toBe(false)
   })
 
   it('sin categoría incluida deja el nombre en null', () => {

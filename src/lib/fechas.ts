@@ -36,6 +36,22 @@ export function shiftMonth(mes: number, anio: number, n: number): { mes: number;
 }
 
 /**
+ * Los `n` meses **anteriores** a (mes, anio), del más viejo al más reciente y **sin incluir**
+ * el mes de referencia.
+ *
+ * Es la ventana de histórico que se promedia para proyectar un mes: el mes de referencia
+ * queda afuera a propósito, porque al presupuestar un mes que todavía no arrancó sus propios
+ * gastos no dicen nada. `n <= 0` devuelve la ventana vacía.
+ *
+ * Ej: mesesPrevios(2, 2026, 3) → [{11,2025}, {12,2025}, {1,2026}]
+ */
+export function mesesPrevios(mes: number, anio: number, n: number): { mes: number; anio: number }[] {
+  const out: { mes: number; anio: number }[] = []
+  for (let i = n; i >= 1; i--) out.push(shiftMonth(mes, anio, -i))
+  return out
+}
+
+/**
  * Días completos entre dos fechas `YYYY-MM-DD` (`hasta - desde`). Negativo si
  * `hasta` es anterior a `desde`, `0` si son el mismo día.
  *
