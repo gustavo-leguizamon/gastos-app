@@ -128,8 +128,9 @@ export function enumerateMonths(
   return out
 }
 
-// Total ARS del gasto (ver nota de cabecera).
-function gastoTotalArs(g: any): number {
+// Total ARS del gasto (ver nota de cabecera). Exportada porque `presupuestos-base` la
+// necesita para medir el débito real del mes contra lo que quedó atribuido a categorías.
+export function gastoTotalArs(g: any): number {
   if (!g.confirmado && g.items?.length) {
     return g.items.filter((i: any) => i.incluyeEnTotal).reduce((s: number, i: any) => s + i.monto, 0)
   }

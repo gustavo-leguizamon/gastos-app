@@ -1,0 +1,45 @@
+name: CI
+
+# Corre en cada PR hacia las ramas del flujo (dev -> qas -> main) y también al
+# pushear directo a ellas. El hook de .githooks/pre-commit solo corre en la
+# máquina de quien commitea; esto valida lo mismo del lado del servidor, antes
+# de mergear.
+on:
+  pull_request:
+    branches: [dev, qas, main]
+  push:
+    branches: [dev, qas, main]
+
+jobs:
+  test:
+    name: Tests y build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # El postinstall corre `prisma generate`, que solo necesita el schema
+      # (no conecta a la DB).
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests
+        run: npm run test:run
+
+      # DATABASE_URL dummy: el build no debe consultar la DB (todas las routes
+      # de solo GET declaran `dynamic = 'force-dynamic'`, ver el guard en
+      # src/app/api/prerender-guard.test.ts). Prisma igual exige que la variable
+      # exista para inicializar el client, así que le pasamos una sin credenciales
+      # reales. Si el build empieza a fallar acá, es que algo se está
+      # prerenderizando y pegándole a la base.
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          NEXTAUTH_SECRET: ci-build-secret
+          NEXTAUTH_URL: http://localhost:3002

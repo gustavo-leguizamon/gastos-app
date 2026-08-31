@@ -10,24 +10,48 @@ import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
+import Alert from '@mui/material/Alert'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import CircularProgress from '@mui/material/CircularProgress'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import DeleteIcon from '@mui/icons-material/Delete'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import CheckIcon from '@mui/icons-material/Check'
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
+import LockIcon from '@mui/icons-material/Lock'
 import toast from 'react-hot-toast'
 import AppTextField from '@/components/shared/AppTextField'
 import AppSelect from '@/components/shared/AppSelect'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import GenerarPresupuestosDialog from '@/components/presupuestos/GenerarPresupuestosDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import { shiftMonth } from '@/lib/fechas'
+import type { BasePresupuesto } from '@/lib/presupuestos-base'
 import type { Categoria, EjecucionPresupuesto, PresupuestosResponse } from '@/lib/types'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
+
+// Copy de las dos bases. Vive acá y no en `presupuestos-base` porque es texto de pantalla:
+// el módulo es puro y lo importa el server, no tiene por qué cargar con la redacción.
+const BASE_LABEL: Record<BasePresupuesto, string> = {
+  devengado: 'Devengado',
+  caja: 'Caja',
+}
+
+const BASE_AYUDA: Record<BasePresupuesto, string> = {
+  devengado: 'Lo consumido este mes: débito más cada consumo de crédito. Excluye los resúmenes de tarjeta, cuyos consumos ya cuentan uno por uno.',
+  caja: 'La plata que salió de la cuenta: débito y el resumen de tarjeta pagado, desglosado en las categorías de sus consumos.',
+}
+
+const OTRA_BASE: Record<BasePresupuesto, BasePresupuesto> = {
+  devengado: 'caja',
+  caja: 'devengado',
+}
 
 function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -51,6 +75,8 @@ export default function PresupuestosPage() {
   const [nuevoMonto, setNuevoMonto] = useState('')
   const [aBorrar, setABorrar] = useState<EjecucionPresupuesto | null>(null)
   const [copiando, setCopiando] = useState(false)
+  const [base, setBase] = useState<BasePresupuesto>('devengado')
+  const [generarAbierto, setGenerarAbierto] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -135,7 +161,23 @@ export default function PresupuestosPage() {
     return categorias.filter(c => !conTope.has(c.id))
   }, [categorias, data])
 
-  const totales = data?.totales
+  // Los topes son los mismos en las dos bases; lo que cambia es contra qué se comparan.
+  const ejecucion = (base === 'caja' ? data?.ejecucion_caja : data?.ejecucion) ?? []
+  const totales = base === 'caja' ? data?.totales_caja : data?.totales
+
+  // Prefill de las categorías fijas del wizard. Memoizado porque el dialog lo tiene como
+  // dependencia del efecto que resetea el form: un array nuevo por render lo dispararía solo.
+  const fijadasIniciales = useMemo(
+    () => (data?.presupuestos ?? []).filter(p => p.fijado).map(p => p.categoria_id),
+    [data],
+  )
+
+  // La otra base indexada por categoría: cada card muestra las dos cifras juntas, así la
+  // diferencia se ve sin tener que ir y volver con el selector.
+  const otraPorCategoria = useMemo(() => {
+    const filas = base === 'caja' ? data?.ejecucion : data?.ejecucion_caja
+    return new Map((filas ?? []).map(f => [f.categoria_id, f]))
+  }, [data, base])
 
   return (
     <Box sx={{ pb: { xs: 6, sm: 8 } }}>
@@ -143,7 +185,7 @@ export default function PresupuestosPage() {
         <Box sx={{ flex: 1 }}>
           <Typography variant="h5" fontWeight={700}>Presupuestos</Typography>
           <Typography variant="body2" color="text.secondary">
-            Topes por categoría — excluye los resúmenes de tarjeta, cuyos consumos ya cuentan como gastos individuales
+            Topes por categoría — {BASE_AYUDA[base]}
           </Typography>
         </Box>
         <IconButton size="small" onClick={() => navegar(-1)}><ChevronLeftIcon /></IconButton>
@@ -153,6 +195,63 @@ export default function PresupuestosPage() {
         <IconButton size="small" onClick={() => navegar(1)}><ChevronRightIcon /></IconButton>
       </Box>
 
+      {/* Las dos bases miden cosas distintas y las dos importan: devengado dice cuánto
+          consumiste, caja cuánta plata salió de la cuenta (la que mide el ahorro del mes). */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        <Typography variant="caption" color="text.secondary">Medir contra</Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={base}
+          onChange={(_, v) => v && setBase(v as BasePresupuesto)}
+        >
+          <ToggleButton value="devengado">{BASE_LABEL.devengado}</ToggleButton>
+          <ToggleButton value="caja">{BASE_LABEL.caja}</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Débito que ninguna categoría se llevó: los sub-ítems de algún resumen no cierran
+          contra su total. Se avisa en vez de repartirlo, que daría una comparación falsa. */}
+      {base === 'caja' && !!data?.no_atribuido_caja && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {fmtARS(Math.abs(data.no_atribuido_caja))} de débito {data.no_atribuido_caja > 0 ? 'no quedaron atribuidos a' : 'se atribuyeron de más entre'} las
+          categorías: los sub-ítems de algún resumen de tarjeta no coinciden con su total cargado.
+        </Alert>
+      )}
+
+      {/* Objetivo del período, si los topes salieron del generador. Como los topes son los
+          mismos en las dos bases, el ahorro proyectado no depende de cuál esté activa. */}
+      {data?.objetivo && totales && (
+        <Card variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block">Objetivo de ahorro</Typography>
+            <Typography variant="h6" fontWeight={700}>{fmtARS(data.objetivo.monto)}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block">Ingresos esperados</Typography>
+            <Typography fontWeight={600}>{fmtARS(data.objetivo.ingresos_esperados)}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block">Si se cumplen los topes</Typography>
+            <Typography
+              fontWeight={600}
+              sx={{
+                color: data.objetivo.ingresos_esperados - totales.presupuestado >= data.objetivo.monto
+                  ? COLOR.ok
+                  : COLOR.excedido,
+              }}
+            >
+              ahorrás {fmtARS(data.objetivo.ingresos_esperados - totales.presupuestado)}
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Generado sobre ${BASE_LABEL[data.objetivo.base].toLowerCase()} · ${data.objetivo.meses_historico} meses`}
+          />
+        </Card>
+      )}
+
       {totales && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
           <Card variant="outlined" sx={{ p: 2 }}>
@@ -160,7 +259,9 @@ export default function PresupuestosPage() {
             <Typography variant="h6" fontWeight={700}>{fmtARS(totales.presupuestado)}</Typography>
           </Card>
           <Card variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="caption" color="text.secondary" display="block">Gastado</Typography>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Gastado · {BASE_LABEL[base].toLowerCase()}
+            </Typography>
             <Typography variant="h6" fontWeight={700}>{fmtARS(totales.gastado)}</Typography>
             {totales.consumido_pct !== null && (
               <Typography variant="caption" color="text.secondary">
@@ -214,34 +315,56 @@ export default function PresupuestosPage() {
                 ? 'Todas las categorías ya tienen presupuesto este mes.'
                 : 'Los topes se cargan por mes: cambiar uno no toca los meses ya cerrados.'}
             </Typography>
-            {/* Los presupuestos se repiten mes a mes; sin esto habría que re-tipearlos todos. */}
-            <Button size="small" startIcon={<ContentCopyIcon />} onClick={handleCopiar} disabled={copiando}>
-              Copiar del mes anterior
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {/* Deriva todos los topes de un objetivo de ahorro en vez de cargarlos a ojo. */}
+              <Button size="small" startIcon={<AutoFixHighIcon />} onClick={() => setGenerarAbierto(true)}>
+                Generar automático
+              </Button>
+              {/* Los presupuestos se repiten mes a mes; sin esto habría que re-tipearlos todos. */}
+              <Button size="small" startIcon={<ContentCopyIcon />} onClick={handleCopiar} disabled={copiando}>
+                Copiar del mes anterior
+              </Button>
+            </Box>
           </Box>
         </CardContent>
       </Card>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
-      ) : !data || data.ejecucion.length === 0 ? (
+      ) : !data || ejecucion.length === 0 ? (
         <Card variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="text.secondary">
-            No hay presupuestos ni gastos con categoría en {MESES[filtros.mes - 1]} {filtros.anio}.
+            No hay presupuestos ni gastos con categoría en {MESES[filtros.mes - 1]} {filtros.anio}
+            {base === 'caja' ? ' que hayan salido de la cuenta' : ''}.
           </Typography>
         </Card>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {data.ejecucion.map(f => (
+          {ejecucion.map(f => (
             <FilaPresupuesto
               key={f.categoria_id}
               fila={f}
+              otra={otraPorCategoria.get(f.categoria_id) ?? null}
+              otraLabel={BASE_LABEL[OTRA_BASE[base]]}
+              fijado={fijadasIniciales.includes(f.categoria_id)}
               onGuardar={monto => guardar(f.categoria_id, monto)}
               onBorrar={() => setABorrar(f)}
             />
           ))}
         </Box>
       )}
+
+      <GenerarPresupuestosDialog
+        open={generarAbierto}
+        mes={filtros.mes}
+        anio={filtros.anio}
+        categorias={categorias}
+        ingresosSugeridos={data?.ingresos_sugeridos ?? 0}
+        objetivo={data?.objetivo ?? null}
+        fijadasIniciales={fijadasIniciales}
+        onClose={() => setGenerarAbierto(false)}
+        onAplicado={load}
+      />
 
       <ConfirmDialog
         open={!!aBorrar}
@@ -256,9 +379,14 @@ export default function PresupuestosPage() {
 }
 
 function FilaPresupuesto({
-  fila, onGuardar, onBorrar,
+  fila, otra, otraLabel, fijado, onGuardar, onBorrar,
 }: {
   fila: EjecucionPresupuesto
+  /** La misma categoría medida en la otra base. `null` si allá no tuvo movimiento. */
+  otra: EjecucionPresupuesto | null
+  otraLabel: string
+  /** El tope quedó fijado: el reparto automático no lo toca. */
+  fijado: boolean
   onGuardar: (monto: number) => Promise<boolean>
   onBorrar: () => void
 }) {
@@ -282,7 +410,13 @@ function FilaPresupuesto({
     <Card variant="outlined">
       <CardContent sx={{ pb: '16px !important' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-          <Typography fontWeight={600} sx={{ flex: 1, minWidth: 120 }}>{fila.categoria_nombre}</Typography>
+          <Typography fontWeight={600} sx={{ minWidth: 120 }}>{fila.categoria_nombre}</Typography>
+          {fijado && (
+            <Tooltip title="Fijado: el reparto automático no lo toca">
+              <LockIcon fontSize="small" color="disabled" />
+            </Tooltip>
+          )}
+          <Box sx={{ flex: 1 }} />
 
           {fila.monto === null ? (
             <Chip size="small" label="Sin presupuesto" variant="outlined" />
@@ -338,6 +472,12 @@ function FilaPresupuesto({
             </Typography>
           )}
         </Box>
+
+        {/* La otra base, al lado: es la comparación que la pantalla existe para mostrar. */}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+          {otraLabel}: <strong>{fmtARS(otra?.gastado ?? 0)}</strong>
+          {otra && otra.consumido_pct !== null && ` · ${otra.consumido_pct.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`}
+        </Typography>
       </CardContent>
     </Card>
   )

@@ -79,6 +79,10 @@ model Presupuesto {
   mes         Int
   anio        Int
   monto       Float
+  /// El tope no se toca al redistribuir un objetivo de ahorro. Cubre los dos casos que el
+  /// reparto trata igual: la categoría marcada como gasto fijo (no ajustable) y la que se
+  /// ajustó a mano después de generar. Se persiste para poder prefillear el mes siguiente.
+  fijado      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -86,6 +90,32 @@ model Presupuesto {
 
   @@unique([categoriaId, mes, anio])
   @@index([anio, mes])
+}
+
+/// Objetivo de ahorro del mes: el monto que se quiere que sobre, y del que se derivan los
+/// topes por categoría (ver `docs/claude/presupuestos.md`). Antes los presupuestos se
+/// cargaban uno por uno a ojo, sin nada que atara la suma a una meta.
+///
+/// Se persiste junto con los supuestos con los que se generó — los ingresos esperados (que
+/// al presupuestar un mes que todavía no arrancó casi nunca están cargados como `Ingreso`),
+/// la base de medición y la ventana de histórico — porque sin ellos no se puede recalcular
+/// más adelante ni explicar de dónde salió cada tope.
+///
+/// Uno por (mes, año): es la meta del período, no una por categoría.
+model ObjetivoAhorro {
+  id                Int      @id @default(autoincrement())
+  mes               Int
+  anio              Int
+  monto             Float
+  ingresosEsperados Float
+  /// 'devengado' | 'caja' — contra qué base se midió el objetivo (`presupuestos-base.ts`).
+  base              String   @default("devengado")
+  /// Meses hacia atrás promediados para proponer los topes.
+  mesesHistorico    Int      @default(3)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([mes, anio])
 }
 
 // Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito
