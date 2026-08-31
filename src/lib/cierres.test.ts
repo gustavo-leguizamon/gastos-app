@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addMeses, generarSiguienteCierre, ultimoCierre, type CierreBase } from './cierres'
+import { addMeses, estadoCiclo, generarSiguienteCierre, ultimoCierre, type CierreBase } from './cierres'
 
 function cierre(over: Partial<CierreBase> = {}): CierreBase {
   return {
@@ -103,5 +103,46 @@ describe('ultimoCierre', () => {
   it('lista vacía o nula devuelve null', () => {
     expect(ultimoCierre([])).toBeNull()
     expect(ultimoCierre(null as any)).toBeNull()
+  })
+})
+
+describe('estadoCiclo', () => {
+  const ciclo = { fechaCierre: '2026-08-10', fechaProximoCierre: '2026-09-09' } // 30 días
+
+  it('marca cerrado cuando el próximo cierre ya pasó', () => {
+    expect(estadoCiclo(ciclo, '2026-09-10')).toEqual({ estado: 'cerrado', dias: -1, progreso: 1 })
+  })
+
+  it('el día del cierre todavía cuenta como abierto', () => {
+    expect(estadoCiclo(ciclo, '2026-09-09')).toEqual({ estado: 'abierto', dias: 0, progreso: 1 })
+  })
+
+  it('cuenta los días que faltan y el progreso del ciclo', () => {
+    expect(estadoCiclo(ciclo, '2026-08-25')).toEqual({ estado: 'abierto', dias: 15, progreso: 0.5 })
+  })
+
+  it('sin fechaProximoCierre no hay nada que decir', () => {
+    expect(estadoCiclo({ fechaCierre: '2026-08-10', fechaProximoCierre: null }, '2026-08-25'))
+      .toEqual({ estado: 'sin_fecha', dias: null, progreso: null })
+    expect(estadoCiclo(null, '2026-08-25')).toEqual({ estado: 'sin_fecha', dias: null, progreso: null })
+  })
+
+  it('sin fechaCierre hay días pero no progreso (cierre incompleto)', () => {
+    expect(estadoCiclo({ fechaCierre: null, fechaProximoCierre: '2026-09-09' }, '2026-08-25'))
+      .toEqual({ estado: 'abierto', dias: 15, progreso: null })
+  })
+
+  it('un intervalo inválido no genera barra', () => {
+    expect(estadoCiclo({ fechaCierre: '2026-09-09', fechaProximoCierre: '2026-09-09' }, '2026-09-01').progreso).toBeNull()
+    expect(estadoCiclo({ fechaCierre: '2026-10-09', fechaProximoCierre: '2026-09-09' }, '2026-09-01').progreso).toBeNull()
+  })
+
+  it('recorta el progreso a [0, 1] si hoy cae fuera del ciclo', () => {
+    expect(estadoCiclo(ciclo, '2026-07-01').progreso).toBe(0)
+    expect(estadoCiclo(ciclo, '2026-12-01').progreso).toBe(1)
+  })
+
+  it('una fecha con formato inválido no rompe', () => {
+    expect(estadoCiclo({ fechaCierre: '2026-08-10', fechaProximoCierre: 'ayer' }, '2026-08-25').estado).toBe('sin_fecha')
   })
 })

@@ -37,7 +37,7 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre las 53 routes y fall
 | `POST /api/tarjetas/[id]/cierres/generar` | Crea el cierre del período **siguiente** al último cargado, proyectando sus fechas (`fechaProximoCierre` del último = `fechaCierre` del nuevo). 409 si no hay ningún cierre del que partir o si el siguiente ya existe; 404 tarjeta inexistente. Ver `docs/claude/tarjetas.md`. |
 | `GET/POST /api/tarjetas/[id]/cierres` | List / create cierres (mes, anio, fechaCierre, fechaVencimiento, fechaProximoCierre) — unique por `(tarjetaId, mes, anio)` |
 | `PUT/DELETE /api/tarjetas/[id]/cierres/[cierreId]` | Edit / remove a cierre |
-| `GET /api/tarjetas/cerradas` | Tarjetas cuyo `TarjetaCierre` del `(mes, anio)` consultado tiene `fechaProximoCierre` < today. Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, banco_logo, banco_icono, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre }[]`. |
+| `GET /api/tarjetas/proximos-cierres` | **Todas** las tarjetas con el estado de su ciclo en el `(mes, anio)` consultado, ordenadas por `fechaProximoCierre` asc (las que no lo tienen, al final). Params: `mes`, `anio`, `today` (YYYY-MM-DD). Returns `{ id, nombre, banco, marca, banco_logo, banco_icono, fecha_cierre, fecha_vencimiento, fecha_proximo_cierre, estado: 'cerrado' | 'abierto' | 'sin_fecha', dias_para_cierre, progreso }[]`. |
 | `GET /api/presupuestos` | Topes del período + su ejecución. Params `mes`, `anio`. Devuelve `{ mes, anio, presupuestos, ejecucion, totales }`. Ver `docs/claude/presupuestos.md`. |
 | `POST /api/presupuestos` | Fija el tope de una categoría (upsert por `categoria_id`+`mes`+`anio`). |
 | `DELETE /api/presupuestos/[id]` | Quita el tope (distinto de ponerlo en 0). |

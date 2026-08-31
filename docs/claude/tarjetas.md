@@ -51,12 +51,12 @@ Se muestra en:
 - **`GastosTable`, columna `_expand`** (filas de **resumen de tarjeta**, `es_tarjeta`): a la izquierda del `BrandLogo` de la marca (`size=18`), dentro del mismo `Tooltip` de cierre/vencimiento. La columna mide 112px para que entren warning + toggle + los dos logos.
 - **`GastosTable` vista mobile (card)**: junto al `BrandLogo` que acompaña la descripción.
 - **`/configuracion`** → fila de la tarjeta (`size=24`) y preview del uploader.
-- **`TarjetasCerradas`** (`size=24`), al lado del `BrandLogo`.
+- **`ProximosCierres`** (`size=24`), al lado del `BrandLogo`.
 
 **Cómo llega cada campo al cliente:**
 - `tarjeta_banco_logo` viaja en la response de cada gasto (`toGastoResponse` → `g.tarjeta?.bancoLogo ?? null`) — es un slug corto.
 - `banco_icono` **no** viaja en la response de gastos (un data URI por fila inflaría el payload del grid). `GastosTable` hace un `fetch('/api/tarjetas')` propio (efecto atado a `refreshKey`), arma un `Record<tarjetaId, dataUri>` y lo resuelve por `row.tarjeta_id`.
-- `/api/tarjetas` (GET/POST/PUT) y `/api/tarjetas/cerradas` exponen `banco_logo` y `banco_icono`, y los write paths aceptan ambos en el body (mapeados a `bancoLogo`/`bancoIcono`).
+- `/api/tarjetas` (GET/POST/PUT) y `/api/tarjetas/proximos-cierres` exponen `banco_logo` y `banco_icono`, y los write paths aceptan ambos en el body (mapeados a `bancoLogo`/`bancoIcono`).
 
 El campo `banco` sigue siendo **texto libre** — no se reemplazó por el select porque alimenta las descripciones derivadas (`"Nombre (Banco)"` de los resúmenes de tarjeta). `banco_logo` y `banco_icono` son ejes independientes y opcionales.
 
@@ -111,17 +111,31 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 
 **Sync del gasto fuente → sub-items propagados (concepto + categoría + etiquetas):** `PUT /api/gastos/[id]` (editar el gasto crédito que origina los pagos) busca los sub-items linkeados (`findMany where: { pago: { gastoId } }`) y actualiza **cada uno** con `conceptoId`, `categoriaId` y `etiquetas` (`set`) del gasto fuente, así el resumen de la tarjeta refleja la clasificación actual (concepto → descripción derivada; categoría/etiquetas para el reporte). Se hace por item porque `etiquetas` (M2M) no soporta `updateMany`. La **edición masiva** (`PATCH /api/gastos/categorias`) también propaga la categoría a los sub-items, vía `updateMany` (sólo `categoriaId`). `GastoDialog.onSaved = triggerRefresh` recarga la tabla; si el sub-item vive en otro mes se ve al navegar. En try/catch — no bloquea la edición.
 
-## Tarjetas cerradas (dashboard de gastos)
+## Próximos cierres (dashboard de gastos)
 
-`TarjetasCerradas` (`src/components/gastos/TarjetasCerradas.tsx`) — montado en `/gastos` debajo de `ResumenCards`. `GET /api/tarjetas/cerradas?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como chips/cards las tarjetas cuyo `TarjetaCierre` del mes filtrado tiene `fechaProximoCierre` **menor a hoy**. Cada chip:
-- `<BrandLogo marca={t.marca} width={44} height={32} />`.
+`ProximosCierres` (`src/components/gastos/ProximosCierres.tsx`) — montado en `/gastos` debajo de `ResumenCards`. `GET /api/tarjetas/proximos-cierres?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como cards **todas** las tarjetas, no sólo las que ya cerraron: la sección responde "¿en qué punto del ciclo está cada tarjeta este mes?", y para eso la que todavía no cerró tiene que estar a la vista.
+
+**Orden:** por `fecha_proximo_cierre` ascendente — primero las que ya cerraron (fecha pasada), después las que están por cerrar, y al final las que **no tienen el cierre cargado** del período (desempate por nombre para que no dependa del orden de la DB). Esas últimas se muestran igual, en vez de desaparecer: un cierre sin cargar no es un no-evento, es justo lo que después hace fallar la propagación del pago con 400.
+
+**Estado del ciclo** — lo calcula `estadoCiclo(cierre, today)` (`src/lib/cierres.ts`, puro y testeado) y lo devuelve la route en `estado` / `dias_para_cierre` / `progreso`:
+
+| `estado` | Cuándo | Cómo se ve la card |
+|---|---|---|
+| `cerrado` | `fechaProximoCierre` < `today` | Como siempre: borde y fondo tintados con `marcaColor(t.marca)`, logos a color. |
+| `abierto` | `fechaProximoCierre` >= `today` (el día del cierre todavía cuenta como abierto) | **Grisada** (borde `divider`, fondo `action.hover`, logos en `grayscale(1)` con `opacity: .65`) + pie con "faltan N días · NN%" y una `LinearProgress` de 4px. |
+| `sin_fecha` | No hay `fechaProximoCierre` cargada | Grisada, con "sin cierre cargado" y sin barra. |
+
+`progreso` es la fracción del ciclo `fechaCierre → fechaProximoCierre` ya transcurrida, recortada a `[0, 1]`. Queda en `null` (sin barra, sólo los días) si falta `fechaCierre` o el intervalo no es válido — un cierre a medio cargar no habilita a dibujar una barra inventada.
+
+Cada card:
+- `<BrandLogo marca={t.marca} width={44} height={32} />` + `BancoLogo` (`size=24`).
 - Banco (o nombre si no hay banco) como texto principal.
 - **Nombre de la tarjeta** como caption (se omite si el título ya es el nombre, es decir cuando la tarjeta no tiene banco).
-- Tooltip con las 3 fechas.
+- Tooltip con las 3 fechas + el estado del ciclo.
 
 **Estética unificada con `/configuracion`:** ambos usan `BrandLogo` con dimensiones idénticas (44x32) y el mismo wrapper (borde + `bgcolor` tintados con `marcaColor(t.marca)`). Helper `marcaColor` exportado desde `TarjetaLogo.tsx`.
 
-Si no hay matches, el componente no renderiza. Refresca con `refreshKey` del store.
+Si no hay ninguna tarjeta, el componente no renderiza. Refresca con `refreshKey` del store.
 
 
 ## Generar el cierre del próximo mes
