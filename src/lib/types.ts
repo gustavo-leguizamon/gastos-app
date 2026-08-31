@@ -379,6 +379,8 @@ export interface Presupuesto {
   mes: number
   anio: number
   monto: number
+  /** El reparto automático no lo toca: gasto fijo marcado, o ajustado a mano. */
+  fijado: boolean
 }
 
 export type EstadoPresupuesto = 'ok' | 'cerca' | 'excedido'
@@ -406,10 +408,40 @@ export interface TotalesPresupuesto {
   excedidas: number
 }
 
+/**
+ * Objetivo de ahorro del mes, con los supuestos con los que se generaron los topes: sin ellos
+ * no se puede recalcular después ni explicar de dónde salió cada uno.
+ */
+export interface ObjetivoAhorro {
+  id: number
+  mes: number
+  anio: number
+  monto: number
+  ingresos_esperados: number
+  base: 'devengado' | 'caja'
+  meses_historico: number
+}
+
+/**
+ * Los topes del período con su ejecución **en las dos bases** (ver `presupuestos-base.ts`).
+ * Los topes son los mismos; lo que cambia es contra qué se los compara: `ejecucion`/`totales`
+ * mide lo consumido (devengado) y `ejecucion_caja`/`totales_caja` la plata que salió de la
+ * cuenta (caja, la misma que mide el ahorro del mes).
+ */
 export interface PresupuestosResponse {
   mes: number
   anio: number
   presupuestos: Presupuesto[]
   ejecucion: EjecucionPresupuesto[]
   totales: TotalesPresupuesto
+  ejecucion_caja: EjecucionPresupuesto[]
+  totales_caja: TotalesPresupuesto
+  /** Débito del mes que no quedó atribuido a ninguna categoría. 0 es lo normal. */
+  no_atribuido_caja: number
+  /** `null` si los topes se cargaron a mano y no hay meta contra la cual medirlos. */
+  objetivo: ObjetivoAhorro | null
+  /** Ingresos ya cargados del mes. */
+  ingresos_mes: number
+  /** Prefill del wizard: `ingresos_mes` si hay, si no el promedio de los meses previos. */
+  ingresos_sugeridos: number
 }

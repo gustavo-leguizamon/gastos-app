@@ -44,6 +44,8 @@ export function toPresupuestoResponse(row: any) {
     mes: row.mes,
     anio: row.anio,
     monto: row.monto,
+    // El tope que el reparto automático no toca: gasto fijo marcado, o ajustado a mano.
+    fijado: !!row.fijado,
   }
 }
 

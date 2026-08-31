@@ -1,5 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { shiftMonth, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres, fechaEnTimeZone, diasEntre, TZ_ARGENTINA } from './fechas'
+import { shiftMonth, mesesPrevios, resolvePeriodoTarjeta, resolvePeriodoTarjetaByCierres, fechaEnTimeZone, diasEntre, TZ_ARGENTINA } from './fechas'
+
+describe('mesesPrevios', () => {
+  it('devuelve los meses anteriores, del más viejo al más reciente', () => {
+    expect(mesesPrevios(6, 2026, 3)).toEqual([
+      { mes: 3, anio: 2026 },
+      { mes: 4, anio: 2026 },
+      { mes: 5, anio: 2026 },
+    ])
+  })
+
+  it('no incluye el mes de referencia', () => {
+    expect(mesesPrevios(6, 2026, 3)).not.toContainEqual({ mes: 6, anio: 2026 })
+  })
+
+  it('cruza el cambio de año', () => {
+    expect(mesesPrevios(2, 2026, 3)).toEqual([
+      { mes: 11, anio: 2025 },
+      { mes: 12, anio: 2025 },
+      { mes: 1, anio: 2026 },
+    ])
+  })
+
+  it('sin meses pedidos la ventana es vacía', () => {
+    expect(mesesPrevios(6, 2026, 0)).toEqual([])
+    expect(mesesPrevios(6, 2026, -1)).toEqual([])
+  })
+})
 
 describe('fechaEnTimeZone', () => {
   it('formatea como YYYY-MM-DD', () => {
