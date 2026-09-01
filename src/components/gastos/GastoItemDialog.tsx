@@ -17,6 +17,8 @@ import CircularProgress from '@mui/material/CircularProgress'
 import AppToggle from '@/components/shared/AppToggle'
 import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import ToggleButton from '@mui/material/ToggleButton'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import Accordion from '@mui/material/Accordion'
 import AccordionSummary from '@mui/material/AccordionSummary'
@@ -34,6 +36,7 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
 import toast from 'react-hot-toast'
 import { sumItemsTotal } from '@/lib/subitems-total'
+import { matchSubitem, type FiltroVerificado } from '@/lib/gastos-filtro'
 import { etiquetasSugeridas, type SugerenciasEtiquetas } from '@/lib/etiquetas-sugeridas'
 import type { Gasto, GastoItem, Categoria, Etiqueta } from '@/lib/types'
 
@@ -83,6 +86,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
   const [filtroItems, setFiltroItems] = useState('')
+  // Filtro por la marca de verificado: revisar un resumen de tarjeta es ir tildando
+  // sub-items, y con muchos conviene poder mirar solo los que faltan.
+  const [filtroVerificado, setFiltroVerificado] = useState<FiltroVerificado>('todos')
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
@@ -236,14 +242,9 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     }
   }
 
+  const cantVerificados = items.filter(i => i.verificado).length
   const sortedItems = [...items]
-    .filter(i => {
-      if (!filtroItems.trim()) return true
-      const q = filtroItems.toLowerCase()
-      return i.descripcion.toLowerCase().includes(q)
-        || (i.categoria?.nombre.toLowerCase().includes(q) ?? false)
-        || (i.etiquetas ?? []).some(c => c.nombre.toLowerCase().includes(q))
-    })
+    .filter(i => matchSubitem(i, filtroItems, filtroVerificado))
     .sort((a, b) => {
       if (a.incluye_en_vencimiento !== b.incluye_en_vencimiento) {
         return a.incluye_en_vencimiento ? -1 : 1
@@ -406,7 +407,7 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
         {/* Columna derecha: lista de items */}
         <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
           {items.length > 0 && (
-            <Box sx={{ px: 1, pb: 1 }}>
+            <Box sx={{ px: 1, pb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <TextField
                 size="small"
                 fullWidth
@@ -414,11 +415,30 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
                 value={filtroItems}
                 onChange={e => setFiltroItems(e.target.value)}
               />
+              {/* Filtro por marca de verificado, con el conteo de cada estado para saber
+                  cuánto falta revisar sin tener que cambiar de filtro. */}
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                fullWidth
+                value={filtroVerificado}
+                onChange={(_, v) => { if (v) setFiltroVerificado(v) }}
+              >
+                <ToggleButton value="todos" sx={{ px: 1 }}>Todos ({items.length})</ToggleButton>
+                <ToggleButton value="verificados" sx={{ px: 1 }}>Verificados ({cantVerificados})</ToggleButton>
+                <ToggleButton value="pendientes" sx={{ px: 1 }}>Sin verificar ({items.length - cantVerificados})</ToggleButton>
+              </ToggleButtonGroup>
             </Box>
           )}
           {sortedItems.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              {items.length === 0 ? 'No hay sub-items cargados aún.' : 'No se encontraron sub-items para esa búsqueda.'}
+              {items.length === 0
+                ? 'No hay sub-items cargados aún.'
+                : filtroVerificado === 'verificados'
+                  ? 'No hay sub-items verificados' + (filtroItems.trim() ? ' para esa búsqueda.' : '.')
+                  : filtroVerificado === 'pendientes'
+                    ? 'No quedan sub-items sin verificar' + (filtroItems.trim() ? ' para esa búsqueda.' : '.')
+                    : 'No se encontraron sub-items para esa búsqueda.'}
             </Typography>
           ) : (
             sortedItems.map(item => (
