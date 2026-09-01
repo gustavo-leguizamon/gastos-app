@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchBusqueda, type GastoBuscable } from './gastos-filtro'
+import { matchBusqueda, matchSubitem, type GastoBuscable, type SubitemFiltrable } from './gastos-filtro'
 
 function gasto(over: Partial<GastoBuscable> = {}): GastoBuscable {
   return {
@@ -69,5 +69,52 @@ describe('matchBusqueda', () => {
     expect(matchBusqueda(gasto({ items: null, etiquetas: null }), 'x')).toBe(false)
     expect(matchBusqueda({ descripcion: 'Luz' }, 'luz')).toBe(true)
     expect(matchBusqueda({ descripcion: 'Luz' }, 'gas')).toBe(false)
+  })
+})
+
+describe('matchSubitem', () => {
+  function item(over: Partial<SubitemFiltrable> = {}): SubitemFiltrable {
+    return { descripcion: 'Netflix', verificado: false, categoria: null, etiquetas: [], ...over }
+  }
+
+  it("'todos' no filtra por la marca", () => {
+    expect(matchSubitem(item({ verificado: true }), '', 'todos')).toBe(true)
+    expect(matchSubitem(item({ verificado: false }), '', 'todos')).toBe(true)
+  })
+
+  it("'verificados' deja sólo los marcados", () => {
+    expect(matchSubitem(item({ verificado: true }), '', 'verificados')).toBe(true)
+    expect(matchSubitem(item({ verificado: false }), '', 'verificados')).toBe(false)
+  })
+
+  it("'pendientes' deja sólo los no marcados", () => {
+    expect(matchSubitem(item({ verificado: false }), '', 'pendientes')).toBe(true)
+    expect(matchSubitem(item({ verificado: true }), '', 'pendientes')).toBe(false)
+  })
+
+  it('sin marca (ausente o null) cuenta como pendiente', () => {
+    expect(matchSubitem({ descripcion: 'Netflix' }, '', 'pendientes')).toBe(true)
+    expect(matchSubitem({ descripcion: 'Netflix' }, '', 'verificados')).toBe(false)
+    expect(matchSubitem(item({ verificado: null }), '', 'pendientes')).toBe(true)
+  })
+
+  it('la marca y la búsqueda se combinan (AND)', () => {
+    const verificado = item({ descripcion: 'Netflix', verificado: true })
+    expect(matchSubitem(verificado, 'netflix', 'verificados')).toBe(true)
+    expect(matchSubitem(verificado, 'spotify', 'verificados')).toBe(false)
+    expect(matchSubitem(verificado, 'netflix', 'pendientes')).toBe(false)
+  })
+
+  it('busca en descripción, categoría y etiquetas del sub-ítem', () => {
+    const i = item({ descripcion: 'Consumo', categoria: { nombre: 'Streaming' }, etiquetas: [{ nombre: 'Viaje' }] })
+    expect(matchSubitem(i, 'consumo')).toBe(true)
+    expect(matchSubitem(i, 'streaming')).toBe(true)
+    expect(matchSubitem(i, 'viaje')).toBe(true)
+    expect(matchSubitem(i, 'disney')).toBe(false)
+  })
+
+  it('búsqueda vacía o en blanco no filtra, y las listas nulas no rompen', () => {
+    expect(matchSubitem(item(), '   ')).toBe(true)
+    expect(matchSubitem({ descripcion: 'Netflix', etiquetas: null, categoria: null }, 'zzz')).toBe(false)
   })
 })
