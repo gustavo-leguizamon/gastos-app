@@ -42,3 +42,41 @@ export function matchBusqueda(gasto: GastoBuscable, busqueda: string): boolean {
     it => contiene(it.descripcion) || contiene(it.categoria?.nombre) || enEtiquetas(it.etiquetas),
   )
 }
+
+// ─── Filtros del detalle de sub-ítems (dialog "Sub-items") ──────────────────
+
+/** Estados del filtro por marca de verificación de un sub-ítem. */
+export type FiltroVerificado = 'todos' | 'verificados' | 'pendientes'
+
+/** Forma mínima de un sub-ítem para filtrarlo (subconjunto de `GastoItem`). */
+export interface SubitemFiltrable {
+  descripcion: string
+  verificado?: boolean | null
+  categoria?: { nombre: string } | null
+  etiquetas?: { nombre: string }[] | null
+}
+
+/**
+ * Predicado del detalle de sub-ítems: búsqueda libre (descripción, categoría y
+ * etiquetas del sub-ítem) **y** estado de la marca de verificado.
+ *
+ * Vive acá por lo mismo que `matchBusqueda`: decide qué filas ve el usuario al
+ * revisar un resumen de tarjeta, y un sub-ítem que "desaparece" no se nota mirando
+ * la pantalla. `verificado` ausente/`null` cuenta como no verificado (pendiente).
+ */
+export function matchSubitem(
+  item: SubitemFiltrable,
+  busqueda: string,
+  verificado: FiltroVerificado = 'todos',
+): boolean {
+  if (verificado === 'verificados' && !item.verificado) return false
+  if (verificado === 'pendientes' && item.verificado) return false
+
+  const q = busqueda.trim().toLowerCase()
+  if (!q) return true
+
+  const contiene = (s: string | null | undefined) => (s ?? '').toLowerCase().includes(q)
+  return contiene(item.descripcion)
+    || contiene(item.categoria?.nombre)
+    || (item.etiquetas ?? []).some(e => contiene(e.nombre))
+}
