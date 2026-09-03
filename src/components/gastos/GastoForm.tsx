@@ -8,6 +8,7 @@ import { gastoFormSchema } from '@/lib/gasto-form-schema'
 import { normalizeNombre } from '@/lib/conceptos'
 import { parseCuotas, formatCuotas } from '@/lib/cuotas'
 import { etiquetasSugeridas, type SugerenciasEtiquetas } from '@/lib/etiquetas-sugeridas'
+import { tarjetasVisiblesEn } from '@/lib/tarjetas-baja'
 import {
   splitPropina, resolveCategoriaPropina,
   CONCEPTO_PROPINA, CATEGORIA_PROPINA, MODO_PROPINA_DEFAULT,
@@ -305,13 +306,26 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
     setValue('cuotas_totales', parsed.cuotas_totales)
   }
 
+  // Tarjetas ofrecibles para el período del gasto: las dadas de baja antes de este mes ya no se
+  // poseen y elegirlas sería un error de carga. La ya seleccionada se conserva — editando un
+  // gasto viejo, sacarle la tarjeta de la lista le borraría el dato al guardar.
+  const tarjetasDisponibles = useMemo(
+    () => tarjetasVisiblesEn(
+      tarjetas,
+      gasto?.mes ?? defaultMes,
+      gasto?.anio ?? defaultAnio,
+      tarjetaId != null ? [tarjetaId] : [],
+    ),
+    [tarjetas, tarjetaId, gasto?.mes, gasto?.anio, defaultMes, defaultAnio],
+  )
+
   // Medio de pago unificado: débito o una tarjeta concreta (colapsa tipo_pago + tarjeta_id).
   // En un resumen de tarjeta (`es_tarjeta`) se mantienen los dos controles separados, porque ahí
   // la tarjeta es opcional y puede convivir con tipo_pago 'D'.
   const medioPagoValue = tipoPago === 'C' ? (tarjetaId ? `C:${tarjetaId}` : null) : 'D'
   const medioPagoOptions = useMemo(() => ([
     { value: 'D', label: 'Débito / Efectivo' },
-    ...tarjetas.map(t => ({
+    ...tarjetasDisponibles.map(t => ({
       value: `C:${t.id}`,
       label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
       render: () => (
@@ -322,7 +336,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       ),
       adornment: () => <BrandLogo marca={t.marca} width={30} height={22} />,
     })),
-  ]), [tarjetas])
+  ]), [tarjetasDisponibles])
 
   // Alta inline de categoría/etiqueta desde el propio form.
   const crearCategoria = async (nombre: string) => {
@@ -351,7 +365,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       render={({ field }) => (
         <AppSelect
           label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`}
-          options={tarjetas.map(t => ({
+          options={tarjetasDisponibles.map(t => ({
             value: t.id,
             label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
             render: () => (

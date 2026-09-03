@@ -11,8 +11,11 @@ const mp = prisma as any
 
 const req = (qs: string) => ({ url: `http://localhost:3002/api/tarjetas/proximos-cierres?${qs}` }) as any
 
-function tarjeta(id: number, nombre: string, cierres: any[] = []) {
-  return { id, nombre, banco: 'Galicia', marca: 'visa', bancoLogo: 'galicia', bancoIcono: null, cierres }
+function tarjeta(id: number, nombre: string, cierres: any[] = [], baja: [number, number] | null = null) {
+  return {
+    id, nombre, banco: 'Galicia', marca: 'visa', bancoLogo: 'galicia', bancoIcono: null, cierres,
+    bajaMes: baja?.[0] ?? null, bajaAnio: baja?.[1] ?? null,
+  }
 }
 
 const cierre = (fechaCierre: string | null, fechaProximoCierre: string | null) => ({
@@ -67,6 +70,26 @@ describe('GET /api/tarjetas/proximos-cierres', () => {
     })
   })
 
+  it('ordena la que está por cerrar por su propia fechaCierre, no al final', async () => {
+    mp.tarjeta.findMany.mockResolvedValue([
+      tarjeta(1, 'Sin ninguna fecha'),
+      tarjeta(2, 'Abierta', [cierre('2026-08-01', '2026-09-20')]),
+      tarjeta(3, 'Por cerrar', [cierre('2026-09-05', null)]),
+      tarjeta(4, 'Cerrada', [cierre('2026-08-01', '2026-08-21')]),
+    ])
+
+    const data = await (await GET(req('mes=8&anio=2026&today=2026-09-03'))).json()
+
+    expect(data.map((t: any) => [t.nombre, t.estado])).toEqual([
+      ['Cerrada', 'cerrado'],
+      ['Por cerrar', 'por_cerrar'],
+      ['Abierta', 'abierto'],
+      ['Sin ninguna fecha', 'sin_fecha'],
+    ])
+    expect(data[1]).toMatchObject({ dias_para_cierre: 2, fecha_proximo_cierre: null })
+    expect(data[1].progreso).toBeCloseTo(29 / 31)
+  })
+
   it('desempata por nombre', async () => {
     mp.tarjeta.findMany.mockResolvedValue([
       tarjeta(1, 'Zeta', [cierre('2026-08-01', '2026-09-01')]),
@@ -74,6 +97,22 @@ describe('GET /api/tarjetas/proximos-cierres', () => {
     ])
     const data = await (await GET(req('mes=8&anio=2026&today=2026-08-31'))).json()
     expect(data.map((t: any) => t.nombre)).toEqual(['Alfa', 'Zeta'])
+  })
+
+  it('excluye las tarjetas dadas de baja en el período, pero no las de meses anteriores', async () => {
+    const filas = [
+      tarjeta(1, 'Vigente', [cierre('2026-08-01', '2026-09-01')]),
+      tarjeta(2, 'De baja', [cierre('2026-08-01', '2026-09-01')], [8, 2026]),
+    ]
+    mp.tarjeta.findMany.mockResolvedValue(filas)
+
+    const agosto = await (await GET(req('mes=8&anio=2026&today=2026-08-31'))).json()
+    expect(agosto.map((t: any) => t.nombre)).toEqual(['Vigente'])
+
+    // Julio es anterior a la baja: ahí la tarjeta se usaba y tiene que seguir a la vista.
+    mp.tarjeta.findMany.mockResolvedValue(filas)
+    const julio = await (await GET(req('mes=7&anio=2026&today=2026-07-31'))).json()
+    expect(julio.map((t: any) => t.nombre)).toEqual(['De baja', 'Vigente'])
   })
 
   it('sin params no toca la DB', async () => {

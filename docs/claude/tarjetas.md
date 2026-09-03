@@ -115,7 +115,7 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 
 `ProximosCierres` (`src/components/gastos/ProximosCierres.tsx`) — montado en `/gastos` debajo de `ResumenCards`. `GET /api/tarjetas/proximos-cierres?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como cards **todas** las tarjetas, no sólo las que ya cerraron: la sección responde "¿en qué punto del ciclo está cada tarjeta este mes?", y para eso la que todavía no cerró tiene que estar a la vista.
 
-**Orden:** por `fecha_proximo_cierre` ascendente — primero las que ya cerraron (fecha pasada), después las que están por cerrar, y al final las que **no tienen el cierre cargado** del período (desempate por nombre para que no dependa del orden de la DB). Esas últimas se muestran igual, en vez de desaparecer: un cierre sin cargar no es un no-evento, es justo lo que después hace fallar la propagación del pago con 400.
+**Orden:** por **el cierre que la tarjeta tiene por delante**, ascendente — primero las que ya cerraron (fecha pasada), después las que están por cerrar de más cerca a más lejos, y al final las que **no tienen ninguna fecha cargada** del período (desempate por nombre para que no dependa del orden de la DB). Ese cierre es `fecha_proximo_cierre`, salvo en `por_cerrar` (que no lo tiene cargado), donde es la propia `fecha_cierre` — así una tarjeta que cierra en 2 días se ordena por su imminencia y no queda tirada al final. Las que no tienen fecha se muestran igual, en vez de desaparecer: un cierre sin cargar no es un no-evento, es justo lo que después hace fallar la propagación del pago con 400.
 
 **Estado del ciclo** — lo calcula `estadoCiclo(cierre, today)` (`src/lib/cierres.ts`, puro y testeado) y lo devuelve la route en `estado` / `dias_para_cierre` / `progreso`:
 
@@ -123,9 +123,16 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 |---|---|---|
 | `cerrado` | `fechaProximoCierre` < `today` | Como siempre: borde y fondo tintados con `marcaColor(t.marca)`, logos a color. |
 | `abierto` | `fechaProximoCierre` >= `today` (el día del cierre todavía cuenta como abierto) | **Grisada** (borde `divider`, fondo `action.hover`, logos en `grayscale(1)` con `opacity: .65`) + pie con "faltan N días · NN%" y una `LinearProgress` de 4px. |
-| `sin_fecha` | No hay `fechaProximoCierre` cargada | Grisada, con "sin cierre cargado" y sin barra. |
+| `por_cerrar` | **No** hay `fechaProximoCierre`, pero `fechaCierre` >= `today` | Igual que `abierto` (logos grisados) pero en **ámbar**: borde y fondo `alpha(warning.main, .5/.12)`, leyenda "cierra en N días · NN%" en `warning.main` y `LinearProgress color="warning"`. El tooltip agrega "El resumen de este período todavía no cerró · falta cargar el próximo cierre". |
+| `sin_fecha` | No hay `fechaProximoCierre` y `fechaCierre` ya pasó (o no hay ninguna fecha válida) | Grisada, con "sin cierre cargado" y sin barra. |
 
-`progreso` es la fracción del ciclo `fechaCierre → fechaProximoCierre` ya transcurrida, recortada a `[0, 1]`. Queda en `null` (sin barra, sólo los días) si falta `fechaCierre` o el intervalo no es válido — un cierre a medio cargar no habilita a dibujar una barra inventada.
+`dias_para_cierre` son los días hasta el cierre que la tarjeta tiene por delante: `fechaProximoCierre` en `cerrado`/`abierto`, la propia `fechaCierre` en `por_cerrar`.
+
+`progreso` es la fracción del ciclo que termina en ese cierre ya transcurrida, recortada a `[0, 1]`:
+- `cerrado`/`abierto`: el ciclo `fechaCierre → fechaProximoCierre`. Queda en `null` (sin barra, sólo los días) si falta `fechaCierre` o el intervalo no es válido — un cierre a medio cargar no habilita a dibujar una barra inventada.
+- `por_cerrar`: el ciclo **actual**, el que todavía está acumulando y cierra en `fechaCierre`. Su inicio es el cierre anterior, que por definición no está cargado, así que se deriva como `fechaCierre - 1 mes` (la misma suposición de ciclo mensual que ya hace `generarSiguienteCierre`). El ámbar señala las dos cosas a la vez: el cierre inminente y que falta cargar el próximo cierre.
+
+El único caso sin `fechaProximoCierre` del que se puede decir algo es `por_cerrar`: antes caía todo junto en `sin_fecha` y la tarjeta se mostraba "sin cierre cargado" **teniendo el dato** de que cierra en dos días. Pasada la `fechaCierre` sin próximo cierre cargado ya no queda nada que medir y vuelve a `sin_fecha`.
 
 Cada card:
 - `<BrandLogo marca={t.marca} width={44} height={32} />` + `BancoLogo` (`size=24`).
@@ -153,3 +160,38 @@ Los `TarjetaCierre` se cargaban a mano mes por mes, aunque el dato para derivarl
 Todo sale **nullable**: si el último cierre está incompleto, el generado también lo está y se completa a mano. Es preferible a inventar una fecha.
 
 **`POST /api/tarjetas/[id]/cierres/generar`** crea la fila. 409 si la tarjeta no tiene ningún cierre del que partir, y 409 (vía el unique `(tarjetaId, mes, anio)`, `P2002`) si el siguiente ya estaba cargado. En la UI es el botón **"Generar próximo"** de `TarjetaCierres`; las fechas quedan editables, porque el generado es un **borrador con la proyección**, no un dato firme.
+
+## Baja de una tarjeta (por período)
+
+La tarjeta que ya no se posee seguía apareciendo en `/gastos` para siempre: en la fila de cierres, en el select de medio de pago del alta y en el filtro por tarjeta. **Borrarla no era salida**: `Gasto.tarjetaId` cascadea (`onDelete: Cascade`), así que borrar la tarjeta se lleva los gastos que la usaron y con ellos el histórico de dónde se gastó. Por eso la baja es un **corte temporal**, no un borrado.
+
+`Tarjeta.bajaMes` / `Tarjeta.bajaAnio` (nullable, migración `20260903100000_tarjeta_baja`; API `baja_mes`/`baja_anio`). Ambos `null` = activa. Desde `(bajaMes, bajaAnio)` **inclusive** la tarjeta deja de mostrarse y de ofrecerse en `/gastos`; los meses anteriores no cambian en nada.
+
+**`src/lib/tarjetas-baja.ts`** (puro, testeado en `tarjetas-baja.test.ts`):
+
+| Función | Qué hace |
+|---|---|
+| `tarjetaActivaEn(t, mes, anio)` | Si la tarjeta está vigente en el período. El mes configurado **ya cuenta como de baja** (`<`, no `<=`): "deshabilitar en agosto" = en agosto no aparece más. Compara el período completo (`anio * 12 + mes`), así que enero 2027 es posterior a diciembre 2026. |
+| `tarjetasActivasEn(lista, mes, anio)` | Filtra conservando el orden de entrada. |
+| `tarjetasVisiblesEn(lista, mes, anio, conservarIds)` | Las vigentes **más** las de `conservarIds` que hayan quedado afuera. Lo que usan los selects de `/gastos`. |
+| `parseBaja(mes, anio)` | Normaliza el body de `POST`/`PUT /api/tarjetas`. |
+
+Dos decisiones que sostienen todo lo demás:
+
+- **El par es todo-o-nada.** Un mes sin año (o al revés, o un mes fuera de `1..12`) no define un corte, así que `parseBaja` guarda `null` en los dos y `tarjetaActivaEn` deja la tarjeta activa. Un dato a medias no hace desaparecer una tarjeta. Como efecto, mandar la baja vacía o inválida en el `PUT` es justamente el camino para **rehabilitarla**.
+- **`tarjetasVisiblesEn` rescata la ya elegida.** Una tarjeta seleccionada que desaparece de las opciones se pierde sin aviso: el form la guardaría en `null` al editar un gasto viejo, y el filtro quedaría aplicado sin nada que lo muestre. La baja saca de la lista lo que no se puede elegir de nuevo, no lo que ya está elegido.
+
+El módulo lee el par en las **dos convenciones** (`bajaMes`/`baja_mes`) porque es la costura entre las filas de Prisma que le pasan las routes y la respuesta de `/api/tarjetas` que le pasan los componentes. La normalización vive ahí una vez, en vez de un `.map()` de adaptación en cada call site.
+
+**Dónde se aplica el filtro y dónde no** — la regla es "en `/gastos` se recorta; donde se lee historia, no":
+
+| Lugar | Comportamiento |
+|---|---|
+| `ProximosCierres` (`/api/tarjetas/proximos-cierres`) | **Recorta.** Una tarjeta que ya no se tiene no tiene ciclo. Filtrado en memoria (son pocas filas) para que la condición viva en `tarjetaActivaEn` y no en un `OR` de Prisma. |
+| `GastoForm` (medio de pago + select de Tarjeta) | **Recorta** por el período del gasto (`gasto.mes/anio` o los defaults), conservando la ya seleccionada. Elegir una tarjeta que no se posee sería un error de carga. |
+| `FiltrosGastos` (filtro por tarjeta) | **Recorta** por el mes mostrado, conservando las ya tildadas. Trae todas una vez y filtra en el cliente: el mes cambia seguido. |
+| `GastosTable` (iconos de banco) | **No recorta.** Los gastos históricos tienen que seguir mostrando su logo. |
+| `/reportes` | **No recorta.** El punto de la baja es no perder el histórico. |
+| `/configuracion` | **No recorta** — es donde se revierte. La tarjeta de baja se muestra grisada, con un chip `Baja MM/AAAA`. |
+
+**En `/configuracion`:** en el form de edición de la tarjeta, un toggle *"Dada de baja (ya no la tengo)"* que al activarse propone el **mes actual** y despliega los selects de mes/año. El warning de **"cierre incompleto"** se suprime en las tarjetas de baja: no van a tener el cierre del mes nunca, y dejarlo prendido sería una alerta permanente imposible de resolver.

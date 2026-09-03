@@ -32,6 +32,11 @@ model Tarjeta {
   bancoLogo String?
   /// Icono subido por el usuario (data URI, ver src/lib/imagen-icono.ts). Gana sobre bancoLogo.
   bancoIcono String?
+  /// Período (mes/anio) desde el que la tarjeta está de baja: ya no se posee y deja de
+  /// aparecer en /gastos **desde ese mes inclusive**, pero sigue existiendo para no perder
+  /// el histórico de los gastos que la usaron. Ambos null = activa. Ver src/lib/tarjetas-baja.ts.
+  bajaMes    Int?
+  bajaAnio   Int?
   gastos    Gasto[]
   cierres   TarjetaCierre[]
 }

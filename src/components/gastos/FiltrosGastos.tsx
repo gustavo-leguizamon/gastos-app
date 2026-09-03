@@ -25,6 +25,7 @@ import TuneIcon from '@mui/icons-material/Tune'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import BrandLogo from '@/components/shared/BrandLogo'
+import { tarjetasVisiblesEn } from '@/lib/tarjetas-baja'
 import type { Casa, Categoria, Etiqueta, Tarjeta, FiltrosGastos } from '@/lib/types'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -67,6 +68,11 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
     fetch('/api/etiquetas').then((r) => r.json()).then(setEtiquetas)
     fetch('/api/tarjetas').then((r) => r.json()).then((d) => setTarjetas(Array.isArray(d) ? d : []))
   }, [])
+
+  // El filtro es siempre dentro del mes mostrado, así que una tarjeta dada de baja antes de ese
+  // mes no tiene gastos que filtrar. Se traen todas una vez (el mes cambia seguido) y el recorte
+  // se hace acá, conservando las ya tildadas.
+  const tarjetasVisibles = tarjetasVisiblesEn(tarjetas, filtros.mes, filtros.anio, tarjetaIds)
 
   const prevMes = () => {
     if (filtros.mes === 1) setFiltros({ mes: 12, anio: filtros.anio - 1 })
@@ -285,7 +291,7 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
             label="Tarjetas"
             options={[
               { value: SIN_CLASIFICAR, label: 'Sin tarjeta' },
-              ...tarjetas.map((t) => ({
+              ...tarjetasVisibles.map((t) => ({
                 value: t.id,
                 label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
                 render: () => (
