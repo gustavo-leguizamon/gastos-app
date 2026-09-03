@@ -30,6 +30,13 @@ export interface Tarjeta {
   banco_logo: TarjetaBanco | null
   /** Icono subido por el usuario (data URI). Gana sobre `banco_logo`. */
   banco_icono: string | null
+  /**
+   * Período desde el que la tarjeta está de baja: deja de aparecer en /gastos **desde ese
+   * mes inclusive**, pero sigue existiendo para no perder el histórico. Ambos `null` =
+   * activa. Ver `src/lib/tarjetas-baja.ts`.
+   */
+  baja_mes: number | null
+  baja_anio: number | null
   cierres?: TarjetaCierre[]
 }
 
