@@ -76,15 +76,23 @@ export function ultimoCierre<T extends { mes: number; anio: number }>(cierres: T
  * - `cerrado`: el próximo cierre ya pasó — el resumen del período está cerrado.
  * - `abierto`: todavía no cerró (el día del cierre cuenta como abierto, igual que el
  *   filtro `fechaProximoCierre < today` que tenía la sección antes de mostrar las abiertas).
- * - `sin_fecha`: no hay `fechaProximoCierre` cargada, así que no se puede decir nada.
+ * - `por_cerrar`: no hay `fechaProximoCierre`, pero la `fechaCierre` del período todavía no
+ *   llegó — el resumen de este período sigue acumulando y cierra en `dias`. Es el único caso
+ *   sin próximo cierre del que igual se puede decir algo.
+ * - `sin_fecha`: no hay `fechaProximoCierre` y la `fechaCierre` ya pasó (o no hay ninguna
+ *   fecha válida) — no se puede decir nada del ciclo.
  */
-export type EstadoCiclo = 'cerrado' | 'abierto' | 'sin_fecha'
+export type EstadoCiclo = 'cerrado' | 'abierto' | 'por_cerrar' | 'sin_fecha'
 
 export interface CicloTarjeta {
   estado: EstadoCiclo
-  /** Días completos de hoy al próximo cierre. `0` = cierra hoy, negativo = ya cerró. */
+  /**
+   * Días completos de hoy al cierre que la tarjeta tiene por delante: el `fechaProximoCierre`
+   * en `cerrado`/`abierto`, la propia `fechaCierre` en `por_cerrar`. `0` = cierra hoy,
+   * negativo = ya cerró (sólo posible en `cerrado`).
+   */
   dias: number | null
-  /** Fracción `0..1` del ciclo `fechaCierre → fechaProximoCierre` ya transcurrida. */
+  /** Fracción `0..1` del ciclo que termina en ese cierre ya transcurrida. */
   progreso: number | null
 }
 
@@ -102,7 +110,7 @@ export function estadoCiclo(
   today: string,
 ): CicloTarjeta {
   const dias = cierre?.fechaProximoCierre ? diasEntre(today, cierre.fechaProximoCierre) : null
-  if (dias === null) return { estado: 'sin_fecha', dias: null, progreso: null }
+  if (dias === null) return cicloPorCerrar(cierre?.fechaCierre ?? null, today)
 
   const total = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, cierre.fechaProximoCierre!) : null
   const transcurrido = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, today) : null
@@ -112,4 +120,30 @@ export function estadoCiclo(
       : null
 
   return { estado: dias < 0 ? 'cerrado' : 'abierto', dias, progreso }
+}
+
+/**
+ * Sin `fechaProximoCierre` no se puede medir el ciclo que viene, pero si la `fechaCierre` del
+ * período todavía no llegó sí se puede medir **el ciclo actual**: el resumen está abierto y
+ * cierra en esa fecha. Antes esto caía en `sin_fecha` junto con los cierres que no tienen
+ * ninguna fecha, así que la tarjeta se mostraba como "sin cierre cargado" teniendo el dato.
+ *
+ * El inicio del ciclo es el cierre anterior, que por definición no está cargado: se deriva
+ * como `fechaCierre - 1 mes`, la misma suposición de ciclo mensual que ya hace
+ * `generarSiguienteCierre`. Si la `fechaCierre` ya pasó no queda nada que medir y vuelve a
+ * `sin_fecha` — que es exactamente como se venía mostrando.
+ */
+function cicloPorCerrar(fechaCierre: string | null, today: string): CicloTarjeta {
+  const dias = fechaCierre ? diasEntre(today, fechaCierre) : null
+  if (dias === null || dias < 0) return { estado: 'sin_fecha', dias: null, progreso: null }
+
+  const inicio = addMeses(fechaCierre, -1)
+  const total = inicio ? diasEntre(inicio, fechaCierre!) : null
+  const transcurrido = inicio ? diasEntre(inicio, today) : null
+  const progreso =
+    total !== null && total > 0 && transcurrido !== null
+      ? Math.min(1, Math.max(0, transcurrido / total))
+      : null
+
+  return { estado: 'por_cerrar', dias, progreso }
 }
