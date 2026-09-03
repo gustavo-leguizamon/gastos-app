@@ -41,11 +41,23 @@ import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
 import BancoLogo from '@/components/shared/BancoLogo'
 import IconoBancoUpload from '@/components/shared/IconoBancoUpload'
 import { BANCOS } from '@/lib/bancos'
+import { tarjetaActivaEn } from '@/lib/tarjetas-baja'
 import BrandLogo from '@/components/shared/BrandLogo'
 import AppSelect from '@/components/shared/AppSelect'
 import ClasificadorManager from '@/components/configuracion/ClasificadorManager'
 import EtiquetasPorCategoria from '@/components/configuracion/EtiquetasPorCategoria'
 import type { Casa, Categoria, Etiqueta, Moneda, Settings, Tarjeta, TarjetaBanco, TarjetaMarca } from '@/lib/types'
+
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+/** Período que se propone al marcar la baja: el mes actual, que es el caso normal. */
+const bajaDefault = () => {
+  const d = new Date()
+  return { baja_mes: d.getMonth() + 1, baja_anio: d.getFullYear() }
+}
+
+/** `MM/AAAA` para mostrar un período de baja. */
+const periodoLabel = (mes: number, anio: number) => `${String(mes).padStart(2, '0')}/${anio}`
 
 function useSimpleCrud<T extends { id: number }>(endpoint: string) {
   const [items, setItems] = useState<T[]>([])
@@ -428,6 +440,39 @@ export default function ConfiguracionPage() {
                           bancoLogo={editingTarjeta.banco_logo}
                           bancoTexto={editingTarjeta.banco}
                         />
+                        <Divider />
+                        {/* Baja de la tarjeta: la saca de /gastos desde el período elegido sin
+                            borrarla, así los gastos que la usaron siguen ahí. */}
+                        <AppToggle
+                          label="Dada de baja (ya no la tengo)"
+                          checked={editingTarjeta.baja_mes != null && editingTarjeta.baja_anio != null}
+                          onChange={e => setEditingTarjeta(p => p
+                            ? { ...p, ...(e.target.checked ? bajaDefault() : { baja_mes: null, baja_anio: null }) }
+                            : p)}
+                        />
+                        {editingTarjeta.baja_mes != null && editingTarjeta.baja_anio != null && (
+                          <>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <TextField
+                                select size="small" label="Baja desde el mes" sx={{ flex: 1 }}
+                                SelectProps={{ native: true }}
+                                value={editingTarjeta.baja_mes}
+                                onChange={e => setEditingTarjeta(p => p ? { ...p, baja_mes: Number(e.target.value) } : p)}
+                              >
+                                {MESES.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                              </TextField>
+                              <TextField
+                                size="small" type="number" label="Año" sx={{ flex: 1 }}
+                                value={editingTarjeta.baja_anio}
+                                onChange={e => setEditingTarjeta(p => p ? { ...p, baja_anio: Number(e.target.value) || p.baja_anio } : p)}
+                              />
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              Desde {MESES[editingTarjeta.baja_mes - 1]} {editingTarjeta.baja_anio} inclusive deja de
+                              aparecer en Gastos. Los meses anteriores y los reportes no cambian.
+                            </Typography>
+                          </>
+                        )}
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           <Button size="small" variant="contained" startIcon={<CheckIcon />} onClick={handleSaveTarjeta}>Guardar</Button>
                           <Button size="small" startIcon={<CloseIcon />} onClick={() => setEditingTarjeta(null)}>Cancelar</Button>
@@ -439,7 +484,10 @@ export default function ConfiguracionPage() {
                       const currentMes = now.getMonth() + 1
                       const currentAnio = now.getFullYear()
                       const currentCierre = t.cierres?.find(c => c.mes === currentMes && c.anio === currentAnio)
-                      const incompleto = !currentCierre || !currentCierre.fecha_cierre || !currentCierre.fecha_vencimiento || !currentCierre.fecha_proximo_cierre
+                      const activa = tarjetaActivaEn(t, currentMes, currentAnio)
+                      // A una tarjeta de baja no le falta el cierre del mes: no lo va a tener nunca.
+                      // Dejar el warning prendido sería una alerta permanente imposible de resolver.
+                      const incompleto = activa && (!currentCierre || !currentCierre.fecha_cierre || !currentCierre.fecha_vencimiento || !currentCierre.fecha_proximo_cierre)
                       const alertaMsg = !currentCierre
                         ? `No hay cierre cargado para ${String(currentMes).padStart(2, '0')}/${currentAnio}`
                         : 'Faltan fechas en el cierre del mes actual'
@@ -452,8 +500,8 @@ export default function ConfiguracionPage() {
                             boxShadow: 'none',
                             borderRadius: 1,
                             border: '1px solid',
-                            borderColor: `${accent}55`,
-                            bgcolor: `${accent}10`,
+                            borderColor: activa ? `${accent}55` : 'divider',
+                            bgcolor: activa ? `${accent}10` : 'action.hover',
                             '&:before': { display: 'none' },
                             '&.Mui-expanded': { margin: 0 },
                           }}
@@ -467,9 +515,21 @@ export default function ConfiguracionPage() {
                             }}
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                              <BrandLogo marca={t.marca} width={44} height={32} />
-                              <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
-                              <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, ...(activa ? {} : { filter: 'grayscale(1)', opacity: 0.6 }) }}>
+                                <BrandLogo marca={t.marca} width={44} height={32} />
+                                <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
+                                <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
+                              </Box>
+                              {t.baja_mes != null && t.baja_anio != null && (
+                                <Tooltip arrow title={`No aparece en Gastos desde ${periodoLabel(t.baja_mes, t.baja_anio)}; el histórico anterior se mantiene`}>
+                                  <Chip
+                                    size="small"
+                                    variant="outlined"
+                                    label={`Baja ${periodoLabel(t.baja_mes, t.baja_anio)}`}
+                                    sx={{ flexShrink: 0, height: 20, fontSize: '0.7rem' }}
+                                  />
+                                </Tooltip>
+                              )}
                               {incompleto && (
                                 <Tooltip arrow title={alertaMsg}>
                                   <WarningAmberIcon sx={{ color: 'warning.main', fontSize: 20, flexShrink: 0 }} />

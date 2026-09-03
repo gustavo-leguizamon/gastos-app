@@ -121,10 +121,36 @@ describe('estadoCiclo', () => {
     expect(estadoCiclo(ciclo, '2026-08-25')).toEqual({ estado: 'abierto', dias: 15, progreso: 0.5 })
   })
 
-  it('sin fechaProximoCierre no hay nada que decir', () => {
+  it('sin fechaProximoCierre y con el cierre ya pasado no hay nada que decir', () => {
     expect(estadoCiclo({ fechaCierre: '2026-08-10', fechaProximoCierre: null }, '2026-08-25'))
       .toEqual({ estado: 'sin_fecha', dias: null, progreso: null })
     expect(estadoCiclo(null, '2026-08-25')).toEqual({ estado: 'sin_fecha', dias: null, progreso: null })
+    expect(estadoCiclo({ fechaCierre: null, fechaProximoCierre: null }, '2026-08-25').estado).toBe('sin_fecha')
+  })
+
+  it('sin fechaProximoCierre pero con el cierre por venir mide el ciclo actual', () => {
+    // Ciclo derivado 2026-08-05 → 2026-09-05 (31 días); hoy 2026-09-03 → faltan 2, 29/31.
+    const r = estadoCiclo({ fechaCierre: '2026-09-05', fechaProximoCierre: null }, '2026-09-03')
+    expect(r.estado).toBe('por_cerrar')
+    expect(r.dias).toBe(2)
+    expect(r.progreso).toBeCloseTo(29 / 31)
+  })
+
+  it('el día del cierre todavía cuenta como por_cerrar, no como sin_fecha', () => {
+    expect(estadoCiclo({ fechaCierre: '2026-09-05', fechaProximoCierre: null }, '2026-09-05'))
+      .toEqual({ estado: 'por_cerrar', dias: 0, progreso: 1 })
+    expect(estadoCiclo({ fechaCierre: '2026-09-05', fechaProximoCierre: null }, '2026-09-06').estado)
+      .toBe('sin_fecha')
+  })
+
+  it('recorta el progreso del ciclo actual si hoy es anterior al ciclo derivado', () => {
+    expect(estadoCiclo({ fechaCierre: '2026-09-05', fechaProximoCierre: null }, '2026-06-01'))
+      .toMatchObject({ estado: 'por_cerrar', progreso: 0 })
+  })
+
+  it('una fechaCierre inválida no habilita el ciclo actual', () => {
+    expect(estadoCiclo({ fechaCierre: 'mañana', fechaProximoCierre: null }, '2026-09-03').estado)
+      .toBe('sin_fecha')
   })
 
   it('sin fechaCierre hay días pero no progreso (cierre incompleto)', () => {
