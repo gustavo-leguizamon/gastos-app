@@ -153,18 +153,41 @@ describe('estadoCiclo', () => {
       .toBe('sin_fecha')
   })
 
+  it('con el cierre por venir gana por_cerrar aunque el próximo cierre esté cargado', () => {
+    // El caso real: cierre 06/09 y próximo 06/10. Antes decía "faltan 32 días · 0%" — los 32
+    // días eran al cierre de octubre y el 0% el del ciclo que ni arrancó. Lo accionable es que
+    // el resumen de septiembre cierra en 2 días, con el ciclo actual (06/08 → 06/09) al 29/31.
+    const r = estadoCiclo({ fechaCierre: '2026-09-06', fechaProximoCierre: '2026-10-06' }, '2026-09-04')
+    expect(r.estado).toBe('por_cerrar')
+    expect(r.dias).toBe(2)
+    expect(r.progreso).toBeCloseTo(29 / 31)
+  })
+
+  it('pasada la fechaCierre vuelve a medir el ciclo que viene', () => {
+    // Un día después del cierre: el evento por delante ya es el próximo cierre.
+    expect(estadoCiclo({ fechaCierre: '2026-09-06', fechaProximoCierre: '2026-10-06' }, '2026-09-07'))
+      .toMatchObject({ estado: 'abierto', dias: 29 })
+  })
+
+  it('por_cerrar gana también sobre cerrado si las fechas están invertidas', () => {
+    // Dato inconsistente (próximo cierre anterior al cierre): decir "ya cerró" cuando el cierre
+    // del período todavía no llegó es peor que medir el ciclo actual.
+    expect(estadoCiclo({ fechaCierre: '2026-09-06', fechaProximoCierre: '2026-08-01' }, '2026-09-04').estado)
+      .toBe('por_cerrar')
+  })
+
   it('sin fechaCierre hay días pero no progreso (cierre incompleto)', () => {
     expect(estadoCiclo({ fechaCierre: null, fechaProximoCierre: '2026-09-09' }, '2026-08-25'))
       .toEqual({ estado: 'abierto', dias: 15, progreso: null })
   })
 
   it('un intervalo inválido no genera barra', () => {
-    expect(estadoCiclo({ fechaCierre: '2026-09-09', fechaProximoCierre: '2026-09-09' }, '2026-09-01').progreso).toBeNull()
-    expect(estadoCiclo({ fechaCierre: '2026-10-09', fechaProximoCierre: '2026-09-09' }, '2026-09-01').progreso).toBeNull()
+    // Con la fechaCierre ya pasada, para que el caso llegue al ciclo fechaCierre → próximo.
+    expect(estadoCiclo({ fechaCierre: '2026-09-09', fechaProximoCierre: '2026-09-09' }, '2026-09-20').progreso).toBeNull()
+    expect(estadoCiclo({ fechaCierre: '2026-10-09', fechaProximoCierre: '2026-09-09' }, '2026-11-01').progreso).toBeNull()
   })
 
   it('recorta el progreso a [0, 1] si hoy cae fuera del ciclo', () => {
-    expect(estadoCiclo(ciclo, '2026-07-01').progreso).toBe(0)
     expect(estadoCiclo(ciclo, '2026-12-01').progreso).toBe(1)
   })
 
