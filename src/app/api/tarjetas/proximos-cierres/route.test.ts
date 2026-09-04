@@ -99,6 +99,25 @@ describe('GET /api/tarjetas/proximos-cierres', () => {
     expect(data.map((t: any) => t.nombre)).toEqual(['Alfa', 'Zeta'])
   })
 
+  it('ordena la que está por cerrar por su fechaCierre aunque tenga próximo cierre cargado', async () => {
+    // El caso real: Sabrina cierra el 06/09 y su próximo cierre es el 06/10. Ordenarla por el
+    // próximo la mandaba al fondo (detrás de las que cierran en semanas) justo cuando cierra.
+    mp.tarjeta.findMany.mockResolvedValue([
+      tarjeta(1, 'Santander', [cierre('2026-08-05', '2026-10-01')]),
+      tarjeta(2, 'Sabrina', [cierre('2026-09-06', '2026-10-06')]),
+      tarjeta(3, 'Macro USD', [cierre('2026-08-24', '2026-09-24')]),
+    ])
+
+    const data = await (await GET(req('mes=9&anio=2026&today=2026-09-04'))).json()
+
+    expect(data.map((t: any) => [t.nombre, t.estado, t.dias_para_cierre])).toEqual([
+      ['Sabrina', 'por_cerrar', 2],
+      ['Macro USD', 'abierto', 20],
+      ['Santander', 'abierto', 27],
+    ])
+    expect(data[0].progreso).toBeCloseTo(29 / 31)
+  })
+
   it('excluye las tarjetas dadas de baja en el período, pero no las de meses anteriores', async () => {
     const filas = [
       tarjeta(1, 'Vigente', [cierre('2026-08-01', '2026-09-01')]),

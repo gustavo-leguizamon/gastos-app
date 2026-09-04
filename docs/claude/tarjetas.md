@@ -115,24 +115,28 @@ El paso 2 (validación de cierre) corre **antes** de crear el pago; la propagaci
 
 `ProximosCierres` (`src/components/gastos/ProximosCierres.tsx`) — montado en `/gastos` debajo de `ResumenCards`. `GET /api/tarjetas/proximos-cierres?mes=<filtros.mes>&anio=<filtros.anio>&today=<YYYY-MM-DD>` y muestra como cards **todas** las tarjetas, no sólo las que ya cerraron: la sección responde "¿en qué punto del ciclo está cada tarjeta este mes?", y para eso la que todavía no cerró tiene que estar a la vista.
 
-**Orden:** por **el cierre que la tarjeta tiene por delante**, ascendente — primero las que ya cerraron (fecha pasada), después las que están por cerrar de más cerca a más lejos, y al final las que **no tienen ninguna fecha cargada** del período (desempate por nombre para que no dependa del orden de la DB). Ese cierre es `fecha_proximo_cierre`, salvo en `por_cerrar` (que no lo tiene cargado), donde es la propia `fecha_cierre` — así una tarjeta que cierra en 2 días se ordena por su imminencia y no queda tirada al final. Las que no tienen fecha se muestran igual, en vez de desaparecer: un cierre sin cargar no es un no-evento, es justo lo que después hace fallar la propagación del pago con 400.
+**Orden:** por **el cierre que la tarjeta tiene por delante**, ascendente — primero las que ya cerraron (fecha pasada), después las que están por cerrar de más cerca a más lejos, y al final las que **no tienen ninguna fecha cargada** del período (desempate por nombre para que no dependa del orden de la DB). Ese cierre es `fecha_proximo_cierre`, salvo en `por_cerrar`, donde es la propia `fecha_cierre` — ordenar una `por_cerrar` por su próximo cierre la mandaría **un mes al fondo** (detrás de las que cierran en semanas) justo cuando está por cerrar. Las que no tienen fecha se muestran igual, en vez de desaparecer: un cierre sin cargar no es un no-evento, es justo lo que después hace fallar la propagación del pago con 400.
 
 **Estado del ciclo** — lo calcula `estadoCiclo(cierre, today)` (`src/lib/cierres.ts`, puro y testeado) y lo devuelve la route en `estado` / `dias_para_cierre` / `progreso`:
 
+La regla de la que sale todo: **el cierre que se mide es siempre el primero que la tarjeta tiene por delante.** Los estados se evalúan en este orden, y `por_cerrar` gana.
+
 | `estado` | Cuándo | Cómo se ve la card |
 |---|---|---|
-| `cerrado` | `fechaProximoCierre` < `today` | Como siempre: borde y fondo tintados con `marcaColor(t.marca)`, logos a color. |
-| `abierto` | `fechaProximoCierre` >= `today` (el día del cierre todavía cuenta como abierto) | **Grisada** (borde `divider`, fondo `action.hover`, logos en `grayscale(1)` con `opacity: .65`) + pie con "faltan N días · NN%" y una `LinearProgress` de 4px. |
-| `por_cerrar` | **No** hay `fechaProximoCierre`, pero `fechaCierre` >= `today` | Igual que `abierto` (logos grisados) pero en **ámbar**: borde y fondo `alpha(warning.main, .5/.12)`, leyenda "cierra en N días · NN%" en `warning.main` y `LinearProgress color="warning"`. El tooltip agrega "El resumen de este período todavía no cerró · falta cargar el próximo cierre". |
-| `sin_fecha` | No hay `fechaProximoCierre` y `fechaCierre` ya pasó (o no hay ninguna fecha válida) | Grisada, con "sin cierre cargado" y sin barra. |
+| `por_cerrar` | `fechaCierre` >= `today` — el cierre de **este** período todavía no llegó. Gana sobre los otros dos, **tenga o no `fechaProximoCierre` cargado** | Igual que `abierto` (logos grisados) pero en **ámbar**: borde y fondo `alpha(warning.main, .5/.12)`, leyenda "cierra en N días · NN%" en `warning.main` y `LinearProgress color="warning"`. El tooltip agrega "El resumen de este período todavía no cerró" (+ "· falta cargar el próximo cierre" si no lo tiene). |
+| `cerrado` | `fechaCierre` ya pasó y `fechaProximoCierre` < `today` | Como siempre: borde y fondo tintados con `marcaColor(t.marca)`, logos a color. |
+| `abierto` | `fechaCierre` ya pasó y `fechaProximoCierre` >= `today` (el día del cierre todavía cuenta como abierto) | **Grisada** (borde `divider`, fondo `action.hover`, logos en `grayscale(1)` con `opacity: .65`) + pie con "faltan N días · NN%" y una `LinearProgress` de 4px. |
+| `sin_fecha` | No hay ninguna fecha con la que ubicarse en el ciclo | Grisada, con "sin cierre cargado" y sin barra. |
 
-`dias_para_cierre` son los días hasta el cierre que la tarjeta tiene por delante: `fechaProximoCierre` en `cerrado`/`abierto`, la propia `fechaCierre` en `por_cerrar`.
+`dias_para_cierre` son los días hasta ese cierre: la propia `fechaCierre` en `por_cerrar`, `fechaProximoCierre` en `cerrado`/`abierto`.
 
 `progreso` es la fracción del ciclo que termina en ese cierre ya transcurrida, recortada a `[0, 1]`:
-- `cerrado`/`abierto`: el ciclo `fechaCierre → fechaProximoCierre`. Queda en `null` (sin barra, sólo los días) si falta `fechaCierre` o el intervalo no es válido — un cierre a medio cargar no habilita a dibujar una barra inventada.
-- `por_cerrar`: el ciclo **actual**, el que todavía está acumulando y cierra en `fechaCierre`. Su inicio es el cierre anterior, que por definición no está cargado, así que se deriva como `fechaCierre - 1 mes` (la misma suposición de ciclo mensual que ya hace `generarSiguienteCierre`). El ámbar señala las dos cosas a la vez: el cierre inminente y que falta cargar el próximo cierre.
+- `por_cerrar`: el ciclo **actual**, el que todavía está acumulando y cierra en `fechaCierre`. Su inicio es el cierre anterior, que no está en la fila (`fechaCierre` y `fechaProximoCierre` son el final de este ciclo y del que sigue), así que se deriva como `fechaCierre - 1 mes` — la misma suposición de ciclo mensual que ya hace `generarSiguienteCierre`.
+- `cerrado`/`abierto`: el ciclo `fechaCierre → fechaProximoCierre`, el que acumula los consumos del resumen que viene. Queda en `null` (sin barra, sólo los días) si falta `fechaCierre` o el intervalo no es válido — un cierre a medio cargar no habilita a dibujar una barra inventada.
 
-El único caso sin `fechaProximoCierre` del que se puede decir algo es `por_cerrar`: antes caía todo junto en `sin_fecha` y la tarjeta se mostraba "sin cierre cargado" **teniendo el dato** de que cierra en dos días. Pasada la `fechaCierre` sin próximo cierre cargado ya no queda nada que medir y vuelve a `sin_fecha`.
+**Por qué `por_cerrar` tiene precedencia.** Sin ella, una tarjeta con el cierre a dos días y el próximo cierre cargado mostraba **"faltan 32 días · 0%"**: los 32 días eran hasta el cierre del mes siguiente y el 0% el del ciclo que todavía no arrancó. Las dos cifras eran correctas y las dos inútiles — el dato accionable es que el resumen de este mes cierra ya, que es la última ventana para cargarle consumos. Y si las fechas están invertidas (`fechaProximoCierre` anterior a `fechaCierre`), decir "ya cerró" cuando el cierre del período no llegó es peor que medir el ciclo actual, así que ahí también gana.
+
+Con la `fechaCierre` ya pasada y sin `fechaProximoCierre` no queda nada que medir y el estado vuelve a `sin_fecha`, que es como se venían mostrando esas tarjetas.
 
 Cada card:
 - `<BrandLogo marca={t.marca} width={44} height={32} />` + `BancoLogo` (`size=24`).
