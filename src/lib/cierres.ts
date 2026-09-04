@@ -119,7 +119,10 @@ export function estadoCiclo(
   if (porCerrar) return porCerrar
 
   const dias = cierre?.fechaProximoCierre ? diasEntre(today, cierre.fechaProximoCierre) : null
-  if (dias === null) return cicloPorCerrar(cierre?.fechaCierre ?? null, today)
+  // Llegar acá ya implica que `cicloPorCerrar` dio `null` (la `fechaCierre` pasó o no es
+  // válida), así que sin próximo cierre no queda ninguna fecha con la que ubicarse. Volver a
+  // llamarla devolvería `null`, y `estadoCiclo` no puede devolver `null`.
+  if (dias === null) return { estado: 'sin_fecha', dias: null, progreso: null }
 
   const total = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, cierre.fechaProximoCierre!) : null
   const transcurrido = cierre?.fechaCierre ? diasEntre(cierre.fechaCierre, today) : null
