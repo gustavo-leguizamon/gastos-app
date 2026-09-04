@@ -85,8 +85,8 @@ export default function ProximosCierres({ filtros, refreshKey }: Props) {
           // la que todavía no cerró va grisada, para que el estado se lea de un vistazo.
           const accent = marcaColor((t.marca ?? null) as TarjetaMarca | null) ?? '#6366f1'
           // `por_cerrar` = el resumen de este período todavía está abierto y cierra en breve.
-          // Va en ámbar (y no en el gris de las abiertas) porque son las dos cosas a la vez:
-          // el cierre inminente y el recordatorio de que falta cargar el próximo cierre.
+          // Va en ámbar y no en el gris de las abiertas porque es el estado accionable: es la
+          // última ventana para cargarle consumos antes de que el resumen quede fijo.
           const porCerrar = t.estado === 'por_cerrar'
           return (
             <Tooltip
@@ -111,7 +111,8 @@ export default function ProximosCierres({ filtros, refreshKey }: Props) {
                   </Typography>
                   {porCerrar && (
                     <Typography variant="caption" sx={{ display: 'block' }}>
-                      El resumen de este período todavía no cerró · falta cargar el próximo cierre
+                      El resumen de este período todavía no cerró
+                      {t.fecha_proximo_cierre ? '' : ' · falta cargar el próximo cierre'}
                     </Typography>
                   )}
                 </Box>
