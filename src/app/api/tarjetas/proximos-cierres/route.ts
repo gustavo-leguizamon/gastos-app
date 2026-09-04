@@ -47,12 +47,12 @@ export async function GET(req: NextRequest) {
   })
 
   // Por el cierre que la tarjeta tiene por delante, ascendente: las que ya cerraron primero y
-  // después las que están por cerrar, más cerca antes. Para una `por_cerrar` ese cierre es su
-  // propia `fechaCierre` (no tiene próximo cierre cargado) — ordenarla por imminencia junto a
-  // las demás y no al final, que es donde quedan sólo las que no tienen ninguna fecha.
+  // después las que están por cerrar, más cerca antes. En una `por_cerrar` ese cierre es su
+  // propia `fechaCierre` y **no** su `fechaProximoCierre`, que es el del ciclo siguiente:
+  // ordenarla por ése la mandaría un mes al fondo justo cuando está por cerrar.
   // Entre iguales manda el nombre, para que el orden no dependa del de la DB.
   const proximo = (t: (typeof items)[number]) =>
-    t.fecha_proximo_cierre ?? (t.estado === 'por_cerrar' ? t.fecha_cierre : null)
+    t.estado === 'por_cerrar' ? t.fecha_cierre : t.fecha_proximo_cierre
 
   items.sort((a, b) => {
     const [pa, pb] = [proximo(a), proximo(b)]
