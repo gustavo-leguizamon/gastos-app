@@ -28,6 +28,7 @@ import PaidIcon from '@mui/icons-material/Paid'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import SavingsIcon from '@mui/icons-material/Savings'
 import PaymentsIcon from '@mui/icons-material/Payments'
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
@@ -35,6 +36,7 @@ const NAV = [
   { label: 'Presupuestos', href: '/presupuestos', icon: <SavingsIcon fontSize="small" /> },
   { label: 'Reportes', href: '/reportes', icon: <BarChartIcon fontSize="small" /> },
   { label: 'Inversiones', href: '/inversiones', icon: <TrendingUpIcon fontSize="small" /> },
+  { label: 'Divisas', href: '/divisas', icon: <CurrencyExchangeIcon fontSize="small" /> },
   { label: 'Sueldos', href: '/sueldos', icon: <PaidIcon fontSize="small" /> },
   { label: 'Configuración', href: '/configuracion', icon: <SettingsIcon fontSize="small" /> },
 ]

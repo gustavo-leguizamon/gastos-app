@@ -8,13 +8,15 @@ datasource db {
 }
 
 model Moneda {
-  id       Int       @id @default(autoincrement())
-  codigo   String    @unique
-  nombre   String
-  simbolo  String
-  gastos      Gasto[]
-  ingresos    Ingreso[]
-  inversiones Inversion[]
+  id           Int                @id @default(autoincrement())
+  codigo       String             @unique
+  nombre       String
+  simbolo      String
+  gastos       Gasto[]
+  ingresos     Ingreso[]
+  inversiones  Inversion[]
+  operaciones  OperacionDivisa[]
+  cotizaciones CotizacionDivisa[]
 }
 
 model Casa {
@@ -25,11 +27,11 @@ model Casa {
 }
 
 model Tarjeta {
-  id        Int             @id @default(autoincrement())
-  nombre    String
-  banco     String?
-  marca     String?
-  bancoLogo String?
+  id         Int             @id @default(autoincrement())
+  nombre     String
+  banco      String?
+  marca      String?
+  bancoLogo  String?
   /// Icono subido por el usuario (data URI, ver src/lib/imagen-icono.ts). Gana sobre bancoLogo.
   bancoIcono String?
   /// Período (mes/anio) desde el que la tarjeta está de baja: ya no se posee y deja de
@@ -37,20 +39,20 @@ model Tarjeta {
   /// el histórico de los gastos que la usaron. Ambos null = activa. Ver src/lib/tarjetas-baja.ts.
   bajaMes    Int?
   bajaAnio   Int?
-  gastos    Gasto[]
-  cierres   TarjetaCierre[]
+  gastos     Gasto[]
+  cierres    TarjetaCierre[]
 }
 
 model TarjetaCierre {
-  id                  Int      @id @default(autoincrement())
-  tarjetaId           Int
-  mes                 Int
-  anio                Int
-  fechaCierre         String?
-  fechaVencimiento    String?
-  fechaProximoCierre  String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  tarjetaId          Int
+  mes                Int
+  anio               Int
+  fechaCierre        String?
+  fechaVencimiento   String?
+  fechaProximoCierre String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   tarjeta Tarjeta @relation(fields: [tarjetaId], references: [id], onDelete: Cascade)
 
@@ -63,11 +65,11 @@ model Categoria {
   // Único, igual que `Concepto.nombre`: un duplicado por typo/casing parte el reporte por
   // categoría en dos sin que nada lo señale. El match case-insensitive lo hace
   // `resolveCategoria` en los write paths (el índice de Postgres es case-sensitive).
-  id     Int         @id @default(autoincrement())
-  nombre String      @unique
-  gastos Gasto[]
-  items  GastoItem[]
-  presupuestos Presupuesto[]
+  id              Int                      @id @default(autoincrement())
+  nombre          String                   @unique
+  gastos          Gasto[]
+  items           GastoItem[]
+  presupuestos    Presupuesto[]
   reglasEtiquetas CategoriaEtiquetaRegla[]
 }
 
@@ -126,10 +128,10 @@ model ObjetivoAhorro {
 // Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito
 // (ej. "Viaje", "Deducible", "Compartido"). Migradas desde el viejo M2M de Categoria.
 model Etiqueta {
-  id     Int         @id @default(autoincrement())
-  nombre String      @unique
-  gastos Gasto[]     @relation("GastoEtiquetas")
-  items  GastoItem[] @relation("GastoItemEtiquetas")
+  id     Int                      @id @default(autoincrement())
+  nombre String                   @unique
+  gastos Gasto[]                  @relation("GastoEtiquetas")
+  items  GastoItem[]              @relation("GastoItemEtiquetas")
   reglas CategoriaEtiquetaRegla[]
 }
 
@@ -174,36 +176,36 @@ model Concepto {
 }
 
 model Gasto {
-  id                   Int      @id @default(autoincrement())
-  casaId               Int
-  conceptoId           Int
-  fechaVencimiento     String
-  tipoPago             String
-  monedaId             Int
-  tipoCambio           Float    @default(1)
-  totalMoneda          Float
-  totalPagado          Float    @default(0)
-  pasajeMesSiguiente   Float    @default(0)
-  prestamo_a_otro      Float    @default(0)
-  tarjetaId            Int?
-  cuotaActual          Int?
-  cuotasTotales        Int?
-  mes                  Int
-  anio                 Int
-  notas                String?
-  confirmado           Boolean  @default(true)
-  esTarjeta            Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  casaId             Int
+  conceptoId         Int
+  fechaVencimiento   String
+  tipoPago           String
+  monedaId           Int
+  tipoCambio         Float    @default(1)
+  totalMoneda        Float
+  totalPagado        Float    @default(0)
+  pasajeMesSiguiente Float    @default(0)
+  prestamo_a_otro    Float    @default(0)
+  tarjetaId          Int?
+  cuotaActual        Int?
+  cuotasTotales      Int?
+  mes                Int
+  anio               Int
+  notas              String?
+  confirmado         Boolean  @default(true)
+  esTarjeta          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  categoriaId          Int?
+  categoriaId Int?
 
-  casa    Casa     @relation(fields: [casaId], references: [id])
-  moneda  Moneda   @relation(fields: [monedaId], references: [id])
-  tarjeta   Tarjeta?   @relation(fields: [tarjetaId], references: [id])
-  concepto  Concepto   @relation(fields: [conceptoId], references: [id])
-  categoria  Categoria? @relation(fields: [categoriaId], references: [id])
-  etiquetas Etiqueta[] @relation("GastoEtiquetas")
+  casa      Casa        @relation(fields: [casaId], references: [id])
+  moneda    Moneda      @relation(fields: [monedaId], references: [id])
+  tarjeta   Tarjeta?    @relation(fields: [tarjetaId], references: [id])
+  concepto  Concepto    @relation(fields: [conceptoId], references: [id])
+  categoria Categoria?  @relation(fields: [categoriaId], references: [id])
+  etiquetas Etiqueta[]  @relation("GastoEtiquetas")
   pagos     Pago[]
   items     GastoItem[]
 
@@ -217,11 +219,11 @@ model Gasto {
 }
 
 model GastoItem {
-  id            Int      @id @default(autoincrement())
-  gastoId       Int
-  conceptoId    Int
-  monto         Float
-  fecha         String?
+  id                   Int      @id @default(autoincrement())
+  gastoId              Int
+  conceptoId           Int
+  monto                Float
+  fecha                String?
   cuotaActual          Int?
   cuotasTotales        Int?
   incluyeEnTotal       Boolean  @default(true)
@@ -233,7 +235,7 @@ model GastoItem {
 
   gasto     Gasto      @relation(fields: [gastoId], references: [id], onDelete: Cascade)
   concepto  Concepto   @relation(fields: [conceptoId], references: [id])
-  categoria  Categoria? @relation(fields: [categoriaId], references: [id])
+  categoria Categoria? @relation(fields: [categoriaId], references: [id])
   etiquetas Etiqueta[] @relation("GastoItemEtiquetas")
   pago      Pago?      @relation(fields: [pagoId], references: [id], onDelete: Cascade)
 }
@@ -291,33 +293,103 @@ model Movimiento {
   inversion Inversion @relation(fields: [inversionId], references: [id], onDelete: Cascade)
 }
 
+/// Compra / venta de divisa (dólares). Es el libro de la tenencia: **cuántos dólares hay y
+/// cuántos pesos costaron no se guardan** — se derivan recorriendo las operaciones en orden
+/// (ver src/lib/divisas-compute.ts). Un saldo persistido se desincroniza del detalle que lo
+/// produjo en cuanto se corrige una operación vieja.
+///
+/// No es un `Gasto`: comprar dólares no es consumo, es cambiar un activo por otro. Si entrara
+/// a `Gasto` inflaría el gasto del mes, rompería el presupuesto por categoría y el estimado
+/// del próximo mes proyectaría compras de dólares como si fueran la factura de luz. Por el
+/// mismo motivo una venta no es un `Ingreso`.
+///
+/// Tampoco es una `Inversion`: esa es snapshot-based (se carga el saldo) y **a propósito no
+/// convierte a ARS**, porque mezclar cotizaciones ensuciaría el rendimiento. Acá la variación
+/// del tipo de cambio es justamente lo que se quiere medir, y para eso hace falta el flujo:
+/// cantidad, precio y comisión de cada operación.
+model OperacionDivisa {
+  id             Int      @id @default(autoincrement())
+  /// `YYYY-MM-DD`, como el resto del proyecto. Sin `mes`/`anio` explícitos (a diferencia de
+  /// `Gasto`/`Ingreso`/`Sueldo`): no hay nada que imputar a otro período — una compra ocurrió
+  /// el día que ocurrió, y el orden cronológico es lo único que la corrida necesita.
+  fecha          String
+  /// 'compra' | 'venta' | 'rendimiento' | 'egreso'. Ver `TipoOperacionDivisa`.
+  tipo           String
+  /// La divisa que se mueve (USD, EUR). Nunca ARS: ARS es la otra pata de toda operación.
+  monedaId       Int
+  /// Cantidad operada, **siempre positiva**. El signo lo da `tipo`: un número negativo suelto
+  /// no dice si fue una venta o la corrección de una compra cargada de más.
+  cantidad       Float
+  /// ARS por unidad pactados en la operación. `null` en 'rendimiento' (los dólares no se
+  /// compraron, no hubo precio) y opcional en 'egreso'.
+  cotizacion     Float?
+  comision       Float    @default(0)
+  /// 'ARS' | 'DIVISA' — el broker cobra en pesos en la compra y en dólares en la venta o en
+  /// cripto. Sin saber de qué lado se descuenta, ni la tenencia ni el costo cierran.
+  comisionMoneda String   @default("ARS")
+  /// Dónde quedaron: banco, broker, billetera. Texto libre por ahora.
+  plataforma     String?
+  descripcion    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  moneda Moneda @relation(fields: [monedaId], references: [id])
+
+  /// La corrida siempre se lee completa y en orden para una divisa.
+  @@index([monedaId, fecha])
+}
+
+/// Cotización de referencia de una divisa en una fecha: con qué precio se valúa la tenencia.
+///
+/// Se guarda el histórico y no sólo el último valor porque sin él no hay curva — el valor en
+/// pesos de la posición sólo se puede dibujar si se sabe a cuánto cotizaba en cada momento.
+///
+/// Una por (moneda, fecha): es *la* referencia del día, no un registro de mercado. Si se
+/// siguen varias (MEP, blue, cripto), se carga la que se usa para valuar y se anota cuál en
+/// `fuente`. Recargar el mismo día pisa el valor (upsert sobre el unique).
+model CotizacionDivisa {
+  id        Int      @id @default(autoincrement())
+  monedaId  Int
+  fecha     String
+  /// ARS por unidad.
+  valor     Float
+  /// De dónde salió (BNA, MEP, blue, cripto). Texto libre, informativo.
+  fuente    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  moneda Moneda @relation(fields: [monedaId], references: [id])
+
+  @@unique([monedaId, fecha])
+}
+
 model Settings {
-  id                          Int      @id @default(1)
-  estimMesesAtras             Int      @default(2)
-  estimMissingBehavior        String   @default("zero")
-  estimIncluirCuotasVigentes  Boolean  @default(true)
-  estimExcluirUltimaCuota     Boolean  @default(true)
+  id                         Int      @id @default(1)
+  estimMesesAtras            Int      @default(2)
+  estimMissingBehavior       String   @default("zero")
+  estimIncluirCuotasVigentes Boolean  @default(true)
+  estimExcluirUltimaCuota    Boolean  @default(true)
   // Casa preseleccionada al abrir el alta de un gasto. Null = sin default (el usuario elige),
   // salvo que exista una sola casa (en ese caso GastoForm la autocompleta igual).
-  casaDefaultId               Int?
-  updatedAt                   DateTime @updatedAt
+  casaDefaultId              Int?
+  updatedAt                  DateTime @updatedAt
 }
 
 model Sueldo {
-  id             Int      @id @default(autoincrement())
-  fecha          String
+  id            Int      @id @default(autoincrement())
+  fecha         String
   /// Período al que se imputa el cobro. Explícitos, misma convención que `Gasto` e `Ingreso`:
   /// permiten imputar a agosto un sueldo cobrado el 31 de julio, y hacen que cruzar ingresos
   /// con gastos por período no dependa de derivar el mes de una fecha.
-  mes            Int
-  anio           Int
-  sueldoTeorico  Float    @default(0)
-  sueldoArs      Float    @default(0)
-  sueldoUsd      Float    @default(0)
-  cotizacionBna  Float    @default(0)
-  cotizacionMep  Float    @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  mes           Int
+  anio          Int
+  sueldoTeorico Float    @default(0)
+  sueldoArs     Float    @default(0)
+  sueldoUsd     Float    @default(0)
+  cotizacionBna Float    @default(0)
+  cotizacionMep Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([anio, mes])
 }

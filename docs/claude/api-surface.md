@@ -9,7 +9,7 @@ Next **prerenderiza en el build** toda route que exporte **sólo `GET`** y cuyo 
 
 Ni el type-check ni los tests de la propia route lo detectan. **Si agregás una route de sólo `GET` que toca Prisma, poné `export const dynamic = 'force-dynamic'`.** Basta con que la route exporte además un `POST`/`PUT`/`DELETE`, o que el `GET` reciba `req`, para que Next ya la trate como dinámica y no haga falta.
 
-Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre las 53 routes y falla si alguna cae en el caso sin declararlo. Hoy la regla aplica a `etiquetas/sugeridas`, `gastos/descripciones` e `items/descripciones`.
+Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre las 57 routes y falla si alguna cae en el caso sin declararlo. Hoy la regla aplica a `etiquetas/sugeridas`, `gastos/descripciones` e `items/descripciones`.
 
 ## Routes
 
@@ -62,6 +62,10 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre las 53 routes y fall
 | `PUT/DELETE /api/inversiones/[id]` | Rename / delete inversion (cascade deletes movimientos) |
 | `GET/POST /api/inversiones/[id]/movimientos` | List (sorted by `fecha` asc, ties by `id`) / create movimientos |
 | `PUT/DELETE /api/inversiones/[id]/movimientos/[movId]` | Edit / remove a movimiento |
+| `GET/POST /api/divisas/operaciones` | Operaciones de compra/venta de divisa. `GET` filtra por `moneda_id` y devuelve **en orden cronológico ascendente** (`fecha asc`, `id asc`): es el orden que espera la corrida de `computeOperaciones`. `POST` valida con `parseOperacionBody` → 400 sin tocar la DB. Ver `docs/claude/divisas.md`. |
+| `PUT/DELETE /api/divisas/operaciones/[id]` | Editar / borrar una operación. 400 con id o body inválido, 404 si no existe (sin actualizar ni borrar). |
+| `GET/POST /api/divisas/cotizaciones` | Histórico de cotizaciones de referencia. `GET` filtra por `moneda_id`, cronológico ascendente. `POST` **upsertea** sobre `(monedaId, fecha)`: hay una por día y recargarla corrige el valor en vez de dejar dos compitiendo por valuar la tenencia. |
+| `DELETE /api/divisas/cotizaciones/[id]` | Borrar una cotización. 400 id inválido, 404 si no existe. |
 | `GET/POST /api/sueldos` | List / create sueldos. Sin restricción propia: alcanza con estar logueado (ver `docs/claude/sueldos.md`). |
 | `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
 | `GET/POST/DELETE /api/push/subscribe` | Suscripciones Web Push del usuario logueado (email de la sesión). `POST` upsertea por `endpoint` (body `{ endpoint, p256dh, auth }`, 400 si falta alguno); `DELETE` borra la de este browser (body `{ endpoint }`, filtrado también por email); `GET` devuelve `{ subscriptions: n }`. 401 sin sesión. Ver `docs/claude/auth-pwa.md`. |
