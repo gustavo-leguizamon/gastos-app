@@ -15,7 +15,6 @@ export interface ResumenSettings {
 export interface ResumenResult {
   total_gastos: number
   total_gastos_neto: number
-  total_prestamos: number
   total_tarjetas: number
   total_pasajes: number
   total_restante: number
@@ -130,7 +129,6 @@ export function computeResumen(
   let total_pagado = 0
   let total_restante = 0
   let pagar_hoy = 0
-  let total_prestamos = 0
   let total_tarjetas = 0
   let total_pasajes = 0
   let total_debito = 0
@@ -143,13 +141,11 @@ export function computeResumen(
       : g.items.filter((i: any) => i.incluyeEnTotal).reduce((s: number, i: any) => s + i.monto, 0)
     const pagado = g.pagos.reduce((s: number, p: any) => s + p.monto, 0)
     const restante = totalArs - pagado
-    const prestamo = g.prestamo_a_otro ?? 0
     total_gastos += totalArs
     total_pagado += pagado
     total_restante += restante
-    total_prestamos += prestamo
     total_pasajes += g.pasajeMesSiguiente ?? 0
-    if (g.tipoPago === 'C' && prestamo === 0) total_tarjetas += totalArs
+    if (g.tipoPago === 'C') total_tarjetas += totalArs
     // Débito/efectivo — la plata que sale de la cuenta. Es la base del ahorro del mes.
     if (g.tipoPago === 'D') total_debito += totalArs
     if (vencePorGasto(g.esTarjeta, g.items.length)) {
@@ -201,8 +197,7 @@ export function computeResumen(
   const ahorro = computeAhorro(ingresos, r(total_debito))
   return {
     total_gastos: r(total_gastos),
-    total_gastos_neto: r(total_gastos - total_prestamos - total_tarjetas - total_pasajes),
-    total_prestamos: r(total_prestamos),
+    total_gastos_neto: r(total_gastos - total_tarjetas - total_pasajes),
     total_tarjetas: r(total_tarjetas),
     total_pasajes: r(total_pasajes),
     total_restante: r(total_restante),

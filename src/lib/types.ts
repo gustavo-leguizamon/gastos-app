@@ -1,6 +1,9 @@
 // `ModoPropina` vive en `propina.ts` (junto a la lógica que lo interpreta). El import es
 // sólo de tipo: se borra al compilar, así que no genera ciclo con ese módulo.
 import type { ModoPropina } from './propina'
+// Igual que `ModoPropina`: los tipos de la operación de divisa viven en `divisas-compute.ts`,
+// junto a la lógica que los interpreta. Import sólo de tipo, no genera ciclo.
+import type { ComisionMoneda, TipoOperacionDivisa } from './divisas-compute'
 
 export interface Moneda {
   id: number
@@ -119,7 +122,6 @@ export interface Gasto {
   total_pagado: number
   total_restante: number
   pasaje_mes_siguiente: number
-  prestamo_a_otro: number
   tarjeta_id: number | null
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
@@ -158,7 +160,6 @@ export interface GastoFormData {
   total_moneda: number
   total_pagado: number
   pasaje_mes_siguiente: number
-  prestamo_a_otro: number
   tarjeta_id: number | null
   cuota_actual: number | null
   cuotas_totales: number | null
@@ -218,7 +219,6 @@ export interface ConceptoDefaults {
 export interface Resumen {
   total_gastos: number
   total_gastos_neto: number
-  total_prestamos: number
   total_tarjetas: number
   total_pasajes: number
   total_restante: number
@@ -283,6 +283,42 @@ export interface Movimiento {
   /** Motivo del movimiento, texto libre. `null` = no se aclaró. */
   descripcion: string | null
   created_at: string
+}
+
+/**
+ * Una operación de compra/venta de divisa. `cantidad` es **siempre positiva**: la dirección
+ * la da `tipo`. La tenencia, el costo en pesos y el resultado no viajan acá porque no
+ * existen a nivel fila — se derivan de la corrida (`computeOperaciones`).
+ */
+export interface OperacionDivisa {
+  id: number
+  fecha: string
+  tipo: TipoOperacionDivisa
+  moneda_id: number
+  moneda_codigo: string | null
+  moneda_simbolo: string | null
+  cantidad: number
+  /** ARS por unidad pactados. `null` en un `rendimiento`: no se compró, no hubo precio. */
+  cotizacion: number | null
+  comision: number
+  /** De qué lado se cobró la comisión: cambia la divisa que quedó o los pesos que salieron. */
+  comision_moneda: ComisionMoneda
+  /** Banco, broker, billetera. Texto libre. */
+  plataforma: string | null
+  descripcion: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Cotización de referencia de una divisa en una fecha: con qué precio se valúa la tenencia. */
+export interface CotizacionDivisa {
+  id: number
+  moneda_id: number
+  fecha: string
+  /** ARS por unidad. */
+  valor: number
+  /** BNA, MEP, blue, cripto. Informativo. */
+  fuente: string | null
 }
 
 export interface Sueldo {

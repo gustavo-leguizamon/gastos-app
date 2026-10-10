@@ -3,7 +3,7 @@ import * as yup from 'yup'
 /**
  * Schema de validación del formulario de gasto (`GastoForm`).
  *
- * Montos: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente` y `prestamo_a_otro`
+ * Montos: `total_moneda`, `total_pagado` y `pasaje_mes_siguiente`
  * admiten valores negativos (devoluciones / reintegros / ajustes). El único campo
  * numérico con piso es `tipo_cambio` (> 0) y las cuotas (>= 1).
  */
@@ -17,7 +17,6 @@ export const gastoFormSchema = yup.object({
   total_moneda: yup.number().required('Requerido'),
   total_pagado: yup.number().required('Requerido'),
   pasaje_mes_siguiente: yup.number().required('Requerido'),
-  prestamo_a_otro: yup.number().required('Requerido'),
   tarjeta_id: yup
     .number()
     .nullable()

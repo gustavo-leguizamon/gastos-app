@@ -20,7 +20,6 @@ const base = (over: Partial<GastoFormData> = {}): GastoFormData => ({
   total_moneda: 25000,
   total_pagado: 0,
   pasaje_mes_siguiente: 0,
-  prestamo_a_otro: 0,
   tarjeta_id: 7,
   cuota_actual: 1,
   cuotas_totales: 3,
@@ -135,10 +134,9 @@ describe('buildPropinaGasto', () => {
   })
 
   it('no duplica el pago parcial ni los ajustes del gasto de origen', () => {
-    const p = buildPropinaGasto(base({ pagado_completo: false, total_pagado: 5000, pasaje_mes_siguiente: 800, prestamo_a_otro: 200 }), split)
+    const p = buildPropinaGasto(base({ pagado_completo: false, total_pagado: 5000, pasaje_mes_siguiente: 800 }), split)
     expect(p.total_pagado).toBe(0)
     expect(p.pasaje_mes_siguiente).toBe(0)
-    expect(p.prestamo_a_otro).toBe(0)
   })
 
   it('nunca es un resumen de tarjeta', () => {

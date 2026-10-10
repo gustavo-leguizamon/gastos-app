@@ -67,7 +67,6 @@ async function propagatePagoToTarjeta(opts: {
         totalMoneda: 0,
         totalPagado: 0,
         pasajeMesSiguiente: 0,
-        prestamo_a_otro: 0,
         tarjetaId: source.tarjetaId,
         mes: target.mes,
         anio: target.anio,

@@ -100,7 +100,6 @@ const CARDS: CardDef[] = [
 const RESUMEN_VACIO: Resumen = {
   total_gastos: 0,
   total_gastos_neto: 0,
-  total_prestamos: 0,
   total_tarjetas: 0,
   total_pasajes: 0,
   total_restante: 0,
@@ -207,16 +206,11 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
                   </Typography>
                 </Box>
               )}
-              {card.key === 'total_gastos' && (resumen.total_prestamos > 0 || resumen.total_tarjetas > 0 || resumen.total_pasajes > 0) && (
+              {card.key === 'total_gastos' && (resumen.total_tarjetas > 0 || resumen.total_pasajes > 0) && (
                 <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     Neto: <strong>{formatARS(resumen.total_gastos_neto)}</strong>
                   </Typography>
-                  {resumen.total_prestamos > 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      Préstamos: {formatARS(resumen.total_prestamos)}
-                    </Typography>
-                  )}
                   {resumen.total_tarjetas > 0 && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                       Tarjetas: {formatARS(resumen.total_tarjetas)}

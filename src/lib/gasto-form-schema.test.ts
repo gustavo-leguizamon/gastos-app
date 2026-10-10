@@ -11,7 +11,6 @@ const base = {
   total_moneda: 1000,
   total_pagado: 0,
   pasaje_mes_siguiente: 0,
-  prestamo_a_otro: 0,
   tarjeta_id: null,
   cuota_actual: null,
   cuotas_totales: null,
@@ -29,7 +28,7 @@ const validate = (over: Record<string, unknown>) => gastoFormSchema.validate({ .
 
 describe('gastoFormSchema — montos negativos', () => {
   // Devoluciones/reintegros de tarjeta: todos los montos deben admitir negativos.
-  it.each(['total_moneda', 'total_pagado', 'pasaje_mes_siguiente', 'prestamo_a_otro'])(
+  it.each(['total_moneda', 'total_pagado', 'pasaje_mes_siguiente'])(
     'acepta %s negativo',
     async (field) => {
       const out = await validate({ [field]: -1500.5 })
