@@ -118,7 +118,6 @@ export function buildPropinaGasto(data: GastoFormData, split: SplitPropina): Gas
     total_moneda: split.total_propina,
     total_pagado: 0,
     pasaje_mes_siguiente: 0,
-    prestamo_a_otro: 0,
     cuota_actual: null,
     cuotas_totales: null,
     es_tarjeta: false,

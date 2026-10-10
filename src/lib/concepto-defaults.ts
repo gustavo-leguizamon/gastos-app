@@ -8,7 +8,7 @@ import type { ConceptoDefaults } from '@/lib/types'
  * concepto (anio, mes, id descendente) — ver `ULTIMO_USO_ORDER_BY`.
  *
  * Contrato deliberado: `es_tarjeta`, `notas`, `cuota_actual`/`cuotas_totales`, `pasaje_mes_siguiente`
- * y `prestamo_a_otro` **no** se heredan. Son propios de la ocurrencia puntual (un resumen de
+ * **no** se heredan. Son propios de la ocurrencia puntual (un resumen de
  * tarjeta, una nota de ese mes, una cuota 3/12 que el mes que viene es 4/12), no del concepto:
  * copiarlos generaría datos incorrectos en silencio.
  */

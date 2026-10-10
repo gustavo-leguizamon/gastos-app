@@ -7,24 +7,23 @@
 - `total_pagado = SUM(pagos.monto)` — del relation `Pago`, **no** de `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
-**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, `prestamo_a_otro`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total.
+**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total.
 
 Los únicos pisos numéricos que quedan son `tipo_cambio > 0` (`min(0.0001)`) y las cuotas `>= 1`. Los pagos siguen rechazando monto `0` (`PagoDialog` valida `montoNum !== 0`).
 
 El schema Yup del formulario vive en **`src/lib/gasto-form-schema.ts`** (módulo puro, sin imports de MUI/React) y `GastoForm` lo consume vía `yupResolver`. Está testeado en `gasto-form-schema.test.ts`: acepta negativos en los cuatro montos y mantiene los pisos de `tipo_cambio`, cuotas, casa/moneda/descripción y tarjeta requerida cuando `tipo_pago === 'C'`.
 
-En el grid, las columnas **Pasaje** y **Préstamo** (y el bloque de extras de la vista mobile) se muestran cuando el valor es `!== 0` — antes usaban `> 0`, lo que ocultaba los negativos.
+En el grid, la columna **Pasaje** (y el bloque de extras de la vista mobile) se muestran cuando el valor es `!== 0` — antes usaban `> 0`, lo que ocultaba los negativos.
 
 `/api/resumen` computa estos agregados server-side para las cards. También devuelve:
-- `total_gastos_neto = total_gastos - total_prestamos - total_tarjetas - total_pasajes`
-- `total_prestamos = SUM(prestamo_a_otro)`
-- `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C' AND prestamo_a_otro === 0` — gastos crédito con `prestamo_a_otro > 0` se excluyen para no restar dos veces.
+- `total_gastos_neto = total_gastos - total_tarjetas - total_pasajes`
+- `total_tarjetas = SUM(total_ars) for gastos with tipoPago === 'C'`
 - `total_pasajes = SUM(pasaje_mes_siguiente)` — montos pasados al mes siguiente también restan al neto.
 - `total_restante_neto = total_restante - total_pasajes` — el restante del mes descontando lo que se pasa al mes siguiente.
 
 - `total_ingresos` = suma de los `Ingreso` del mes **en ARS** (`montoMoneda * tipoCambio`, como el gasto); `total_debito` = `SUM(total_ars)` de los gastos con `tipoPago === 'D'` (débito/efectivo, incluye los resúmenes de tarjeta y excluye los consumos de crédito, que ya están dentro de esos resúmenes); `total_ahorro` = `total_ingresos - total_debito` y `ahorro_pct`. Ver `docs/claude/ingresos.md`.
 
-Se muestran como breakdown secundario dentro de las cards: "Total Gastos" muestra `total_gastos_neto` + componentes (préstamos/tarjetas/pasajes) si alguno es no-cero; "Restante" muestra `total_restante_neto` + el monto de pasajes si `total_pasajes > 0`.
+Se muestran como breakdown secundario dentro de las cards: "Total Gastos" muestra `total_gastos_neto` + componentes (tarjetas/pasajes) si alguno es no-cero; "Restante" muestra `total_restante_neto` + el monto de pasajes si `total_pasajes > 0`.
 
 `ResumenCards` renderiza además las cards **Ingresos** (abre el ABM del mes en `IngresosDialog`) y **Ahorro** (con el % de lo ingresado, en rojo si es negativo y `—` si no hay ingresos cargados).
 
@@ -106,6 +105,15 @@ Desde la grilla, el botón **"Exportar"** ofrece **Gastos** y **Sub-ítems** (un
 ## Presupuestos
 
 Topes mensuales por categoría, en su propia sección `/presupuestos` (comparte el `filtros` del `gastosStore`, así que sigue el mes que se está mirando). Ver [presupuestos.md](presupuestos.md).
+
+## Préstamos (sin campo propio)
+
+Prestar plata a alguien **no tiene campo en el gasto**: antes existía `prestamo_a_otro` (sólo editable, y restaba del neto); se eliminó porque un préstamo es plata que salió del bolsillo y se modela como cualquier otro gasto.
+
+- El gasto que se prestó se carga normal y se marca con la etiqueta **`Préstamos`** (la categoría no se toca).
+- La **devolución** es un gasto de **monto negativo** con la misma categoría y etiquetas del original + la etiqueta **`Devolucion`**. Ya está soportado por los montos negativos (ver arriba): resta de `total_gastos`, de `total_tarjetas` si es crédito y del débito del ahorro.
+- Para ver el saldo pendiente, filtrar `/reportes` por la etiqueta `Préstamos`.
+- **Legacy:** la columna `Gasto.prestamo_a_otro` sigue en la DB (la app no la lee ni la escribe, y `GastoFormData`/`Gasto`/`Resumen` ya no la exponen; `total_prestamos` desapareció del resumen) porque la DB es una sola para los tres ambientes y producción puede correr código viejo. `scripts/migrar-prestamos-a-gastos.js` (dry-run por defecto, `--apply` escribe) pasa los datos viejos al modelo nuevo: etiqueta `Préstamos` al gasto original y un gasto negativo en ARS (`-prestamo_a_otro`, tipo de cambio 1, `es_tarjeta: false`, nota con el id de origen) por cada uno. Es idempotente y transaccional. La columna se borra en una migración posterior.
 
 ## Payment system
 
@@ -226,7 +234,7 @@ El form está optimizado para cargar rápido: los campos con default correcto en
 
 **Área principal** — sólo lo que se tipea en toda carga, en este orden: `descripcion` (con `autoFocus` en alta) + `total_moneda` → **propina** (colapsada, sólo en alta de un gasto común — ver [Propina como gasto aparte](#propina-como-gasto-aparte)) → `tipo_cambio` + "Total en ARS" (sólo si la moneda no es ARS) → `fecha_vencimiento` + **Medio de pago**.
 
-**Acordeón "Más opciones"** (`defaultExpanded` sólo en edición), en filas de dos: `categoria_id` + `etiqueta_ids` → `casa_id` + `moneda_id` → `pagado_completo` (fila propia) → `total_pagado` + cuotas → `notas` → `pasaje_mes_siguiente` + `prestamo_a_otro` (edición) → `confirmado` → `es_tarjeta`. El orden está armado para que los `sm={6}` queden emparejados y no sobre ninguno suelto: por eso `moneda_id` sube al lado de `casa_id` y las cuotas bajan al lado de `total_pagado` (cuando `pagado_completo` está marcado, `total_pagado` se oculta y las cuotas quedan solas en la fila).
+**Acordeón "Más opciones"** (`defaultExpanded` sólo en edición), en filas de dos: `categoria_id` + `etiqueta_ids` → `casa_id` + `moneda_id` → `pagado_completo` (fila propia) → `total_pagado` + cuotas → `notas` → `pasaje_mes_siguiente` (edición) → `confirmado` → `es_tarjeta`. El orden está armado para que los `sm={6}` queden emparejados y no sobre ninguno suelto: por eso `moneda_id` sube al lado de `casa_id` y las cuotas bajan al lado de `total_pagado` (cuando `pagado_completo` está marcado, `total_pagado` se oculta y las cuotas quedan solas en la fila).
 
 Todos estos campos están acá porque el autofill los llena (categoría/etiquetas desde el concepto, casa desde el default configurable) o porque su default sirve en la carga típica. Corolario: los helpers `de jun 2026` de esos campos sólo se ven al expandir el acordeón; el aviso de que hubo prefill vive en el helper de `descripcion`, que siempre está visible.
 
@@ -243,7 +251,7 @@ Todos estos campos están acá porque el autofill los llena (categoría/etiqueta
 
 Reglas del autofill:
 
-- **No se heredan** `es_tarjeta`, `notas`, cuotas, `pasaje_mes_siguiente` ni `prestamo_a_otro`: son propios de la ocurrencia puntual, no del concepto (una cuota 3/12 el mes que viene es 4/12).
+- **No se heredan** `es_tarjeta`, `notas`, cuotas, ni `pasaje_mes_siguiente`: son propios de la ocurrencia puntual, no del concepto (una cuota 3/12 el mes que viene es 4/12).
 - La query excluye `esTarjeta: true` (un resumen de tarjeta no es un gasto cargable a mano) y la `tarjeta_id` sólo se hereda si el pago era con crédito.
 - **Cuándo dispara**: sólo al elegir del dropdown (`onChange`) o al salir del campo (`onBlur`) — nunca por tecla, porque tipear "Luz de la casa" pasaría por "Luz" en el camino y prefillearía con el concepto equivocado.
 - **Nunca sobreescribe** un campo que el usuario ya tocó (se chequea `formState.dirtyFields`). Los `setValue` del autofill no marcan dirty, así que cambiar la descripción reemplaza el autofill anterior pero preserva lo tipeado a mano.
@@ -261,7 +269,7 @@ Reglas del autofill:
   - Si falla, toast pero gasto ya creado.
   - Como el pago va por endpoint normal, **propagación a tarjeta de crédito** dispara automático cuando `tipo_pago = 'C'` con `tarjeta_id`.
   - En edición no se renderiza; pagos por `PagoDialog`.
-- **Pasaje / Préstamo**: solo en edición (`isEditing = !!gasto`).
+- **Pasaje**: solo en edición (`isEditing = !!gasto`).
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (Yup `when('tipo_pago', { is: 'C', ... })`). La UI oculta "Sin especificar" y el label pierde "(opcional)". Sin tarjeta → `FormHelperText` "Seleccioná una tarjeta". `tipo_pago === 'D'` sigue siendo opcional.
 
 ## Propina como gasto aparte
@@ -291,7 +299,7 @@ El form permite cargar los dos de una sola vez. **Se siguen persistiendo como do
 **Qué hereda y qué no:**
 
 - **Hereda**: `fecha_vencimiento`, `casa_id`, `tipo_pago` + `tarjeta_id`, `moneda_id`, `tipo_cambio`, `mes`/`anio`, `confirmado` y `pagado_completo`.
-- **No hereda** cuotas (una propina no se financia), `pasaje_mes_siguiente` ni `prestamo_a_otro` (ajustes del gasto de origen), y nunca es `es_tarjeta`.
+- **No hereda** cuotas (una propina no se financia), ni `pasaje_mes_siguiente` (ajuste del gasto de origen), y nunca es `es_tarjeta`.
 - **`total_pagado` va en 0**: un pago parcial tipeado a mano es del gasto principal; duplicarlo inventaría plata pagada. Con `pagado_completo` cada gasto genera su propio pago por su propio total, y si el medio es crédito **cada uno propaga su sub-item al resumen de la tarjeta**, sin código extra.
 
 **UI** (`GastoForm`) — fila propia debajo de `total_moneda`, colapsada detrás de un botón `+ Propina` porque es ocasional y no debe meter ruido en cada carga. Abierta: monto (en la moneda del gasto) + `ToggleButtonGroup` **Aparte / Incluida** + una `X` que la quita y resetea todo el bloque; debajo, **Categoría de la propina** + **Etiquetas de la propina** (`AppSelect`/`AppMultiSelect`, con alta inline como los del gasto). Al final, un **preview en vivo** con los dos montos exactos y **la categoría en la que va a caer la propina**, calculado con la **misma** `splitPropina` que usa el submit — el preview no puede mostrar una cosa y guardar otra, y es lo que hace que el usuario no dependa de interpretar el label del toggle. Si en `incluida` la propina supera al total, el preview pasa a `warning.main` y avisa, **sin bloquear** (los negativos son válidos en toda la app).
@@ -338,7 +346,7 @@ Ambos llaman `triggerRefresh()` al terminar.
 2. **Sub-items candidatos:** si el gasto es `esTarjeta`, sólo los que tienen **cuotas pendientes** (`cuotaActual != null && cuotasTotales != null && cuotaActual < cuotasTotales`). Para gastos normales, todos los sub-items.
 3. **Busca si ya existe** un gasto en el destino: `casaId` + `mes` + `anio` + `conceptoId`.
 4. **Si existe (merge):** no crea gasto nuevo. Agrega sólo los sub-items candidatos cuyo `conceptoId` **no exista ya** entre los items del gasto destino. Devuelve `{ merged: true, gasto_id, added_items }`.
-5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje/prestamo` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, y conecta sus `categorias`, etc.) y todos los sub-items candidatos (cada uno conecta sus propias `categorias`). Devuelve `{ created: true, gasto_id, added_items }`.
+5. **Si no existe:** crea el gasto (reset de `totalPagado/pasaje` a 0, `confirmado: false`, copia `es_tarjeta`, `tarjeta_id`, y conecta sus `categorias`, etc.) y todos los sub-items candidatos (cada uno conecta sus propias `categorias`). Devuelve `{ created: true, gasto_id, added_items }`.
 6. **Incremento de cuota:** tanto el **gasto principal** (al crearlo nuevo) como cada **sub-item** copiado, si están en cuotas no finalizadas (`cuotaActual < cuotasTotales`), se copian con `cuotaActual + 1` (`cuotasTotales` sin cambios). Los demás se copian tal cual. Aplica sea o no `esTarjeta`. El gasto sólo incrementa en la rama de creación (en merge no se toca el gasto destino existente).
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
