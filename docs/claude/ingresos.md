@@ -82,9 +82,9 @@ Se compara contra **lo gastado en débito/efectivo** (`total_debito`, calculado 
   se carga como `tipoPago: 'D'` (con `esTarjeta: true`) porque se paga de la cuenta. Por eso
   filtrar por débito incluye el resumen y excluye los consumos individuales: **no hay doble
   conteo**.
-- **`prestamo_a_otro` y `pasaje_mes_siguiente` no se descuentan** del débito: si salieron de
-  la cuenta este mes, bajan el ahorro este mes (a diferencia de `total_gastos_neto`, que sí
-  los resta).
+- **`pasaje_mes_siguiente` no se descuenta** del débito: si salió de la cuenta este mes,
+  baja el ahorro este mes (a diferencia de `total_gastos_neto`, que sí lo resta). Una
+  **devolución de préstamo** (gasto negativo) sí resta del débito, porque es un gasto más.
 - En un gasto **no confirmado con sub-items** se usa la suma de los sub-items
   `incluyeEnTotal`, igual que el resto de los totales del resumen.
 

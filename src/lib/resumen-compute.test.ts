@@ -17,7 +17,6 @@ function makeGasto(overrides: Record<string, any> = {}) {
     tipoCambio: 1,
     totalMoneda: 1000,
     pasajeMesSiguiente: 0,
-    prestamo_a_otro: 0,
     cuotaActual: null,
     cuotasTotales: null,
     fechaVencimiento: '2026-06-10',
@@ -48,24 +47,37 @@ describe('computeResumen — agregados básicos', () => {
     expect(r.total_restante).toBe(600)
   })
 
-  it('total_tarjetas suma sólo gastos tipo C sin préstamo', () => {
+  it('total_tarjetas suma sólo gastos tipo C', () => {
     const r = computeResumen(
       [
-        makeGasto({ totalMoneda: 1000, tipoPago: 'C', prestamo_a_otro: 0 }),
-        makeGasto({ totalMoneda: 500, tipoPago: 'C', prestamo_a_otro: 200 }), // préstamo → excluido
-        makeGasto({ totalMoneda: 300, tipoPago: 'D' }),                        // débito → excluido
+        makeGasto({ totalMoneda: 1000, tipoPago: 'C' }),
+        makeGasto({ totalMoneda: 500, tipoPago: 'C' }),
+        makeGasto({ totalMoneda: 300, tipoPago: 'D' }), // débito → excluido
       ],
       [], SETTINGS_DEFAULT, TODAY,
     )
-    expect(r.total_tarjetas).toBe(1000)
+    expect(r.total_tarjetas).toBe(1500)
   })
 
-  it('total_prestamos y total_pasajes se acumulan; neto descuenta préstamos, tarjetas y pasajes', () => {
+  it('una devolución (gasto negativo) resta de total_gastos y de total_tarjetas', () => {
     const r = computeResumen(
-      [makeGasto({ totalMoneda: 1000, tipoPago: 'C', prestamo_a_otro: 0, pasajeMesSiguiente: 100 })],
+      [
+        makeGasto({ totalMoneda: 1000, tipoPago: 'C' }),
+        makeGasto({ totalMoneda: -200, tipoPago: 'C' }), // devolución de un préstamo
+      ],
       [], SETTINGS_DEFAULT, TODAY,
     )
-    // total_gastos 1000, tarjetas 1000, pasajes 100 → neto = 1000 - 0 - 1000 - 100 = -100
+    expect(r.total_gastos).toBe(800)
+    expect(r.total_tarjetas).toBe(800)
+    expect(r).not.toHaveProperty('total_prestamos')
+  })
+
+  it('total_pasajes se acumula; neto descuenta tarjetas y pasajes', () => {
+    const r = computeResumen(
+      [makeGasto({ totalMoneda: 1000, tipoPago: 'C', pasajeMesSiguiente: 100 })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    // total_gastos 1000, tarjetas 1000, pasajes 100 → neto = 1000 - 1000 - 100 = -100
     expect(r.total_pasajes).toBe(100)
     expect(r.total_gastos_neto).toBe(-100)
     expect(r.total_restante_neto).toBe(r.total_restante - 100)

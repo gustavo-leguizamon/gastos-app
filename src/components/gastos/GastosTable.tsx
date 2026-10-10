@@ -581,15 +581,6 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       },
     },
     {
-      field: 'prestamo_a_otro',
-      headerName: 'Préstamo',
-      width: 110,
-      renderCell: ({ value, row }) => {
-        if (row._type === 'item' || row._type === 'items_total') return '-'
-        return value !== 0 ? <span style={{ color: '#8b5cf6' }}>{fmtARS(value)}</span> : '-'
-      },
-    },
-    {
       field: 'cuota_actual',
       headerName: 'Cuotas',
       width: 80,
@@ -949,7 +940,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
           </Box>
 
           {/* Extras opcionales */}
-          {(g.pasaje_mes_siguiente !== 0 || g.prestamo_a_otro !== 0 || (g.moneda_codigo !== 'ARS')) && (
+          {(g.pasaje_mes_siguiente !== 0 || (g.moneda_codigo !== 'ARS')) && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1 }}>
               {g.moneda_codigo !== 'ARS' && (
                 <Typography variant="caption" color="text.secondary">
@@ -959,11 +950,6 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
               {g.pasaje_mes_siguiente !== 0 && (
                 <Typography variant="caption" sx={{ color: '#ec4899' }}>
                   Pasaje: {fmtARS(g.pasaje_mes_siguiente)}
-                </Typography>
-              )}
-              {g.prestamo_a_otro !== 0 && (
-                <Typography variant="caption" sx={{ color: '#8b5cf6' }}>
-                  Préstamo: {fmtARS(g.prestamo_a_otro)}
                 </Typography>
               )}
             </Box>

@@ -30,7 +30,6 @@ function rawGasto(over: Record<string, any> = {}) {
     tipoCambio: 1,
     totalMoneda: 1000,
     pasajeMesSiguiente: 0,
-    prestamo_a_otro: 0,
     cuotaActual: null,
     cuotasTotales: null,
     mes: 6,

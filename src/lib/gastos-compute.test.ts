@@ -15,7 +15,6 @@ function makeGasto(overrides: Record<string, any> = {}) {
     tipoCambio: 1,
     totalMoneda: 1000,
     pasajeMesSiguiente: 0,
-    prestamo_a_otro: 0,
     tarjetaId: null,
     etiquetas: [],
     cuotaActual: null,
@@ -35,11 +34,10 @@ function makeGasto(overrides: Record<string, any> = {}) {
 
 describe('toGastoResponse', () => {
   it('mapea campos camelCase → snake_case', () => {
-    const r = toGastoResponse(makeGasto({ casaId: 7, tipoPago: 'C', pasajeMesSiguiente: 50, prestamo_a_otro: 30 }))
+    const r = toGastoResponse(makeGasto({ casaId: 7, tipoPago: 'C', pasajeMesSiguiente: 50 }))
     expect(r.casa_id).toBe(7)
     expect(r.tipo_pago).toBe('C')
     expect(r.pasaje_mes_siguiente).toBe(50)
-    expect(r.prestamo_a_otro).toBe(30)
     expect(r.es_tarjeta).toBe(false)
   })
 
