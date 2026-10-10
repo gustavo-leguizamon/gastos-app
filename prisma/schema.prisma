@@ -186,6 +186,9 @@ model Gasto {
   totalMoneda        Float
   totalPagado        Float    @default(0)
   pasajeMesSiguiente Float    @default(0)
+  /// LEGACY: la app ya no lo lee ni lo escribe (un préstamo es un gasto y su devolución un gasto
+  /// negativo con la etiqueta `Devolucion`). Se conserva porque producción puede correr código
+  /// viejo que lo lee; se elimina en una migración posterior. Ver `scripts/migrar-prestamos-a-gastos.js`.
   prestamo_a_otro    Float    @default(0)
   tarjetaId          Int?
   cuotaActual        Int?

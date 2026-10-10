@@ -83,7 +83,6 @@ export async function POST(req: NextRequest) {
       totalMoneda: source.totalMoneda,
       totalPagado: 0,
       pasajeMesSiguiente: 0,
-      prestamo_a_otro: 0,
       tarjetaId: source.tarjetaId,
       cuotaActual: nextCuota(source),
       cuotasTotales: source.cuotasTotales,

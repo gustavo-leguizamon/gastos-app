@@ -122,7 +122,6 @@ export interface Gasto {
   total_pagado: number
   total_restante: number
   pasaje_mes_siguiente: number
-  prestamo_a_otro: number
   tarjeta_id: number | null
   tarjeta_nombre?: string | null
   tarjeta_banco?: string | null
@@ -161,7 +160,6 @@ export interface GastoFormData {
   total_moneda: number
   total_pagado: number
   pasaje_mes_siguiente: number
-  prestamo_a_otro: number
   tarjeta_id: number | null
   cuota_actual: number | null
   cuotas_totales: number | null
@@ -221,7 +219,6 @@ export interface ConceptoDefaults {
 export interface Resumen {
   total_gastos: number
   total_gastos_neto: number
-  total_prestamos: number
   total_tarjetas: number
   total_pasajes: number
   total_restante: number

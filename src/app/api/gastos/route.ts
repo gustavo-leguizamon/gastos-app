@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
       totalMoneda: body.total_moneda,
       totalPagado: body.total_pagado ?? 0,
       pasajeMesSiguiente: body.pasaje_mes_siguiente ?? 0,
-      prestamo_a_otro: body.prestamo_a_otro ?? 0,
       tarjetaId: body.tarjeta_id ?? null,
       cuotaActual: body.cuota_actual ?? null,
       cuotasTotales: body.cuotas_totales ?? null,

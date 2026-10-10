@@ -19,7 +19,6 @@ function gasto(over: Partial<Gasto> = {}): Gasto {
     total_pagado: 400,
     total_restante: 600,
     pasaje_mes_siguiente: 0,
-    prestamo_a_otro: 0,
     tarjeta_id: null,
     tarjeta_nombre: null,
     categoria_id: null,

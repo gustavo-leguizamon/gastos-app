@@ -69,7 +69,6 @@ export function toGastoResponse(g: any) {
     total_pagado: totalPagado,
     total_restante: round2(totalArs - totalPagado),
     pasaje_mes_siguiente: g.pasajeMesSiguiente,
-    prestamo_a_otro: g.prestamo_a_otro,
     tarjeta_id: g.tarjetaId,
     tarjeta_nombre: g.tarjeta?.nombre ?? null,
     tarjeta_banco: g.tarjeta?.banco ?? null,

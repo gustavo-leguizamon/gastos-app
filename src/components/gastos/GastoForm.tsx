@@ -97,7 +97,6 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       total_moneda: gasto?.total_moneda ?? 0,
       total_pagado: gasto?.total_pagado ?? 0,
       pasaje_mes_siguiente: gasto?.pasaje_mes_siguiente ?? 0,
-      prestamo_a_otro: gasto?.prestamo_a_otro ?? 0,
       tarjeta_id: gasto?.tarjeta_id ?? null,
       cuota_actual: gasto?.cuota_actual ?? null,
       cuotas_totales: gasto?.cuotas_totales ?? null,
@@ -877,47 +876,26 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                   />
                 </Grid>
 
-                {/* Pasaje / Préstamo — solo en edición */}
+                {/* Pasaje — solo en edición */}
                 {isEditing && (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <Controller
-                        name="pasaje_mes_siguiente"
-                        control={control}
-                        render={({ field }) => (
-                          <TextField
-                            {...field}
-                            fullWidth
-                            label="Pasaje Mes Siguiente (ARS)"
-                            type="number"
-                            size="small"
-                            inputProps={{ step: 0.01 }}
-                            error={!!errors.pasaje_mes_siguiente}
-                            helperText={errors.pasaje_mes_siguiente?.message}
-                          />
-                        )}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} sm={6}>
-                      <Controller
-                        name="prestamo_a_otro"
-                        control={control}
-                        render={({ field }) => (
-                          <TextField
-                            {...field}
-                            fullWidth
-                            label="Préstamo a otra persona (ARS)"
-                            type="number"
-                            size="small"
-                            inputProps={{ step: 0.01 }}
-                            error={!!errors.prestamo_a_otro}
-                            helperText={errors.prestamo_a_otro?.message}
-                          />
-                        )}
-                      />
-                    </Grid>
-                  </>
+                  <Grid item xs={12}>
+                    <Controller
+                      name="pasaje_mes_siguiente"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          label="Pasaje Mes Siguiente (ARS)"
+                          type="number"
+                          size="small"
+                          inputProps={{ step: 0.01 }}
+                          error={!!errors.pasaje_mes_siguiente}
+                          helperText={errors.pasaje_mes_siguiente?.message}
+                        />
+                      )}
+                    />
+                  </Grid>
                 )}
 
                 {/* Confirmado */}
