@@ -272,6 +272,12 @@ Reglas del autofill:
 - **Pasaje**: solo en edición (`isEditing = !!gasto`).
 - **Tarjeta obligatoria con crédito**: cuando `tipo_pago === 'C'` el campo `tarjeta_id` es obligatorio (Yup `when('tipo_pago', { is: 'C', ... })`). La UI oculta "Sin especificar" y el label pierde "(opcional)". Sin tarjeta → `FormHelperText` "Seleccioná una tarjeta". `tipo_pago === 'D'` sigue siendo opcional.
 
+## Aviso de gasto repetido (alta)
+
+Al **crear** un gasto (no al editar), `GastoDialog` consulta `GET /api/gastos?mes&anio` del período y compara con `buscarDuplicados` (`src/lib/gastos-duplicado.ts`, puro y testeado). Es "repetido" el que coincide en **concepto** (case-insensitive, normalizado), **mes/año**, **moneda** y **monto** (`total_moneda`); fecha, casa, tarjeta y notas no cuentan, porque el olvido típico es cargarlo con otra fecha o medio de pago. Los resúmenes de tarjeta (`es_tarjeta`) se ignoran.
+
+Si hay match se abre un `ConfirmDialog` ("Este gasto parece repetido", lista las fechas de los existentes) con **Cargar igual** (guarda normal, incluida la propina y "Guardar y cargar otro") o **Cancelar** (vuelve al form con lo tipeado). Es sólo un aviso del cliente: no hay restricción ni cambios en la API, y si la consulta falla se guarda sin avisar. Sólo se chequea el gasto principal, no la propina.
+
 ## Propina como gasto aparte
 
 Hay gastos que llevan propina y se registran como **dos gastos individuales** (el consumo y la propina). Cargarlos por separado obliga a repetir todo el contexto y, cuando la propina viene incluida en lo pagado, a hacer la resta a mano — que es donde se cuelan los errores y donde después no queda rastro de por qué el monto no cierra con el ticket.
