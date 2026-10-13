@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 import GastoForm from './GastoForm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { aplicarPropina } from '@/lib/propina'
+import { buscarDuplicados } from '@/lib/gastos-duplicado'
 import type { Gasto, GastoFormData, FiltrosGastos } from '@/lib/types'
 
 interface Props {
@@ -28,6 +29,8 @@ const FORM_ID = 'gasto-form'
 export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  // Alta pendiente de confirmar porque ya hay un gasto equivalente cargado en el período.
+  const [duplicado, setDuplicado] = useState<{ data: GastoFormData; repetidos: Gasto[] } | null>(null)
   // "Guardar y cargar otro": el diálogo queda abierto y el form se limpia conservando el contexto.
   const [resetSignal, setResetSignal] = useState(0)
   const seguirCargando = useRef(false)
@@ -72,7 +75,31 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
     }
   }
 
+  /** Gastos del período del alta que coinciden con `data`. Si la consulta falla, no avisa. */
+  const buscarRepetidos = async (data: GastoFormData): Promise<Gasto[]> => {
+    try {
+      const res = await fetch(`/api/gastos?mes=${data.mes}&anio=${data.anio}`)
+      if (!res.ok) return []
+      return buscarDuplicados(data, await res.json()) as Gasto[]
+    } catch {
+      return []
+    }
+  }
+
   const handleSubmit = async (data: GastoFormData) => {
+    if (!gasto) {
+      setLoading(true)
+      const repetidos = await buscarRepetidos(data)
+      if (repetidos.length > 0) {
+        setLoading(false)
+        setDuplicado({ data, repetidos })
+        return
+      }
+    }
+    await guardar(data)
+  }
+
+  const guardar = async (data: GastoFormData) => {
     setLoading(true)
     try {
       if (gasto) {
@@ -150,6 +177,21 @@ export default function GastoDialog({ open, gasto, filtros, onClose, onSaved }: 
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!duplicado}
+        title="Este gasto parece repetido"
+        message={
+          duplicado
+            ? `Ya hay ${duplicado.repetidos.length === 1 ? 'un gasto' : `${duplicado.repetidos.length} gastos`} "${duplicado.data.descripcion.trim()}" por el mismo monto en ${String(duplicado.data.mes).padStart(2, '0')}/${duplicado.data.anio}` +
+              ` (vence ${duplicado.repetidos.map(r => r.fecha_vencimiento).join(', ')}). ¿Lo cargás igual?`
+            : ''
+        }
+        confirmLabel="Cargar igual"
+        confirmColor="warning"
+        onConfirm={() => { const d = duplicado!.data; setDuplicado(null); guardar(d) }}
+        onCancel={() => { setDuplicado(null); seguirCargando.current = false }}
+      />
 
       <ConfirmDialog
         open={confirmClose}
