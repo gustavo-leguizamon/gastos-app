@@ -15,7 +15,6 @@ export async function GET(req: NextRequest) {
   const where: any = {}
   if (mes) where.mes = Number(mes)
   if (anio) where.anio = Number(anio)
-  if (casa_id) where.casaId = Number(casa_id)
 
   const settings = await prisma.settings.upsert({
     where: { id: 1 },
@@ -24,8 +23,12 @@ export async function GET(req: NextRequest) {
   })
   const mesesAtras = settings.estimMesesAtras
 
-  const baseWhere: any = {}
-  if (casa_id) baseWhere.casaId = Number(casa_id)
+  // Filtrando por casa, el estimado necesita también los resúmenes de tarjeta de las demás casas:
+  // pueden tener consumos de ésta, y cada sub-item cuenta para la casa de su gasto de origen.
+  const casaNum = casa_id ? Number(casa_id) : null
+  const conResumenes = (w: any) => (casaNum == null ? w : { ...w, OR: [{ casaId: casaNum }, { esTarjeta: true }] })
+  // Casa de origen del sub-item propagado: el gasto con crédito del pago que lo generó.
+  const origen = { pago: { select: { gasto: { select: { casaId: true } } } } }
   const mesNum = mes ? Number(mes) : new Date().getMonth() + 1
   const anioNum = anio ? Number(anio) : new Date().getFullYear()
 
@@ -38,12 +41,28 @@ export async function GET(req: NextRequest) {
     prevMonths.push({ mes: pm, anio: pa })
   }
 
-  const [ingresos, gastos, ...prevGastos] = await Promise.all([
+  const [ingresos, gastosEstim, ...prevGastos] = await Promise.all([
     prisma.ingreso.findMany({ where: buildIngresosWhere(mes, anio, casa_id), select: { montoMoneda: true, tipoCambio: true } }),
-    prisma.gasto.findMany({ where, include: { pagos: true, items: true } }),
-    ...prevMonths.map(p => prisma.gasto.findMany({ where: { ...baseWhere, mes: p.mes, anio: p.anio }, include: { items: true } })),
+    // El concepto (del gasto y de cada sub-item) sólo hace falta para rotular el detalle del estimado.
+    prisma.gasto.findMany({
+      where: conResumenes(where),
+      include: {
+        pagos: true,
+        concepto: { select: { nombre: true } },
+        items: { include: { concepto: { select: { nombre: true } }, ...origen } },
+      },
+    }),
+    ...prevMonths.map(p => prisma.gasto.findMany({
+      where: conResumenes({ mes: p.mes, anio: p.anio }),
+      include: { items: { include: origen } },
+    })),
   ])
 
-  const resumen = computeResumen(gastos, prevGastos, settings, today, ingresos)
+  // Los totales del resumen siguen siendo sólo los gastos de la casa.
+  const gastos = casaNum == null ? gastosEstim : gastosEstim.filter(g => g.casaId === casaNum)
+  const resumen = computeResumen(gastos, prevGastos, settings, today, ingresos, prevMonths, {
+    actual: gastosEstim,
+    casaId: casaNum,
+  })
   return NextResponse.json(resumen)
 }

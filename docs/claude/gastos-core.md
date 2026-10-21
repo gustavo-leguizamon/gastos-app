@@ -44,18 +44,25 @@ Card adicional en el resumen que proyecta el gasto del próximo mes basado en hi
 **Algoritmo:**
 
 1. **Unidades** del mes actual y de los `estim_meses_atras` meses previos. Para cada gasto:
-   - Si tiene sub-items con `incluyeEnTotal = true`: **agrupados por `conceptoId` (sumando montos)** dentro del gasto. Cada grupo es una unidad (key = `parentConcepto + concepto`).
+   - **Los gastos con crédito (`tipoPago === 'C'`) se ignoran**: ya están dentro del resumen de su tarjeta como sub-items propagados (al pagarlos), así que contarlos también como unidad propia los duplicaba — un consumo sumaba en su mes y otra vez en el resumen del mes siguiente. El estimado proyecta lo que sale de la cuenta; lo de tarjeta entra sólo a través del resumen (una unidad por concepto de sub-item, con las cuotas que conserva el sub-item). Mismo criterio que `total_debito`/ahorro.
+   - **Filtro de casa — atribución por casa de origen:** el resumen de tarjeta pertenece a una sola casa (la del primer consumo propagado), aunque tenga consumos de otras. Por eso, con `casa_id`, cada sub-item cuenta para la casa de **su gasto de origen** (`item.pago.gasto.casaId`, el gasto con crédito cuyo pago lo propagó); los cargados a mano (sin pago) cuentan para la casa del resumen. La route trae para el estimado `OR: [{ casaId }, { esTarjeta: true }]` (los resúmenes de **todas** las casas, en el mes y en los previos) y `computeResumen` filtra por unidad (`estim.casaId`). Los **demás totales** del resumen siguen siendo sólo los gastos de la casa (la route los separa antes de llamar). Un resumen propio cuyos consumos son todos de otra casa no aporta nada (no cae al total del resumen).
+   - Si tiene sub-items con `incluyeEnTotal = true`: cada sub-item es una unidad (key = `parentConcepto + concepto`).
    - Si no tiene sub-items elegibles y está confirmado: el gasto es una unidad (key = `concepto` solo).
+   - **Todo lo de la misma key en el mes se suma en una sola unidad** (en el mes actual y en cada mes previo), antes de comparar: dos gastos de "Luz" del mes, o los sub-items "Super" de dos resúmenes de la misma tarjeta, son una fila. Antes cada uno comparaba contra el **primer** match del mes previo, así que dos "Luz" contaban dos veces sobre el histórico de uno solo.
    - Gastos no confirmados sin items se ignoran.
    - El match entre meses es por **`conceptoId`** (id estable), no por texto — ver [Conceptos](#conceptos).
-   - Si en un grupo de sub-items alguno tiene `cuotaActual/cuotasTotales`, se conservan en la unidad agrupada.
-2. **Para cada unidad del mes actual:**
+   - Si en un grupo alguno tiene `cuotaActual/cuotasTotales`, se conservan en la unidad agrupada (la primera vista) y el criterio de cuotas aplica a **todo** el grupo. Límite conocido: un concepto que mezcla consumos en cuotas y sin cuotas en el mismo mes se trata entero como en cuotas.
+2. **Para cada unidad del mes actual** (el match con un mes previo es por key, contra la suma de ese mes):
    - Si está en cuotas y `estim_excluir_ultima_cuota = true` y es la última: se excluye.
    - Si está en cuotas y `estim_incluir_cuotas_vigentes = true`: se suma directo, sin promediar.
    - En caso contrario: se promedia. Para cada mes previo, se busca match por keys. Si no hay match, según `estim_missing_behavior`. Estimado = promedio del array.
 3. La card suma los estimados de todas las unidades.
 
-`/api/resumen` ejecuta `1 + estim_meses_atras` queries en paralelo. Los meses previos no necesitan `pagos`.
+**Detalle (`detalle_proximo_mes`)** — para auditar el total, `computeResumen` devuelve además una fila por unidad del mes actual (`EstimadoDetalle`): `gasto_ids` (los gastos — o resúmenes de tarjeta — que forman la fila), `cantidad` (cuántos gastos o sub-items se sumaron; el diálogo muestra "3 gastos sumados" / "3 sub-items de Visa"), `descripcion` (concepto de la unidad), `gasto_padre` (concepto del gasto contenedor si es un grupo de sub-items), `cuota_actual`/`cuotas_totales`, `monto_actual`, `criterio` (`promedio` / `cuota_vigente` / `ultima_cuota`), `historico` (un elemento por mes previo, del más cercano al más lejano, con `mes`/`anio`, el `monto` del match o `null`, y `en_promedio` — un mes sin match entra como 0 sólo con `missingBehavior = 'zero'`) y `estimado` (lo que aportó). Las unidades excluidas por última cuota **se listan** con `estimado: 0`, para que se vea por qué no suman; los gastos no confirmados sin sub-items no aparecen (no son unidades). Ordenado por `estimado` desc. La suma de `estimado` es `total_proximo_mes` salvo redondeo. Los meses del histórico los pasa la route (`prevPeriodos`, paralelo a `prevGastos`); el gasto y sus sub-items del mes actual se traen con `concepto.nombre` sólo para rotular.
+
+La card **"Estimado próximo mes"** es clickeable (igual que Ingresos) y abre `EstimadoDetalleDialog`: tabla Gasto · Criterio · Este mes · un mes previo por columna · Estimado, con fila de Total. Las columnas **Gasto y Criterio quedan fijas** (`position: sticky` con ancho fijo) al scrollear horizontalmente, para no perder qué fila se mira cuando hay muchos meses. Un mes sin match se muestra como `$ 0` gris si cuenta como cero o `—` si no entra al promedio (tooltip explica cada caso).
+
+`/api/resumen` ejecuta `1 + estim_meses_atras` queries en paralelo. Los meses previos no necesitan `pagos`; sí la casa de origen de cada sub-item (`items.pago.gasto.casaId`).
 
 ## Vencidos (lo que ya pasó de fecha y sigue impago)
 

@@ -4,6 +4,10 @@ import type { ModoPropina } from './propina'
 // Igual que `ModoPropina`: los tipos de la operación de divisa viven en `divisas-compute.ts`,
 // junto a la lógica que los interpreta. Import sólo de tipo, no genera ciclo.
 import type { ComisionMoneda, TipoOperacionDivisa } from './divisas-compute'
+// El detalle del estimado próximo mes lo arma `computeResumen`; mismo criterio.
+import type { EstimadoDetalle } from './resumen-compute'
+
+export type { EstimadoDetalle, EstimadoHistorico, CriterioEstimado } from './resumen-compute'
 
 export interface Moneda {
   id: number
@@ -236,6 +240,8 @@ export interface Resumen {
   total_ahorro: number
   /** `total_ahorro` como % de `total_ingresos` (0 si no hay ingresos). */
   ahorro_pct: number
+  /** Cómo se formó `total_proximo_mes`, una fila por unidad (gasto o grupo de sub-items). */
+  detalle_proximo_mes: EstimadoDetalle[]
 }
 
 /**

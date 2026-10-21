@@ -41,9 +41,55 @@ export interface ResumenResult {
   total_ahorro: number
   /** `total_ahorro` como % de `total_ingresos` (0 si no hay ingresos cargados). */
   ahorro_pct: number
+  /**
+   * Una fila por unidad del mes actual que entró en el cálculo de `total_proximo_mes`
+   * (incluidas las excluidas por última cuota, con `estimado: 0`), para poder auditar
+   * cómo se formó el total. La suma de `estimado` es `total_proximo_mes` (salvo redondeo).
+   */
+  detalle_proximo_mes: EstimadoDetalle[]
+}
+
+/**
+ * Por qué una unidad aporta lo que aporta al estimado:
+ * - `promedio`: promedio del mes actual con los meses previos (`historico`).
+ * - `cuota_vigente`: está en cuotas y no es la última → se suma el monto tal cual.
+ * - `ultima_cuota`: es la última cuota → no aporta (`estimado: 0`).
+ */
+export type CriterioEstimado = 'promedio' | 'cuota_vigente' | 'ultima_cuota'
+
+export interface EstimadoHistorico {
+  mes: number | null
+  anio: number | null
+  /** Monto del match en ese mes; `null` si no hubo match. */
+  monto: number | null
+  /** Si el mes entró al promedio (un mes sin match entra como 0 sólo con `missingBehavior = 'zero'`). */
+  en_promedio: boolean
+}
+
+export interface EstimadoDetalle {
+  /** Gastos que forman la fila (el gasto, o los resúmenes de tarjeta de los sub-items). */
+  gasto_ids: number[]
+  /** Cuántos gastos o sub-items del mismo concepto se sumaron en la fila. */
+  cantidad: number
+  concepto_id: number
+  descripcion: string
+  /** Descripción del gasto contenedor cuando la unidad es un grupo de sub-items. */
+  gasto_padre: string | null
+  es_subitem: boolean
+  cuota_actual: number | null
+  cuotas_totales: number | null
+  monto_actual: number
+  criterio: CriterioEstimado
+  /** Vacío cuando el criterio no promedia. Ordenado del mes más cercano al más lejano. */
+  historico: EstimadoHistorico[]
+  estimado: number
 }
 
 type Unit = {
+  gastoIds: number[]
+  cantidad: number
+  nombre: string
+  padreNombre: string | null
   parentConcepto: number
   concepto: number
   monto: number
@@ -52,66 +98,91 @@ type Unit = {
   isSubitem: boolean
 }
 
-function buildUnits(gs: any[]): Unit[] {
-  const out: Unit[] = []
+/**
+ * Unidades del estimado de un mes, **una por clave** (`concepto` para un gasto; `parentConcepto +
+ * concepto` para un sub-item): todo lo del mismo concepto en el mes se suma antes de comparar con
+ * los meses previos. Si no, dos gastos de "Luz" en un mes comparaban cada uno contra el primer
+ * "Luz" del mes anterior y el estimado los contaba dos veces sobre un histórico de uno solo.
+ * Cuotas: si alguno del grupo las tiene, se conserva la primera vista (igual que antes dentro de
+ * un mismo gasto).
+ *
+ * Con `casaId`, cada unidad cuenta para la casa de **su origen**: el gasto, o — en un sub-item
+ * propagado a un resumen de tarjeta — el gasto con crédito del que viene (`item.pago.gasto.casaId`).
+ * Un resumen pertenece a una sola casa aunque junte consumos de varias; sin esto, filtrando por
+ * casa lo de tarjeta se atribuía entero a la casa dueña del resumen. Los sub-items cargados a mano
+ * (sin pago) cuentan para la casa del resumen.
+ */
+function buildUnits(gs: any[], casaId: number | null = null): Map<string, Unit> {
+  const out = new Map<string, Unit>()
+  const agregar = (u: Unit, casa: number | null | undefined) => {
+    if (casaId != null && casa !== casaId) return
+    const clave = u.isSubitem ? `s:${u.parentConcepto}:${u.concepto}` : `g:${u.concepto}`
+    const existing = out.get(clave)
+    if (!existing) {
+      out.set(clave, u)
+      return
+    }
+    existing.monto += u.monto
+    existing.cantidad += u.cantidad
+    for (const id of u.gastoIds) if (!existing.gastoIds.includes(id)) existing.gastoIds.push(id)
+    if (existing.cuotaActual == null && u.cuotaActual != null) {
+      existing.cuotaActual = u.cuotaActual
+      existing.cuotasTotales = u.cuotasTotales
+    }
+  }
   for (const g of gs) {
+    // Los consumos con crédito ya están dentro del resumen de su tarjeta (sub-items propagados
+    // al pagarlos): contarlos también como unidad propia los duplicaría. El estimado proyecta lo
+    // que sale de la cuenta, así que lo de tarjeta entra sólo a través del resumen.
+    if (g.tipoPago === 'C') continue
     if (!g.confirmado && g.items.length === 0) continue
+    const gastoIds: number[] = g.id != null ? [g.id] : []
     const itemsIncl = g.items.filter((i: any) => i.incluyeEnTotal)
     if (itemsIncl.length > 0) {
-      // Agrupar sub-items del mismo gasto por concepto
-      const grouped = new Map<number, Unit>()
       for (const it of itemsIncl) {
-        const key = it.conceptoId
-        const existing = grouped.get(key)
-        if (existing) {
-          existing.monto += it.monto
-          // Si alguno del grupo tiene cuotas, conservamos esa info (tomamos la primera vista)
-          if (existing.cuotaActual == null && it.cuotaActual != null) {
-            existing.cuotaActual = it.cuotaActual
-            existing.cuotasTotales = it.cuotasTotales ?? null
-          }
-        } else {
-          grouped.set(key, {
-            parentConcepto: g.conceptoId,
-            concepto: key,
-            monto: it.monto,
-            cuotaActual: it.cuotaActual ?? null,
-            cuotasTotales: it.cuotasTotales ?? null,
-            isSubitem: true,
-          })
-        }
+        agregar({
+          gastoIds: [...gastoIds],
+          cantidad: 1,
+          nombre: it.concepto?.nombre ?? '',
+          padreNombre: g.concepto?.nombre ?? '',
+          parentConcepto: g.conceptoId,
+          concepto: it.conceptoId,
+          monto: it.monto,
+          cuotaActual: it.cuotaActual ?? null,
+          cuotasTotales: it.cuotasTotales ?? null,
+          isSubitem: true,
+        }, it.pago?.gasto?.casaId ?? g.casaId)
       }
-      grouped.forEach((u) => out.push(u))
     } else if (g.confirmado) {
-      out.push({
+      agregar({
+        gastoIds,
+        cantidad: 1,
+        nombre: g.concepto?.nombre ?? '',
+        padreNombre: null,
         parentConcepto: g.conceptoId,
         concepto: g.conceptoId,
         monto: g.totalMoneda * g.tipoCambio,
         cuotaActual: g.cuotaActual ?? null,
         cuotasTotales: g.cuotasTotales ?? null,
         isSubitem: false,
-      })
+      }, g.casaId)
     }
   }
   return out
-}
-
-function findMatch(units: Unit[], target: Unit): number | null {
-  for (const u of units) {
-    if (target.isSubitem) {
-      if (u.isSubitem && u.parentConcepto === target.parentConcepto && u.concepto === target.concepto) return u.monto
-    } else {
-      if (!u.isSubitem && u.concepto === target.concepto) return u.monto
-    }
-  }
-  return null
 }
 
 /**
  * Calcula el resumen mensual a partir de los gastos del mes (`gastos`, con
  * `pagos` e `items`), los gastos de los meses previos (`prevGastos`, con
  * `items`, uno por cada mes atrás), los settings de estimación, la fecha
- * `today` (YYYY-MM-DD local del usuario) y los `ingresos` del mes.
+ * `today` (YYYY-MM-DD local del usuario), los `ingresos` del mes y, opcional, el
+ * período de cada elemento de `prevGastos` (`prevPeriodos[i]` ↔ `prevGastos[i]`) para
+ * rotular el histórico del detalle del estimado.
+ *
+ * `estim` separa lo que usa el estimado de lo que usan los totales: `actual` son los gastos
+ * del mes para el estimado (default: `gastos`) y `casaId` la casa filtrada. Filtrando por casa,
+ * `actual` y `prevGastos` traen además los resúmenes de tarjeta de **otras** casas, porque pueden
+ * tener consumos de esta (ver `buildUnits`).
  */
 export function computeResumen(
   gastos: any[],
@@ -119,6 +190,8 @@ export function computeResumen(
   settings: ResumenSettings,
   today: string,
   ingresos: IngresoRow[] = [],
+  prevPeriodos: { mes: number; anio: number }[] = [],
+  estim: { actual?: any[]; casaId?: number | null } = {},
 ): ResumenResult {
   const missingBehavior: 'zero' | 'average_found' =
     settings.estimMissingBehavior === 'average_found' ? 'average_found' : 'zero'
@@ -169,29 +242,55 @@ export function computeResumen(
   }
 
   // Estimado próximo mes
-  const currentUnits = buildUnits(gastos)
-  const prevUnits = prevGastos.map(buildUnits)
+  const casaEstim = estim.casaId ?? null
+  const currentUnits = buildUnits(estim.actual ?? gastos, casaEstim)
+  const prevUnits = prevGastos.map((pg) => buildUnits(pg, casaEstim))
   let total_proximo_mes = 0
-  for (const u of currentUnits) {
+  const detalle: EstimadoDetalle[] = []
+  const r = (n: number) => Math.round(n * 100) / 100
+  for (const [clave, u] of Array.from(currentUnits)) {
+    const base = {
+      gasto_ids: u.gastoIds,
+      cantidad: u.cantidad,
+      concepto_id: u.concepto,
+      descripcion: u.nombre,
+      gasto_padre: u.isSubitem ? u.padreNombre : null,
+      es_subitem: u.isSubitem,
+      cuota_actual: u.cuotaActual,
+      cuotas_totales: u.cuotasTotales,
+      monto_actual: r(u.monto),
+    }
     const tieneCuotas = u.cuotaActual != null && u.cuotasTotales != null
-    if (tieneCuotas && excluirUltimaCuota && (u.cuotaActual as number) >= (u.cuotasTotales as number)) continue
+    if (tieneCuotas && excluirUltimaCuota && (u.cuotaActual as number) >= (u.cuotasTotales as number)) {
+      detalle.push({ ...base, criterio: 'ultima_cuota', historico: [], estimado: 0 })
+      continue
+    }
     if (tieneCuotas && incluirCuotasVigentes) {
       total_proximo_mes += u.monto
+      detalle.push({ ...base, criterio: 'cuota_vigente', historico: [], estimado: r(u.monto) })
       continue
     }
     // Promedio con meses previos
     const valores: number[] = [u.monto]
-    for (const pu of prevUnits) {
-      const found = findMatch(pu, u)
+    const historico: EstimadoHistorico[] = []
+    prevUnits.forEach((pu, i) => {
+      const found = pu.get(clave)?.monto ?? null
       if (found !== null) valores.push(found)
       else if (missingBehavior === 'zero') valores.push(0)
       // si missingBehavior === 'average_found' → no agregamos nada
-    }
-    if (valores.length === 0) continue
-    total_proximo_mes += valores.reduce((s, v) => s + v, 0) / valores.length
+      historico.push({
+        mes: prevPeriodos[i]?.mes ?? null,
+        anio: prevPeriodos[i]?.anio ?? null,
+        monto: found === null ? null : r(found),
+        en_promedio: found !== null || missingBehavior === 'zero',
+      })
+    })
+    const estimado = valores.reduce((s, v) => s + v, 0) / valores.length
+    total_proximo_mes += estimado
+    detalle.push({ ...base, criterio: 'promedio', historico, estimado: r(estimado) })
   }
+  detalle.sort((x, y) => y.estimado - x.estimado || x.descripcion.localeCompare(y.descripcion))
 
-  const r = (n: number) => Math.round(n * 100) / 100
   // El ahorro se mide contra lo gastado en débito/efectivo: la plata que efectivamente sale
   // de la cuenta. Los consumos de crédito no restan acá — restan cuando se paga el resumen.
   const ahorro = computeAhorro(ingresos, r(total_debito))
@@ -210,5 +309,6 @@ export function computeResumen(
     total_debito: r(total_debito),
     total_ahorro: ahorro.ahorro,
     ahorro_pct: ahorro.ahorro_pct,
+    detalle_proximo_mes: detalle,
   }
 }
