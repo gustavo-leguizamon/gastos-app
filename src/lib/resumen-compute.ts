@@ -90,7 +90,6 @@ type Unit = {
   cantidad: number
   nombre: string
   padreNombre: string | null
-  parentConcepto: number
   concepto: number
   monto: number
   cuotaActual: number | null
@@ -99,24 +98,24 @@ type Unit = {
 }
 
 /**
- * Unidades del estimado de un mes, **una por clave** (`concepto` para un gasto; `parentConcepto +
- * concepto` para un sub-item): todo lo del mismo concepto en el mes se suma antes de comparar con
- * los meses previos. Si no, dos gastos de "Luz" en un mes comparaban cada uno contra el primer
- * "Luz" del mes anterior y el estimado los contaba dos veces sobre un histórico de uno solo.
- * Cuotas: si alguno del grupo las tiene, se conserva la primera vista (igual que antes dentro de
- * un mismo gasto).
+ * Unidades del estimado de un mes, **una por clave**, sumando todo lo de la misma clave en el mes
+ * antes de comparar con los meses previos (si no, dos gastos de "Luz" comparaban cada uno contra
+ * el primer "Luz" del mes anterior y contaban dos veces sobre el histórico de uno solo). Cuotas: si
+ * alguno del grupo las tiene, se conserva la primera vista.
  *
- * Con `casaId`, cada unidad cuenta para la casa de **su origen**: el gasto, o — en un sub-item
- * propagado a un resumen de tarjeta — el gasto con crédito del que viene (`item.pago.gasto.casaId`).
- * Un resumen pertenece a una sola casa aunque junte consumos de varias; sin esto, filtrando por
- * casa lo de tarjeta se atribuía entero a la casa dueña del resumen. Los sub-items cargados a mano
- * (sin pago) cuentan para la casa del resumen.
+ * Qué entra:
+ * - **Cada gasto, también los de crédito**, en su mes y por su concepto (clave `concepto`). Así un
+ *   concepto es una sola fila sin importar si se pagó con débito o con qué tarjeta.
+ * - **Del resumen de tarjeta, sólo los sub-items que no vienen de un gasto cargado** (`pagoId`
+ *   nulo): las cuotas 2 en adelante y los cargos del banco (IVA, sellos, intereses…), que existen
+ *   sólo ahí. Los propagados desde un pago ya están contados por su gasto con crédito. También por
+ *   `concepto`, así la cuota 2/6 empalma con la 1/6 que se cargó como gasto. El total del resumen
+ *   nunca es unidad: duplicaría los consumos.
+ * - De un gasto común con sub-items, los sub-items (clave `gasto padre + concepto`).
  */
-function buildUnits(gs: any[], casaId: number | null = null): Map<string, Unit> {
+function buildUnits(gs: any[]): Map<string, Unit> {
   const out = new Map<string, Unit>()
-  const agregar = (u: Unit, casa: number | null | undefined) => {
-    if (casaId != null && casa !== casaId) return
-    const clave = u.isSubitem ? `s:${u.parentConcepto}:${u.concepto}` : `g:${u.concepto}`
+  const agregar = (clave: string, u: Unit) => {
     const existing = out.get(clave)
     if (!existing) {
       out.set(clave, u)
@@ -125,47 +124,45 @@ function buildUnits(gs: any[], casaId: number | null = null): Map<string, Unit> 
     existing.monto += u.monto
     existing.cantidad += u.cantidad
     for (const id of u.gastoIds) if (!existing.gastoIds.includes(id)) existing.gastoIds.push(id)
+    // Mezcla de orígenes (un gasto y un sub-item, o resúmenes de tarjetas distintas): sin padre único.
+    existing.isSubitem = existing.isSubitem && u.isSubitem
+    if (existing.padreNombre !== u.padreNombre) existing.padreNombre = null
     if (existing.cuotaActual == null && u.cuotaActual != null) {
       existing.cuotaActual = u.cuotaActual
       existing.cuotasTotales = u.cuotasTotales
     }
   }
+  const subitem = (g: any, it: any): Unit => ({
+    gastoIds: g.id != null ? [g.id] : [],
+    cantidad: 1,
+    nombre: it.concepto?.nombre ?? '',
+    padreNombre: g.concepto?.nombre ?? '',
+    concepto: it.conceptoId,
+    monto: it.monto,
+    cuotaActual: it.cuotaActual ?? null,
+    cuotasTotales: it.cuotasTotales ?? null,
+    isSubitem: true,
+  })
   for (const g of gs) {
-    // Los consumos con crédito ya están dentro del resumen de su tarjeta (sub-items propagados
-    // al pagarlos): contarlos también como unidad propia los duplicaría. El estimado proyecta lo
-    // que sale de la cuenta, así que lo de tarjeta entra sólo a través del resumen.
-    if (g.tipoPago === 'C') continue
-    if (!g.confirmado && g.items.length === 0) continue
-    const gastoIds: number[] = g.id != null ? [g.id] : []
     const itemsIncl = g.items.filter((i: any) => i.incluyeEnTotal)
+    if (g.esTarjeta) {
+      for (const it of itemsIncl) if (it.pagoId == null) agregar(`g:${it.conceptoId}`, subitem(g, it))
+      continue
+    }
     if (itemsIncl.length > 0) {
-      for (const it of itemsIncl) {
-        agregar({
-          gastoIds: [...gastoIds],
-          cantidad: 1,
-          nombre: it.concepto?.nombre ?? '',
-          padreNombre: g.concepto?.nombre ?? '',
-          parentConcepto: g.conceptoId,
-          concepto: it.conceptoId,
-          monto: it.monto,
-          cuotaActual: it.cuotaActual ?? null,
-          cuotasTotales: it.cuotasTotales ?? null,
-          isSubitem: true,
-        }, it.pago?.gasto?.casaId ?? g.casaId)
-      }
+      for (const it of itemsIncl) agregar(`s:${g.conceptoId}:${it.conceptoId}`, subitem(g, it))
     } else if (g.confirmado) {
-      agregar({
-        gastoIds,
+      agregar(`g:${g.conceptoId}`, {
+        gastoIds: g.id != null ? [g.id] : [],
         cantidad: 1,
         nombre: g.concepto?.nombre ?? '',
         padreNombre: null,
-        parentConcepto: g.conceptoId,
         concepto: g.conceptoId,
         monto: g.totalMoneda * g.tipoCambio,
         cuotaActual: g.cuotaActual ?? null,
         cuotasTotales: g.cuotasTotales ?? null,
         isSubitem: false,
-      }, g.casaId)
+      })
     }
   }
   return out
@@ -178,11 +175,6 @@ function buildUnits(gs: any[], casaId: number | null = null): Map<string, Unit> 
  * `today` (YYYY-MM-DD local del usuario), los `ingresos` del mes y, opcional, el
  * período de cada elemento de `prevGastos` (`prevPeriodos[i]` ↔ `prevGastos[i]`) para
  * rotular el histórico del detalle del estimado.
- *
- * `estim` separa lo que usa el estimado de lo que usan los totales: `actual` son los gastos
- * del mes para el estimado (default: `gastos`) y `casaId` la casa filtrada. Filtrando por casa,
- * `actual` y `prevGastos` traen además los resúmenes de tarjeta de **otras** casas, porque pueden
- * tener consumos de esta (ver `buildUnits`).
  */
 export function computeResumen(
   gastos: any[],
@@ -191,7 +183,6 @@ export function computeResumen(
   today: string,
   ingresos: IngresoRow[] = [],
   prevPeriodos: { mes: number; anio: number }[] = [],
-  estim: { actual?: any[]; casaId?: number | null } = {},
 ): ResumenResult {
   const missingBehavior: 'zero' | 'average_found' =
     settings.estimMissingBehavior === 'average_found' ? 'average_found' : 'zero'
@@ -242,9 +233,8 @@ export function computeResumen(
   }
 
   // Estimado próximo mes
-  const casaEstim = estim.casaId ?? null
-  const currentUnits = buildUnits(estim.actual ?? gastos, casaEstim)
-  const prevUnits = prevGastos.map((pg) => buildUnits(pg, casaEstim))
+  const currentUnits = buildUnits(gastos)
+  const prevUnits = prevGastos.map(buildUnits)
   let total_proximo_mes = 0
   const detalle: EstimadoDetalle[] = []
   const r = (n: number) => Math.round(n * 100) / 100

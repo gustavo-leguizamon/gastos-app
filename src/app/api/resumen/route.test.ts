@@ -38,34 +38,26 @@ describe('GET /api/resumen', () => {
     expect(previo.where).toEqual({ mes: 9, anio: 2026 })
   })
 
-  it('con casa: suma los resúmenes de tarjeta de todas las casas e incluye la casa de origen de cada sub-item', async () => {
+  it('con casa: filtra el mes y los previos por casa (con wraparound de año) y trae el concepto para rotular', async () => {
     await GET(get('?mes=1&anio=2026&casa_id=3'))
     const [actual, previo] = mp.gasto.findMany.mock.calls.map((c: any[]) => c[0])
-    const OR = [{ casaId: 3 }, { esTarjeta: true }]
-    expect(actual.where).toEqual({ mes: 1, anio: 2026, OR })
-    // Wraparound de año en el mes previo.
-    expect(previo.where).toEqual({ mes: 12, anio: 2025, OR })
-    const origen = { pago: { select: { gasto: { select: { casaId: true } } } } }
-    expect(actual.include.items.include).toMatchObject(origen)
-    expect(previo.include.items.include).toEqual(origen)
+    expect(actual.where).toEqual({ mes: 1, anio: 2026, casaId: 3 })
+    expect(previo.where).toEqual({ mes: 12, anio: 2025, casaId: 3 })
+    expect(actual.include.concepto).toEqual({ select: { nombre: true } })
+    expect(actual.include.items.include.concepto).toEqual({ select: { nombre: true } })
   })
 
-  it('con casa: los totales usan sólo los gastos de la casa, el estimado también los consumos propios de otros resúmenes', async () => {
-    const item = { conceptoId: 5, concepto: { nombre: 'Super' }, monto: 200, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null }
+  it('el estimado cuenta el gasto con crédito y no su sub-item propagado al resumen', async () => {
+    const propagado = { conceptoId: 100, concepto: { nombre: 'Luz' }, monto: 1000, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null, pagoId: 9 }
     mp.gasto.findMany
       .mockResolvedValueOnce([
-        gasto({ id: 1, casaId: 3, totalMoneda: 1000 }),
-        gasto({
-          id: 2, casaId: 8, conceptoId: 9, concepto: { nombre: 'Visa' }, esTarjeta: true, totalMoneda: 900,
-          items: [{ ...item, pago: { gasto: { casaId: 3 } } }, { ...item, conceptoId: 6, monto: 700, pago: { gasto: { casaId: 8 } } }],
-        }),
+        gasto({ id: 1, tipoPago: 'C' }),
+        gasto({ id: 2, conceptoId: 9, concepto: { nombre: 'Visa' }, esTarjeta: true, items: [propagado] }),
       ])
       .mockResolvedValueOnce([])
-    const res = await GET(get('?mes=10&anio=2026&casa_id=3&today=2026-10-21'))
-    const body = await res.json()
-    expect(body.total_gastos).toBe(1000)
-    // Luz (1000 + 0) / 2 + Super del resumen de la otra casa (200 + 0) / 2
-    expect(body.total_proximo_mes).toBe(600)
-    expect(body.detalle_proximo_mes.map((d: any) => d.descripcion).sort()).toEqual(['Luz', 'Super'])
+    const body = await (await GET(get('?mes=10&anio=2026&today=2026-10-21'))).json()
+    // Luz (1000 + 0) / 2, una sola vez
+    expect(body.total_proximo_mes).toBe(500)
+    expect(body.detalle_proximo_mes).toHaveLength(1)
   })
 })
