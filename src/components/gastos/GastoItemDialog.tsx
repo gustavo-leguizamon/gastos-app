@@ -31,6 +31,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
@@ -63,9 +64,12 @@ interface Props {
   gasto: Gasto | null
   onClose: () => void
   onChanged: (fullReload?: boolean) => void
+  /** Vuelve a traer el gasto con sus sub-items actuales (por si cambiaron desde otro lado). */
+  onReload: () => Promise<void>
 }
 
-export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Props) {
+export default function GastoItemDialog({ open, gasto, onClose, onChanged, onReload }: Props) {
+  const [reloading, setReloading] = useState(false)
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState('')
   const [fecha, setFecha] = useState('')
@@ -242,6 +246,18 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     }
   }
 
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      await onReload()
+      toast.success('Sub-items actualizados')
+    } catch {
+      toast.error('Error al recargar los sub-items')
+    } finally {
+      setReloading(false)
+    }
+  }
+
   const cantVerificados = items.filter(i => i.verificado).length
   const sortedItems = [...items]
     .filter(i => matchSubitem(i, filtroItems, filtroVerificado))
@@ -352,7 +368,14 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged }: Pro
     >
       <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, fontSize: { xs: 16, sm: 20 } }}>
         <SubdirectoryArrowRightIcon color="primary" />
-        Sub-items — {gasto.descripcion}
+        <Box component="span" sx={{ flex: 1, minWidth: 0 }}>Sub-items — {gasto.descripcion}</Box>
+        <Tooltip title="Recargar sub-items">
+          <span>
+            <IconButton onClick={handleReload} disabled={reloading} aria-label="Recargar sub-items">
+              {reloading ? <CircularProgress size={20} /> : <RefreshIcon />}
+            </IconButton>
+          </span>
+        </Tooltip>
       </DialogTitle>
 
       <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, overflow: 'hidden' }}>
