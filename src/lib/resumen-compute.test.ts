@@ -372,16 +372,16 @@ describe('computeResumen — detalle del estimado próximo mes', () => {
     })
   })
 
-  it('la suma del detalle es el total y viene ordenado de mayor a menor', () => {
+  it('la suma del detalle es el total y viene ordenado alfabéticamente (sin distinguir mayúsculas ni acentos)', () => {
     const r = computeResumen(
       [
-        makeGasto({ conceptoId: 1, totalMoneda: 100 }),
-        makeGasto({ conceptoId: 2, totalMoneda: 300 }),
-        makeGasto({ conceptoId: 3, totalMoneda: 200 }),
+        makeGasto({ conceptoId: 1, concepto: { nombre: 'luz' }, totalMoneda: 100 }),
+        makeGasto({ conceptoId: 2, concepto: { nombre: 'Alquiler' }, totalMoneda: 300 }),
+        makeGasto({ conceptoId: 3, concepto: { nombre: 'Électrica' }, totalMoneda: 200 }),
       ],
       [], SETTINGS_DEFAULT, TODAY,
     )
-    expect(r.detalle_proximo_mes.map((d) => d.estimado)).toEqual([300, 200, 100])
+    expect(r.detalle_proximo_mes.map((d) => d.descripcion)).toEqual(['Alquiler', 'Électrica', 'luz'])
     expect(r.detalle_proximo_mes.reduce((s, d) => s + d.estimado, 0)).toBe(r.total_proximo_mes)
   })
 

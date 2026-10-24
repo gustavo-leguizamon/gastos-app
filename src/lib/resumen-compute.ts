@@ -279,7 +279,9 @@ export function computeResumen(
     total_proximo_mes += estimado
     detalle.push({ ...base, criterio: 'promedio', historico, estimado: r(estimado) })
   }
-  detalle.sort((x, y) => y.estimado - x.estimado || x.descripcion.localeCompare(y.descripcion))
+  // Alfabético por concepto (sin distinguir mayúsculas ni acentos), y a igual nombre la tarjeta.
+  const alfabetico = (x: string, y: string) => x.localeCompare(y, 'es', { sensitivity: 'base' })
+  detalle.sort((x, y) => alfabetico(x.descripcion, y.descripcion) || alfabetico(x.gasto_padre ?? '', y.gasto_padre ?? ''))
 
   // El ahorro se mide contra lo gastado en débito/efectivo: la plata que efectivamente sale
   // de la cuenta. Los consumos de crédito no restan acá — restan cuando se paga el resumen.
