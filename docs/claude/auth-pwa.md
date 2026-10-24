@@ -78,6 +78,7 @@ Layouts dedicados a `theme.breakpoints.down('sm')` (≤600px) o `down('md')` (�
 - **`GastoDialog`, `PagoDialog`, `CopiarMesDialog`, `CopiarGastoDialog`**: `fullScreen={isMobile}` (`<sm`).
 - **`GastoItemDialog`**: `fullScreen` en `<md`. Layout 2-col se vuelve stack vertical (resumen + form arriba, lista abajo). En `<md` el form "Agregar sub-item" va dentro de un `Accordion` **cerrado por defecto** para que la lista de items cargados sea visible de entrada; en `>=md` el form se mantiene fijo. Los campos del form están extraídos en una variable `addItemFields` reusada por ambas ramas.
 - **`PagoDialog`**, **`CopiarMesDialog`**: forms stackean vertical en `<sm`.
+- **`EstimadoDetalleDialog`**: fullscreen en `<sm` con **cards expandibles** en vez de la tabla (histórico con barras al tocar la card). Ver `docs/claude/gastos-core.md` → Estimado próximo mes.
 - **`inversiones/page.tsx`**: movimientos `AppDataGrid` reemplazado por lista vertical de cards en `<sm`. Mobile itera `rows` directo (ya en fecha desc + id desc).
 
 Al agregar páginas/tablas, preferir card-based mobile en vez de scroll horizontal del DataGrid.

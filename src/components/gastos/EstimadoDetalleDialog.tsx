@@ -7,7 +7,10 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
+import Card from '@mui/material/Card'
+import CardActionArea from '@mui/material/CardActionArea'
 import Chip from '@mui/material/Chip'
+import Collapse from '@mui/material/Collapse'
 import InputAdornment from '@mui/material/InputAdornment'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -21,6 +24,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import SearchIcon from '@mui/icons-material/Search'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import type { CriterioEstimado, EstimadoDetalle, EstimadoHistorico } from '@/lib/types'
 
 const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -96,6 +100,102 @@ function CeldaHistorico({ h }: { h: EstimadoHistorico | undefined }) {
   )
 }
 
+/** Segunda línea de una fila: de dónde sale, cuántos se sumaron y la cuota. */
+function contextoDe(d: EstimadoDetalle) {
+  return [
+    d.gasto_padre && (d.cantidad > 1 ? `${d.cantidad} sub-items de ${d.gasto_padre}` : `Sub-item de ${d.gasto_padre}`),
+    !d.gasto_padre && d.cantidad > 1 && `${d.cantidad} gastos sumados`,
+    d.cuota_actual != null && `Cuota ${d.cuota_actual}/${d.cuotas_totales}`,
+  ].filter(Boolean).join(' · ')
+}
+
+const etiquetaMes = (h: EstimadoHistorico, i: number) => (h.mes ? `${MESES_CORTOS[h.mes - 1]} ${h.anio}` : `Mes −${i + 1}`)
+
+/**
+ * Card de una fila en mobile: concepto, criterio, estimado y monto del mes a la vista. Si se promedia,
+ * al tocarla despliega el histórico con una barra por mes, escalada al mayor monto de la fila
+ * (incluido el de este mes) para comparar de un vistazo; los negativos van en rojo.
+ */
+function TarjetaMobile({ d }: { d: EstimadoDetalle }) {
+  const [abierta, setAbierta] = useState(false)
+  const criterio = CRITERIOS[d.criterio]
+  const contexto = contextoDe(d)
+  const expandible = d.historico.length > 0
+  const maximo = Math.max(Math.abs(d.monto_actual), ...d.historico.map((h) => Math.abs(h.monto ?? 0)), 1)
+
+  const cabecera = (
+    <Box sx={{ p: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={600} noWrap>{d.descripcion || '(sin concepto)'}</Typography>
+          {contexto && <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{contexto}</Typography>}
+        </Box>
+        <Typography
+          variant="body2"
+          fontWeight={700}
+          sx={{ whiteSpace: 'nowrap', color: d.criterio === 'ultima_cuota' ? 'text.disabled' : COLOR_ESTIMADO }}
+        >
+          {fmtARS(d.estimado)}
+        </Typography>
+        {expandible && (
+          <ExpandMoreIcon
+            fontSize="small"
+            sx={{ color: 'text.secondary', transition: 'transform .2s', transform: abierta ? 'rotate(180deg)' : 'none' }}
+          />
+        )}
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+        <Chip size="small" label={criterio.label} color={criterio.color} variant="outlined" />
+        <Typography variant="caption" color="text.secondary">
+          Este mes <strong>{fmtARS(d.monto_actual)}</strong>
+        </Typography>
+      </Box>
+      {criterio.nota && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
+          {criterio.nota}
+        </Typography>
+      )}
+    </Box>
+  )
+
+  return (
+    <Card variant="outlined" sx={{ backgroundImage: 'none' }}>
+      {expandible ? <CardActionArea onClick={() => setAbierta((v) => !v)}>{cabecera}</CardActionArea> : cabecera}
+      {expandible && (
+        <Collapse in={abierta} unmountOnExit>
+          <Box sx={{ px: 1.5, pb: 1.5, pt: 1, borderTop: 1, borderColor: 'divider', display: 'grid', gap: 0.75 }}>
+            {d.historico.map((h, i) => {
+              const sinDato = h.monto === null
+              const monto = h.monto ?? 0
+              return (
+                <Box key={i} sx={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary">{etiquetaMes(h, i)}</Typography>
+                  <Box sx={{ height: 8, borderRadius: 4, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                    <Box
+                      sx={{
+                        height: '100%',
+                        width: `${(Math.abs(monto) / maximo) * 100}%`,
+                        bgcolor: monto < 0 ? 'error.main' : COLOR_ESTIMADO,
+                        borderRadius: 4,
+                      }}
+                    />
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ textAlign: 'right', minWidth: 88, ...(sinDato && { color: 'text.disabled', fontStyle: 'italic' }) }}
+                  >
+                    {sinDato ? (h.en_promedio ? `${fmtARS(0)} (no estaba)` : '— no promedia') : fmtARS(monto)}
+                  </Typography>
+                </Box>
+              )
+            })}
+          </Box>
+        </Collapse>
+      )}
+    </Card>
+  )
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -134,7 +234,7 @@ export default function EstimadoDetalleDialog({ open, onClose, detalle, total }:
     >
       <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
         Detalle del estimado próximo mes
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
           Lo que aportó cada concepto del mes al total. Los criterios se configuran en{' '}
           <strong>Configuración → Estimación próximo mes</strong>.
         </Typography>
@@ -144,6 +244,15 @@ export default function EstimadoDetalleDialog({ open, onClose, detalle, total }:
         dividers
         sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', p: { xs: 1.5, sm: 2 } }}
       >
+        {isMobile && (
+          // En mobile el total va arriba (no hay pie de tabla) y queda fijo: sólo la lista scrollea.
+          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">{texto ? 'Subtotal filtrado' : 'Total'}</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ color: COLOR_ESTIMADO }}>
+              {fmtARS(texto ? subtotal : total)}
+            </Typography>
+          </Box>
+        )}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <TextField
             size="small"
@@ -160,6 +269,16 @@ export default function EstimadoDetalleDialog({ open, onClose, detalle, total }:
 
         {detalle.length === 0 ? (
           <Typography color="text.secondary">No hay gastos que entren en el estimado.</Typography>
+        ) : isMobile ? (
+          // Mobile: cards en vez de tabla (convención de la app, ver docs/claude/auth-pwa.md).
+          // Bloque común, no grid/flex: con alto fijo, un grid achica a 0 las cards (tienen
+          // `overflow: hidden`, así que su mínimo es 0) en vez de scrollear.
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', '& > :not(:last-child)': { mb: 1 } }}>
+            {filas.map((d, idx) => <TarjetaMobile key={`${d.es_subitem ? 's' : 'g'}-${d.concepto_id}-${idx}`} d={d} />)}
+            {filas.length === 0 && (
+              <Typography variant="body2" color="text.secondary">Ningún concepto coincide con la búsqueda.</Typography>
+            )}
+          </Box>
         ) : (
           // Único contenedor de scroll (ambos ejes): el header y el total quedan siempre a la vista
           // y la barra horizontal está siempre abajo, no al final de la tabla.
@@ -173,7 +292,7 @@ export default function EstimadoDetalleDialog({ open, onClose, detalle, total }:
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>Este mes</TableCell>
                   {meses.map((m, i) => (
                     <TableCell key={i} align="right" sx={{ whiteSpace: 'nowrap', ...(i === 0 && BORDE_MES) }}>
-                      {m.mes ? `${MESES_CORTOS[m.mes - 1]} ${m.anio}` : `Mes −${i + 1}`}
+                      {etiquetaMes(m, i)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -181,12 +300,7 @@ export default function EstimadoDetalleDialog({ open, onClose, detalle, total }:
               <TableBody>
                 {filas.map((d, idx) => {
                   const criterio = CRITERIOS[d.criterio]
-                  // Segunda línea: de dónde sale la fila, cuántos se sumaron y la cuota.
-                  const contexto = [
-                    d.gasto_padre && (d.cantidad > 1 ? `${d.cantidad} sub-items de ${d.gasto_padre}` : `Sub-item de ${d.gasto_padre}`),
-                    !d.gasto_padre && d.cantidad > 1 && `${d.cantidad} gastos sumados`,
-                    d.cuota_actual != null && `Cuota ${d.cuota_actual}/${d.cuotas_totales}`,
-                  ].filter(Boolean).join(' · ')
+                  const contexto = contextoDe(d)
                   return (
                     <TableRow key={`${d.es_subitem ? 's' : 'g'}-${d.concepto_id}-${idx}`}>
                       <TableCell sx={COL_GASTO}>
