@@ -327,8 +327,8 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   }
 
   const refreshGasto = (gastoId: number, updateDialog?: (g: Gasto) => void) => {
-    fetch(`/api/gastos/${gastoId}`)
-      .then(r => r.json())
+    return fetch(`/api/gastos/${gastoId}`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
       .then(updated => {
         setGastos(prev => prev.map(g => g.id === updated.id ? updated : g))
         updateDialog?.(updated)
@@ -1245,7 +1245,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         gasto={pagoGasto}
         onClose={() => setPagoGasto(null)}
         onChanged={(fullReload) => {
-          refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated))
+          refreshGasto(pagoGasto!.id, updated => setPagoGasto(updated)).catch(() => {})
           triggerResumenRefresh()
           if (fullReload) triggerRefresh()
         }}
@@ -1256,9 +1256,13 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
         gasto={itemGasto}
         onClose={() => setItemGasto(null)}
         onChanged={(fullReload) => {
-          refreshGasto(itemGasto!.id, updated => setItemGasto(updated))
+          refreshGasto(itemGasto!.id, updated => setItemGasto(updated)).catch(() => {})
           triggerResumenRefresh()
           if (fullReload) triggerRefresh()
+        }}
+        onReload={async () => {
+          await refreshGasto(itemGasto!.id, updated => setItemGasto(updated))
+          triggerResumenRefresh()
         }}
       />
 
