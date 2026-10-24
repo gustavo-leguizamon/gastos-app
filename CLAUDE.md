@@ -55,11 +55,11 @@ npx prisma db seed            # Seed initial data (currencies, default house)
 
 ## Flujo de ramas (regla obligatoria)
 
-Tres ramas de larga vida: **`dev`** (integración) → **`qas`** (testing) → **`main`** (producción). Todo el trabajo nuevo va en ramas cortas (`feature/*`, `fix/*`, `chore/*`) que **parten de `dev`** y vuelven a `dev` vía PR; después se promueve `dev → qas` y se releasea `qas → main`, siempre por PR. Nunca se commitea ni pushea directo a las tres ramas de larga vida.
+Dos ramas de larga vida: **`dev`** (integración) → **`main`** (producción). Todo el trabajo nuevo va en ramas cortas (`feature/*`, `fix/*`, `chore/*`) que **parten de `dev`** y vuelven a `dev` vía PR; después se releasea `dev → main`, también por PR. Nunca se commitea ni pushea directo a `dev` ni a `main`. (Hasta octubre de 2026 había una rama intermedia `qas` de testing; se sacó del flujo.)
 
 - Reglas completas, nombres de rama, formato de commit y flujo de hotfix: **skill `git`** (`.claude/skills/git/SKILL.md`). Tiene precedencia sobre cualquier skill de git de la organización.
-- **Deploys:** `vercel.json` → `git.deploymentEnabled` deja desplegar solo `qas` (preview) y `main` (producción); el resto de las ramas no consume builds. El cron de vencimientos corre únicamente en producción.
-- **CI:** `.github/workflows/ci.yml` corre `npm run test:run` + `npm run build` en cada PR y push a `dev`, `qas` y `main`. El build usa un `DATABASE_URL` dummy — si falla ahí, algo se está prerenderizando contra la DB (ver el guard de prerender en Testing).
+- **Deploys:** `vercel.json` → `git.deploymentEnabled` deja desplegar solo `main` (producción); el resto de las ramas no consume builds. No hay ambiente de preview: lo que entra a `main` sale directo a producción. El cron de vencimientos corre únicamente en producción.
+- **CI:** `.github/workflows/ci.yml` corre `npm run test:run` + `npm run build` en cada PR y push a `dev` y `main`. El build usa un `DATABASE_URL` dummy — si falla ahí, algo se está prerenderizando contra la DB (ver el guard de prerender en Testing).
 
 ## Testing (regla obligatoria)
 

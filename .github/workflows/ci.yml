@@ -1,14 +1,14 @@
 name: CI
 
-# Corre en cada PR hacia las ramas del flujo (dev -> qas -> main) y también al
+# Corre en cada PR hacia las ramas del flujo (dev -> main) y también al
 # pushear directo a ellas. El hook de .githooks/pre-commit solo corre en la
 # máquina de quien commitea; esto valida lo mismo del lado del servidor, antes
 # de mergear.
 on:
   pull_request:
-    branches: [dev, qas, main]
+    branches: [dev, main]
   push:
-    branches: [dev, qas, main]
+    branches: [dev, main]
 
 jobs:
   test:
