@@ -17,14 +17,18 @@ import PaymentsIcon from '@mui/icons-material/Payments'
 import SavingsIcon from '@mui/icons-material/Savings'
 import ReportProblemIcon from '@mui/icons-material/ReportProblem'
 import IngresosDialog from '@/components/ingresos/IngresosDialog'
+import EstimadoDetalleDialog from './EstimadoDetalleDialog'
 import type { Resumen, FiltrosGastos } from '@/lib/types'
 
 function formatARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
 }
 
+/** Claves del resumen que son un monto (las que puede mostrar una card). */
+type ClaveMonto = { [K in keyof Resumen]: Resumen[K] extends number ? K : never }[keyof Resumen]
+
 type CardDef = {
-  key: keyof Resumen
+  key: ClaveMonto
   label: string
   icon: JSX.Element
   color: string
@@ -112,6 +116,7 @@ const RESUMEN_VACIO: Resumen = {
   total_debito: 0,
   total_ahorro: 0,
   ahorro_pct: 0,
+  detalle_proximo_mes: [],
 }
 
 interface Props {
@@ -124,6 +129,7 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
   const triggerResumenRefresh = useGastosStore(s => s.triggerResumenRefresh)
   const [resumen, setResumen] = useState<Resumen>(RESUMEN_VACIO)
   const [ingresosOpen, setIngresosOpen] = useState(false)
+  const [estimadoOpen, setEstimadoOpen] = useState(false)
 
   useEffect(() => {
     const d = new Date()
@@ -149,6 +155,7 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
         {CARDS.filter((card) => !card.soloSiHayValor || resumen[card.key] !== 0).map((card) => {
           const esIngresos = card.key === 'total_ingresos'
           const esAhorro = card.key === 'total_ahorro'
+          const esEstimado = card.key === 'total_proximo_mes'
           const color = esAhorro && hayIngresos ? ahorroColor : card.color
 
           const contenido = (
@@ -187,6 +194,13 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
                       Cargá los ingresos del mes para verlo
                     </Typography>
                   )}
+                </Box>
+              )}
+              {esEstimado && (
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${card.color}33` }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Tocá para ver el detalle por gasto
+                  </Typography>
                 </Box>
               )}
               {card.key === 'total_vencido' && (
@@ -229,8 +243,11 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
           return (
             <Grid item xs={12} sm={6} md={3} key={card.key}>
               <Card sx={{ border: `1px solid ${color}33`, height: '100%' }}>
-                {esIngresos ? (
-                  <CardActionArea onClick={() => setIngresosOpen(true)} sx={{ height: '100%' }}>
+                {esIngresos || esEstimado ? (
+                  <CardActionArea
+                    onClick={() => (esIngresos ? setIngresosOpen(true) : setEstimadoOpen(true))}
+                    sx={{ height: '100%' }}
+                  >
                     {contenido}
                   </CardActionArea>
                 ) : contenido}
@@ -245,6 +262,13 @@ export default function ResumenCards({ filtros, refreshKey }: Props) {
         filtros={filtros}
         onClose={() => setIngresosOpen(false)}
         onChanged={triggerResumenRefresh}
+      />
+
+      <EstimadoDetalleDialog
+        open={estimadoOpen}
+        onClose={() => setEstimadoOpen(false)}
+        detalle={resumen.detalle_proximo_mes}
+        total={resumen.total_proximo_mes}
       />
     </>
   )

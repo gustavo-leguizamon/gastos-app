@@ -303,6 +303,193 @@ describe('computeResumen — estimado próximo mes', () => {
   })
 })
 
+describe('computeResumen — detalle del estimado próximo mes', () => {
+  const PREV = [{ mes: 5, anio: 2026 }, { mes: 4, anio: 2026 }]
+
+  it('una fila por unidad con su histórico rotulado y el estimado que aportó', () => {
+    const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 2, estimMissingBehavior: 'zero' }
+    const r = computeResumen(
+      [makeGasto({ id: 7, conceptoId: 100, concepto: { nombre: 'Luz' }, totalMoneda: 900 })],
+      [[makeGasto({ conceptoId: 100, totalMoneda: 600 })], []],
+      settings, TODAY, [], PREV,
+    )
+    expect(r.detalle_proximo_mes).toEqual([{
+      gasto_ids: [7],
+      cantidad: 1,
+      concepto_id: 100,
+      descripcion: 'Luz',
+      gasto_padre: null,
+      es_subitem: false,
+      cuota_actual: null,
+      cuotas_totales: null,
+      monto_actual: 900,
+      criterio: 'promedio',
+      historico: [
+        { mes: 5, anio: 2026, monto: 600, en_promedio: true },
+        // Sin match + missingBehavior=zero → entra al promedio como 0
+        { mes: 4, anio: 2026, monto: null, en_promedio: true },
+      ],
+      estimado: 500, // (900 + 600 + 0) / 3
+    }])
+  })
+
+  it('con average_found el mes sin match queda fuera del promedio', () => {
+    const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1, estimMissingBehavior: 'average_found' }
+    const r = computeResumen(
+      [makeGasto({ conceptoId: 100, totalMoneda: 900 })],
+      [[]], settings, TODAY, [], PREV.slice(0, 1),
+    )
+    expect(r.detalle_proximo_mes[0].historico).toEqual([{ mes: 5, anio: 2026, monto: null, en_promedio: false }])
+    expect(r.detalle_proximo_mes[0].estimado).toBe(900)
+  })
+
+  it('marca el criterio de cuotas: vigente suma directo, última aporta 0 pero se lista', () => {
+    const settings = { ...SETTINGS_DEFAULT, estimIncluirCuotasVigentes: true, estimExcluirUltimaCuota: true }
+    const r = computeResumen(
+      [
+        makeGasto({ conceptoId: 1, totalMoneda: 300, cuotaActual: 2, cuotasTotales: 6 }),
+        makeGasto({ conceptoId: 2, totalMoneda: 400, cuotaActual: 6, cuotasTotales: 6 }),
+      ],
+      [], settings, TODAY,
+    )
+    const porConcepto = Object.fromEntries(r.detalle_proximo_mes.map((d) => [d.concepto_id, d]))
+    expect(porConcepto[1]).toMatchObject({ criterio: 'cuota_vigente', estimado: 300, historico: [] })
+    expect(porConcepto[2]).toMatchObject({ criterio: 'ultima_cuota', estimado: 0, monto_actual: 400 })
+  })
+
+  it('los grupos de sub-items llevan su concepto y el del gasto contenedor', () => {
+    const r = computeResumen(
+      [makeGasto({
+        id: 3,
+        conceptoId: 1,
+        concepto: { nombre: 'Visa' },
+        items: [{ conceptoId: 5, concepto: { nombre: 'Super' }, monto: 100, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null }],
+      })],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.detalle_proximo_mes[0]).toMatchObject({
+      gasto_ids: [3], cantidad: 1, concepto_id: 5, descripcion: 'Super', gasto_padre: 'Visa', es_subitem: true, estimado: 100,
+    })
+  })
+
+  it('la suma del detalle es el total y viene ordenado alfabéticamente (sin distinguir mayúsculas ni acentos)', () => {
+    const r = computeResumen(
+      [
+        makeGasto({ conceptoId: 1, concepto: { nombre: 'luz' }, totalMoneda: 100 }),
+        makeGasto({ conceptoId: 2, concepto: { nombre: 'Alquiler' }, totalMoneda: 300 }),
+        makeGasto({ conceptoId: 3, concepto: { nombre: 'Électrica' }, totalMoneda: 200 }),
+      ],
+      [], SETTINGS_DEFAULT, TODAY,
+    )
+    expect(r.detalle_proximo_mes.map((d) => d.descripcion)).toEqual(['Alquiler', 'Électrica', 'luz'])
+    expect(r.detalle_proximo_mes.reduce((s, d) => s + d.estimado, 0)).toBe(r.total_proximo_mes)
+  })
+
+  it('suma los gastos del mismo concepto del mes antes de comparar con los meses previos', () => {
+    const settings = { ...SETTINGS_DEFAULT, estimMesesAtras: 1 }
+    const r = computeResumen(
+      [
+        makeGasto({ id: 1, conceptoId: 100, concepto: { nombre: 'Luz' }, totalMoneda: 300 }),
+        makeGasto({ id: 2, conceptoId: 100, concepto: { nombre: 'Luz' }, totalMoneda: 500 }),
+      ],
+      // El mes previo también tenía dos: se comparan las sumas (800 vs 1000), no cada uno contra el primero.
+      [[makeGasto({ conceptoId: 100, totalMoneda: 400 }), makeGasto({ conceptoId: 100, totalMoneda: 600 })]],
+      settings, TODAY, [], [{ mes: 5, anio: 2026 }],
+    )
+    expect(r.detalle_proximo_mes).toHaveLength(1)
+    expect(r.detalle_proximo_mes[0]).toMatchObject({
+      gasto_ids: [1, 2], cantidad: 2, monto_actual: 800,
+      historico: [{ mes: 5, anio: 2026, monto: 1000, en_promedio: true }],
+      estimado: 900,
+    })
+    expect(r.total_proximo_mes).toBe(900)
+  })
+
+  describe('consumos con tarjeta', () => {
+    // Sub-item de un resumen: con `pagoId` viene de un gasto con crédito cargado (propagado al
+    // pagarlo); sin `pagoId` existe sólo en el resumen (cuotas 2+ y cargos del banco).
+    const sub = (conceptoId: number, nombre: string, monto: number, extra: Record<string, any> = {}) => ({
+      conceptoId, concepto: { nombre }, monto, incluyeEnTotal: true, incluyeEnVencimiento: false, fecha: null, pagoId: null, ...extra,
+    })
+    const resumen = (items: any[], extra: Record<string, any> = {}) =>
+      makeGasto({ id: 50, conceptoId: 9, concepto: { nombre: 'Visa' }, esTarjeta: true, totalMoneda: 999, items, ...extra })
+
+    it('el gasto con crédito cuenta en su mes; su sub-item propagado al resumen no se vuelve a contar', () => {
+      const r = computeResumen(
+        [
+          makeGasto({ id: 1, conceptoId: 5, concepto: { nombre: 'Limpieza' }, tipoPago: 'C', totalMoneda: 100 }),
+          resumen([sub(5, 'Limpieza', 80, { pagoId: 7 })]),
+        ],
+        [], SETTINGS_DEFAULT, TODAY,
+      )
+      expect(r.detalle_proximo_mes).toEqual([expect.objectContaining({ gasto_ids: [1], descripcion: 'Limpieza', gasto_padre: null, estimado: 100 })])
+      expect(r.total_proximo_mes).toBe(100)
+    })
+
+    it('un concepto pagado con débito y con crédito es una sola fila', () => {
+      const r = computeResumen(
+        [
+          makeGasto({ id: 1, conceptoId: 5, tipoPago: 'D', totalMoneda: 70 }),
+          makeGasto({ id: 2, conceptoId: 5, tipoPago: 'C', totalMoneda: 130 }),
+        ],
+        [[makeGasto({ conceptoId: 5, tipoPago: 'C', totalMoneda: 100 })]],
+        { ...SETTINGS_DEFAULT, estimMesesAtras: 1 }, TODAY, [], [{ mes: 5, anio: 2026 }],
+      )
+      expect(r.detalle_proximo_mes).toHaveLength(1)
+      expect(r.detalle_proximo_mes[0]).toMatchObject({ cantidad: 2, monto_actual: 200, estimado: 150 })
+    })
+
+    it('las cuotas que existen sólo en el resumen entran y empalman con la primera cuota cargada como gasto', () => {
+      const r = computeResumen(
+        [resumen([sub(20, 'Freezer', 100, { cuotaActual: 2, cuotasTotales: 6 })])],
+        [[makeGasto({ conceptoId: 20, tipoPago: 'C', totalMoneda: 100, cuotaActual: 1, cuotasTotales: 6 })]],
+        { ...SETTINGS_DEFAULT, estimMesesAtras: 1 }, TODAY, [], [{ mes: 5, anio: 2026 }],
+      )
+      expect(r.detalle_proximo_mes[0]).toMatchObject({
+        descripcion: 'Freezer', gasto_padre: 'Visa', es_subitem: true, cuota_actual: 2,
+        historico: [{ mes: 5, anio: 2026, monto: 100, en_promedio: true }],
+        estimado: 100,
+      })
+    })
+
+    it('los cargos del banco (sub-items sin pago) entran con la tarjeta como padre', () => {
+      const r = computeResumen([resumen([sub(30, 'IVA (Tarjeta)', 15)])], [], SETTINGS_DEFAULT, TODAY)
+      expect(r.detalle_proximo_mes).toEqual([expect.objectContaining({ descripcion: 'IVA (Tarjeta)', gasto_padre: 'Visa', estimado: 15 })])
+    })
+
+    it('el total del resumen nunca es unidad, tenga o no sub-items', () => {
+      const r = computeResumen([resumen([]), resumen([sub(5, 'Limpieza', 80, { pagoId: 7 })])], [], SETTINGS_DEFAULT, TODAY)
+      expect(r.detalle_proximo_mes).toEqual([])
+      expect(r.total_proximo_mes).toBe(0)
+    })
+
+    it('agrupa los sub-items sin pago del mismo concepto aunque vengan de resúmenes distintos', () => {
+      const r = computeResumen(
+        [
+          resumen([sub(30, 'IVA (Tarjeta)', 10), sub(30, 'IVA (Tarjeta)', 5)], { id: 1 }),
+          resumen([sub(30, 'IVA (Tarjeta)', 25)], { id: 2, conceptoId: 8, concepto: { nombre: 'Mastercard' } }),
+        ],
+        [], SETTINGS_DEFAULT, TODAY,
+      )
+      // Tarjetas distintas: la fila no tiene un único padre.
+      expect(r.detalle_proximo_mes).toEqual([expect.objectContaining({ gasto_ids: [1, 2], cantidad: 3, gasto_padre: null, estimado: 40 })])
+    })
+
+    it('mezcla de un gasto y un sub-item del mismo concepto: no se marca como sub-item', () => {
+      const r = computeResumen(
+        [makeGasto({ id: 1, conceptoId: 20, tipoPago: 'C', totalMoneda: 100 }), resumen([sub(20, 'Freezer', 100)])],
+        [], SETTINGS_DEFAULT, TODAY,
+      )
+      expect(r.detalle_proximo_mes[0]).toMatchObject({ es_subitem: false, gasto_padre: null, cantidad: 2, estimado: 200 })
+    })
+  })
+
+  it('no lista los gastos no confirmados sin sub-items (no entran al estimado)', () => {
+    const r = computeResumen([makeGasto({ confirmado: false })], [], SETTINGS_DEFAULT, TODAY)
+    expect(r.detalle_proximo_mes).toEqual([])
+  })
+})
+
 describe('computeResumen — ingresos y ahorro', () => {
   // Ingreso en ARS: el tipo de cambio es 1 y el monto no se convierte.
   const ingresoArs = (monto: number) => ({ montoMoneda: monto, tipoCambio: 1 })
