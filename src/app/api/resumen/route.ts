@@ -40,10 +40,18 @@ export async function GET(req: NextRequest) {
 
   const [ingresos, gastos, ...prevGastos] = await Promise.all([
     prisma.ingreso.findMany({ where: buildIngresosWhere(mes, anio, casa_id), select: { montoMoneda: true, tipoCambio: true } }),
-    prisma.gasto.findMany({ where, include: { pagos: true, items: true } }),
+    // El concepto (del gasto y de cada sub-item) sólo hace falta para rotular el detalle del estimado.
+    prisma.gasto.findMany({
+      where,
+      include: {
+        pagos: true,
+        concepto: { select: { nombre: true } },
+        items: { include: { concepto: { select: { nombre: true } } } },
+      },
+    }),
     ...prevMonths.map(p => prisma.gasto.findMany({ where: { ...baseWhere, mes: p.mes, anio: p.anio }, include: { items: true } })),
   ])
 
-  const resumen = computeResumen(gastos, prevGastos, settings, today, ingresos)
+  const resumen = computeResumen(gastos, prevGastos, settings, today, ingresos, prevMonths)
   return NextResponse.json(resumen)
 }
