@@ -91,6 +91,18 @@ describe('POST /api/gastos', () => {
     expect(mockPrisma.gasto.create.mock.calls[0][0].data.etiquetas).toEqual({ connect: [{ id: 3 }, { id: 8 }] })
   })
 
+  it('persiste la promoción asociada (promocion_id → promocionId) y por defecto ninguna', async () => {
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, etiquetas: [] }))
+    const base = { casa_id: 5, descripcion: 'PedidosYa', fecha_vencimiento: '2026-07-01', tipo_pago: 'C', moneda_id: 1, total_moneda: 500, tarjeta_id: 7, mes: 7, anio: 2026 }
+
+    const res = await POST({ json: async () => ({ ...base, promocion_id: 12 }) } as any)
+    expect(mockPrisma.gasto.create.mock.calls[0][0].data.promocionId).toBe(12)
+    expect((await res.json()).promocion_id).toBe(12)
+
+    await POST({ json: async () => base } as any)
+    expect(mockPrisma.gasto.create.mock.calls[1][0].data.promocionId).toBeNull()
+  })
+
   it('usa concepto_id del body si viene, sin resolver por texto', async () => {
     mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 101, etiquetas: [] }))
     await POST({ json: async () => ({ casa_id: 1, concepto_id: 7, total_moneda: 100, mes: 6, anio: 2026 }) } as any)

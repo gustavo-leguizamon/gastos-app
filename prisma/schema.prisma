@@ -27,20 +27,21 @@ model Casa {
 }
 
 model Tarjeta {
-  id         Int             @id @default(autoincrement())
-  nombre     String
-  banco      String?
-  marca      String?
-  bancoLogo  String?
+  id          Int             @id @default(autoincrement())
+  nombre      String
+  banco       String?
+  marca       String?
+  bancoLogo   String?
   /// Icono subido por el usuario (data URI, ver src/lib/imagen-icono.ts). Gana sobre bancoLogo.
-  bancoIcono String?
+  bancoIcono  String?
   /// Período (mes/anio) desde el que la tarjeta está de baja: ya no se posee y deja de
   /// aparecer en /gastos **desde ese mes inclusive**, pero sigue existiendo para no perder
   /// el histórico de los gastos que la usaron. Ambos null = activa. Ver src/lib/tarjetas-baja.ts.
-  bajaMes    Int?
-  bajaAnio   Int?
-  gastos     Gasto[]
-  cierres    TarjetaCierre[]
+  bajaMes     Int?
+  bajaAnio    Int?
+  gastos      Gasto[]
+  cierres     TarjetaCierre[]
+  promociones Promocion[]     @relation("PromocionTarjetas")
 }
 
 model TarjetaCierre {
@@ -168,11 +169,12 @@ model CategoriaEtiquetaRegla {
 // `conceptoId` y la API expone `descripcion` derivada de `nombre`. Renombrar un concepto se
 // refleja en todo el histórico. El match para analytics (evolución, estimado, copiar) usa el id.
 model Concepto {
-  id        Int         @id @default(autoincrement())
-  nombre    String      @unique
-  createdAt DateTime    @default(now())
-  gastos    Gasto[]
-  items     GastoItem[]
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique
+  createdAt   DateTime    @default(now())
+  gastos      Gasto[]
+  items       GastoItem[]
+  promociones Promocion[]
 }
 
 model Gasto {
@@ -202,12 +204,15 @@ model Gasto {
   updatedAt          DateTime @updatedAt
 
   categoriaId Int?
+  /// Promoción de reintegro a la que cuenta este gasto (asociación explícita, ver Promocion).
+  promocionId Int?
 
   casa      Casa        @relation(fields: [casaId], references: [id])
   moneda    Moneda      @relation(fields: [monedaId], references: [id])
   tarjeta   Tarjeta?    @relation(fields: [tarjetaId], references: [id])
   concepto  Concepto    @relation(fields: [conceptoId], references: [id])
   categoria Categoria?  @relation(fields: [categoriaId], references: [id])
+  promocion Promocion?  @relation(fields: [promocionId], references: [id], onDelete: SetNull)
   etiquetas Etiqueta[]  @relation("GastoEtiquetas")
   pagos     Pago[]
   items     GastoItem[]
@@ -219,6 +224,7 @@ model Gasto {
   // El match entre meses (evolución, estimado del próximo mes, copiar/merge) es por
   // conceptoId; `Concepto` puede tener muchos gastos y la FK no indexa sola en Postgres.
   @@index([conceptoId])
+  @@index([promocionId])
 }
 
 model GastoItem {
@@ -421,4 +427,53 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+/// Promoción de reintegro recurrente: "en <lugar>, los <días>, pagando con <tarjetas/efectivo>
+/// te devuelven <porcentaje>% hasta <topeMensual> por mes". Es una regla que se repite todos
+/// los meses (no hay una fila por período): lo que varía mes a mes —cuánto se consumió y
+/// cuánto se reintegró— se **calcula** (`src/lib/promociones-compute.ts`), no se persiste.
+///
+/// `dias`: 0 = lunes … 6 = domingo. `efectivo`: aplica a gastos de débito sin tarjeta.
+/// El consumo del mes sale de los gastos **asociados explícitamente** (`Gasto.promocionId`) más
+/// los `usos` manuales. `conceptoId` (opcional) sólo sirve para **sugerir** la promo al cargar
+/// un gasto de ese concepto y para listar candidatos a asociar.
+model Promocion {
+  id           Int      @id @default(autoincrement())
+  lugar        String
+  conceptoId   Int?
+  porcentaje   Float
+  topeMensual  Float
+  dias         Int[]
+  efectivo     Boolean  @default(false)
+  activa       Boolean  @default(true)
+  notas        String?
+  /// Vigencia opcional (YYYY-MM-DD, inclusive). null = sin límite de ese lado. Sirve para no
+  /// sugerir ni contar la promo fuera de ese rango; no filtra gastos (no tienen fecha de compra).
+  vigenteDesde String?
+  vigenteHasta String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  concepto Concepto?      @relation(fields: [conceptoId], references: [id], onDelete: SetNull)
+  tarjetas Tarjeta[]      @relation("PromocionTarjetas")
+  usos     PromocionUso[]
+  gastos   Gasto[]
+}
+
+/// Consumo con promo registrado a mano ("gasté $X el día Y"). Suma al consumo que sale de los
+/// gastos vinculados por concepto, para lo que el automático no ve.
+model PromocionUso {
+  id          Int      @id @default(autoincrement())
+  promocionId Int
+  fecha       String
+  mes         Int
+  anio        Int
+  montoGasto  Float
+  notas       String?
+  createdAt   DateTime @default(now())
+
+  promocion Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+
+  @@index([promocionId, anio, mes])
 }

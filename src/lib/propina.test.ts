@@ -104,6 +104,8 @@ describe('buildPropinaGasto', () => {
   it('sin categoría de propina queda sin categoría, nunca con la del origen', () => {
     expect(buildPropinaGasto(base({ categoria_id: 4 }), split).categoria_id).toBeNull()
     expect(buildPropinaGasto(base({ categoria_id: 4, propina_categoria_id: null }), split).categoria_id).toBeNull()
+    // La promoción es del consumo: la propina no hereda la asociación del gasto.
+    expect(buildPropinaGasto(base({ promocion_id: 7 }), split).promocion_id).toBeNull()
   })
 
   it('etiquetas sin tocar (null) = las del gasto de origen', () => {

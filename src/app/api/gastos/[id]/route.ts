@@ -45,6 +45,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       notas: body.notas || null,
       confirmado: body.confirmado ?? true,
       categoriaId: body.categoria_id ?? null,
+      // Sólo se toca si viene en el body: un PUT parcial no debe soltar la promo asociada.
+      promocionId: body.promocion_id === undefined ? undefined : body.promocion_id ?? null,
       etiquetas: { set: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
       esTarjeta: body.es_tarjeta ?? false,
     },

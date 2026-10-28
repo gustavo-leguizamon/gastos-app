@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({
     concepto: { findUnique: vi.fn(), delete: vi.fn() },
     gasto: { updateMany: vi.fn() },
     gastoItem: { updateMany: vi.fn() },
+    promocion: { updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -32,6 +33,8 @@ describe('POST /api/conceptos/merge', () => {
 
     expect(mp.gasto.updateMany).toHaveBeenCalledWith({ where: { conceptoId: 1 }, data: { conceptoId: 2 } })
     expect(mp.gastoItem.updateMany).toHaveBeenCalledWith({ where: { conceptoId: 1 }, data: { conceptoId: 2 } })
+    // La promo vinculada al concepto origen sigue al destino en vez de quedar sin vínculo.
+    expect(mp.promocion.updateMany).toHaveBeenCalledWith({ where: { conceptoId: 1 }, data: { conceptoId: 2 } })
     expect(mp.concepto.delete).toHaveBeenCalledWith({ where: { id: 1 } })
     expect(body).toMatchObject({ ok: true, target_id: 2, moved_gastos: 3, moved_items: 5 })
   })

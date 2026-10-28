@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
   const [gastos, items] = await prisma.$transaction([
     prisma.gasto.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
     prisma.gastoItem.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
+    // Sin esto la promo vinculada al origen perdería el vínculo (FK `SetNull`) y dejaría de
+    // medir el consumo automático sin avisar.
+    prisma.promocion.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
     prisma.concepto.delete({ where: { id: sourceId } }),
   ])
 
