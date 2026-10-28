@@ -133,6 +133,8 @@ export interface Gasto {
   tarjeta_banco_logo?: TarjetaBanco | null
   // Categoría única (partición) + etiquetas (corte transversal).
   categoria_id: number | null
+  /** Promoción de reintegro a la que cuenta este gasto, o `null`. */
+  promocion_id: number | null
   categoria: Categoria | null
   etiqueta_ids: number[]
   etiquetas: Etiqueta[]
@@ -172,6 +174,8 @@ export interface GastoFormData {
   notas: string
   confirmado: boolean
   categoria_id: number | null
+  /** Promoción de reintegro a la que cuenta este gasto, o `null`. */
+  promocion_id?: number | null
   etiqueta_ids: number[]
   es_tarjeta: boolean
   pagado_completo?: boolean
@@ -493,4 +497,79 @@ export interface PresupuestosResponse {
   ingresos_mes: number
   /** Prefill del wizard: `ingresos_mes` si hay, si no el promedio de los meses previos. */
   ingresos_sugeridos: number
+}
+
+// ── Promociones (reintegros recurrentes) ─────────────────────────────────────────────
+// Ver `src/lib/promociones-compute.ts` y `docs/claude/promociones.md`.
+
+export interface PromocionTarjeta {
+  id: number
+  nombre: string
+  banco: string | null
+  marca: TarjetaMarca | null
+  banco_logo: TarjetaBanco | null
+  banco_icono: string | null
+}
+
+export interface PromocionUso {
+  id: number
+  promocion_id: number
+  fecha: string
+  mes: number
+  anio: number
+  monto_gasto: number
+  notas: string | null
+}
+
+/** Consumo y reintegro de una promo en un período. Se calcula, no se persiste. */
+export interface ProgresoPromocion {
+  consumo_auto: number
+  consumo_manual: number
+  consumo: number
+  /** Gasto que agota justo el tope (`tope ÷ %`). */
+  gasto_minimo: number
+  gasto_restante: number
+  reintegrado: number
+  disponible: number
+  pct_tope: number
+  estado: 'sin_uso' | 'en_curso' | 'tope_alcanzado'
+}
+
+export interface Promocion {
+  id: number
+  lugar: string
+  concepto_id: number | null
+  concepto_nombre: string | null
+  porcentaje: number
+  tope_mensual: number
+  /** 0 = lunes … 6 = domingo. */
+  dias: number[]
+  tarjeta_ids: number[]
+  tarjetas: PromocionTarjeta[]
+  /** Vale pagando en efectivo (débito sin tarjeta). */
+  efectivo: boolean
+  activa: boolean
+  notas: string | null
+  /** Vigencia (YYYY-MM-DD, inclusive); `null` = sin límite de ese lado. */
+  vigente_desde: string | null
+  vigente_hasta: string | null
+}
+
+export interface PromocionConProgreso extends Promocion {
+  /** Vigente en el período consultado (`activa` es el interruptor manual, aparte). */
+  vigente: boolean
+  usos: PromocionUso[]
+  progreso: ProgresoPromocion
+}
+
+export interface PromocionesResponse {
+  mes: number
+  anio: number
+  promociones: PromocionConProgreso[]
+  totales: {
+    tope_total: number
+    reintegrado: number
+    disponible: number
+    completas: number
+  }
 }

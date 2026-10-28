@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import BrandLogo from '@/components/shared/BrandLogo'
+import PromocionGastoField from './PromocionGastoField'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { gastoFormSchema } from '@/lib/gasto-form-schema'
@@ -105,6 +106,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       notas: gasto?.notas ?? '',
       confirmado: gasto?.confirmado ?? true,
       categoria_id: gasto?.categoria_id ?? null,
+      promocion_id: gasto?.promocion_id ?? null,
       etiqueta_ids: gasto?.etiqueta_ids ?? [],
       es_tarjeta: gasto?.es_tarjeta ?? false,
       pagado_completo: true,
@@ -160,6 +162,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const propinaEtiquetaIds = watch('propina_etiqueta_ids')
   const etiquetaIds = watch('etiqueta_ids')
   const descripcion = watch('descripcion')
+  const promocionId = watch('promocion_id')
+  const mesGasto = watch('mes')
+  const anioGasto = watch('anio')
 
   // Etiquetas a destacar para la categoría elegida (`null` = sin criterio, se muestran todas).
   const etiquetasDestacadas = useMemo(
@@ -219,6 +224,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       total_pagado: 0,
       notas: '',
       categoria_id: null,
+      promocion_id: null,
       etiqueta_ids: [],
       cuota_actual: null,
       cuotas_totales: null,
@@ -709,6 +715,18 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             />
           </Grid>
         )}
+
+        <PromocionGastoField
+          descripcion={descripcion ?? ''}
+          tipoPago={tipoPago}
+          tarjetaId={tarjetaId ?? null}
+          mes={mesGasto}
+          anio={anioGasto}
+          esTarjeta={esTarjeta}
+          value={promocionId ?? null}
+          onChange={v => setValue('promocion_id', v, { shouldDirty: true })}
+          autoSeleccionar={!isEditing}
+        />
 
         {/* Todo lo que tiene un default correcto en la mayoría de las cargas */}
         <Grid item xs={12}>
