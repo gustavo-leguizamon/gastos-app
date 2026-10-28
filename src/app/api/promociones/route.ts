@@ -4,7 +4,7 @@ import { validarReferenciasPromocion } from '@/lib/promociones-refs'
 import { promocionesConProgreso } from '@/lib/promociones-db'
 import { parsePromocionBody, toPromocionResponse, totalesPromociones } from '@/lib/promociones-compute'
 
-const INCLUDE = { concepto: true, tarjetas: true } as const
+const INCLUDE = { conceptos: true, tarjetas: true } as const
 
 /**
  * `GET /api/promociones?mes=&anio=` — las promociones con su **progreso en el período**.
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
   const creada = await prisma.promocion.create({
     data: {
       lugar: data.lugar,
-      conceptoId: data.conceptoId,
       porcentaje: data.porcentaje,
       topeMensual: data.topeMensual,
       dias: data.dias,
@@ -55,6 +54,7 @@ export async function POST(req: NextRequest) {
       vigenteDesde: data.vigenteDesde,
       vigenteHasta: data.vigenteHasta,
       tarjetas: { connect: data.tarjetaIds.map(id => ({ id })) },
+      conceptos: { connect: data.conceptoIds.map(id => ({ id })) },
     },
     include: INCLUDE,
   })

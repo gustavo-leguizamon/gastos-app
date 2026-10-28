@@ -27,7 +27,7 @@ export function diaSemanaDeFecha(fecha: unknown): number | null {
 
 export interface PromocionData {
   lugar: string
-  conceptoId: number | null
+  conceptoIds: number[]
   porcentaje: number
   topeMensual: number
   dias: number[]
@@ -77,11 +77,9 @@ export function parsePromocionBody(body: any): PromocionData | null {
   const efectivo = body.efectivo === true
   if (tarjetaIds.length === 0 && !efectivo) return null
 
-  let conceptoId: number | null = null
-  if (body.concepto_id != null && body.concepto_id !== '') {
-    conceptoId = Number(body.concepto_id)
-    if (!Number.isInteger(conceptoId) || conceptoId <= 0) return null
-  }
+  const conceptosRaw: unknown[] = Array.isArray(body.concepto_ids) ? body.concepto_ids : []
+  const conceptoIds = Array.from(new Set(conceptosRaw.map(Number)))
+  if (conceptoIds.some(id => !Number.isInteger(id) || id <= 0)) return null
 
   const notas = typeof body.notas === 'string' && body.notas.trim() ? body.notas.trim() : null
 
@@ -92,7 +90,7 @@ export function parsePromocionBody(body: any): PromocionData | null {
 
   return {
     lugar,
-    conceptoId,
+    conceptoIds,
     porcentaje: r2(porcentaje),
     topeMensual: r2(topeMensual),
     dias,
@@ -127,14 +125,15 @@ export function parseUsoBody(body: any): PromocionUsoData | null {
   return { fecha: body.fecha, mes: periodo.mes, anio: periodo.anio, montoGasto: r2(montoGasto), notas }
 }
 
-/** Mapping camelCase→snake_case de una fila de Prisma (con `concepto` y `tarjetas` incluidos). */
+/** Mapping camelCase→snake_case de una fila de Prisma (con `conceptos` y `tarjetas` incluidos). */
 export function toPromocionResponse(row: any) {
   const tarjetas: any[] = row.tarjetas ?? []
+  const conceptos: any[] = row.conceptos ?? []
   return {
     id: row.id,
     lugar: row.lugar,
-    concepto_id: row.conceptoId ?? null,
-    concepto_nombre: row.concepto?.nombre ?? null,
+    concepto_ids: conceptos.map(c => c.id),
+    concepto_nombres: conceptos.map(c => c.nombre),
     porcentaje: row.porcentaje,
     tope_mensual: row.topeMensual,
     dias: [...(row.dias ?? [])].sort((a: number, b: number) => a - b),

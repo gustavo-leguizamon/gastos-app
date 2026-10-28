@@ -17,7 +17,7 @@ const url = (qs: string) => ({ url: `http://localhost/api/promociones/sugeridas?
 /** 30% hasta $30.000 en PedidosYa, con la tarjeta 10 (no vale en efectivo). */
 function rawPromo(over: Record<string, any> = {}) {
   return {
-    id: 1, lugar: 'PedidosYa', conceptoId: 5, concepto: { id: 5, nombre: 'PedidosYa' },
+    id: 1, lugar: 'PedidosYa', conceptos: [{ id: 5, nombre: 'PedidosYa' }, { id: 6, nombre: 'Rappi' }],
     porcentaje: 30, topeMensual: 30000, dias: [1], efectivo: false, activa: true, notas: null,
     vigenteDesde: null, vigenteHasta: null,
     tarjetas: [{ id: 10, nombre: 'Visa', banco: null, marca: 'visa', bancoLogo: null, bancoIcono: null }],
@@ -50,7 +50,18 @@ describe('GET /api/promociones/sugeridas', () => {
   it('busca el concepto sin distinguir mayúsculas y sólo trae promos activas de ese concepto', async () => {
     await GET(url(base))
     expect(mp.concepto.findFirst).toHaveBeenCalledWith({ where: { nombre: { equals: 'pedidosya', mode: 'insensitive' } } })
-    expect(mp.promocion.findMany.mock.calls[0][0].where).toEqual({ OR: [{ activa: true, conceptoId: 5 }] })
+    expect(mp.promocion.findMany.mock.calls[0][0].where).toEqual({
+      OR: [{ activa: true, conceptos: { some: { id: 5 } } }],
+    })
+  })
+
+  it('sugiere la promo desde cualquiera de sus conceptos vinculados, y no desde otro', async () => {
+    mp.concepto.findFirst.mockResolvedValue({ id: 6, nombre: 'Rappi' })
+    expect(await (await GET(url(base))).json()).toHaveLength(1)
+    // El concepto del gasto no está entre los de la promo (la query lo trajo por la promo forzada).
+    mp.concepto.findFirst.mockResolvedValue({ id: 99, nombre: 'Otro' })
+    mp.promocion.findMany.mockResolvedValue([rawPromo()])
+    expect(await (await GET(url(`${base}&promocion_id=1`))).json()).toMatchObject([{ id: 1, coincide: false }])
   })
 
   it('sugiere la promo con lo que queda por reintegrar', async () => {
@@ -91,7 +102,9 @@ describe('GET /api/promociones/sugeridas', () => {
   it('promocion_id fuerza a incluir la promo ya asociada aunque no coincida, marcada coincide: false', async () => {
     mp.promocion.findMany.mockResolvedValue([rawPromo({ activa: false })])
     const r = await (await GET(url(`${base}&promocion_id=1`))).json()
-    expect(mp.promocion.findMany.mock.calls[0][0].where).toEqual({ OR: [{ activa: true, conceptoId: 5 }, { id: 1 }] })
+    expect(mp.promocion.findMany.mock.calls[0][0].where).toEqual({
+      OR: [{ activa: true, conceptos: { some: { id: 5 } } }, { id: 1 }],
+    })
     expect(r).toHaveLength(1)
     expect(r[0]).toMatchObject({ id: 1, coincide: false })
   })

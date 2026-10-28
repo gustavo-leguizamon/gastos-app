@@ -10,7 +10,7 @@ import { medioCoincide, vigenteEnMes } from '@/lib/promociones-compute'
  * Params: `descripcion` (texto del concepto), `tipo_pago` (`C`/`D`), `tarjeta_id`, `mes`,
  * `anio` y `promocion_id` (opcional).
  *
- * Una promo se sugiere si está **activa**, es del concepto del gasto, el medio de pago entra
+ * Una promo se sugiere si está **activa**, tiene el concepto del gasto entre los suyos, el medio de pago entra
  * (tarjeta de la promo, o débito sin tarjeta si vale en efectivo) y está **vigente** en el mes
  * del gasto. `promocion_id` fuerza a incluir esa promo aunque ya no coincida (con
  * `coincide: false`): al editar un gasto ya asociado, la opción actual no puede desaparecer
@@ -40,13 +40,13 @@ export async function GET(req: NextRequest) {
     : null
 
   const or: any[] = []
-  if (concepto) or.push({ activa: true, conceptoId: concepto.id })
+  if (concepto) or.push({ activa: true, conceptos: { some: { id: concepto.id } } })
   if (forzadaId) or.push({ id: forzadaId })
   if (or.length === 0) return NextResponse.json([])
 
   const filas = await prisma.promocion.findMany({
     where: { OR: or },
-    include: { concepto: true, tarjetas: true, usos: { where: { mes, anio } } },
+    include: { conceptos: true, tarjetas: true, usos: { where: { mes, anio } } },
     orderBy: { lugar: 'asc' },
   })
 
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       coincide:
         p.activa &&
         concepto != null &&
-        p.conceptoId === concepto.id &&
+        p.conceptos.some(c => c.id === concepto.id) &&
         vigenteEnMes(p, mes, anio) &&
         medioCoincide({ tarjetaIds: p.tarjetas.map(t => t.id), efectivo: p.efectivo }, { tipoPago, tarjetaId }),
     }))

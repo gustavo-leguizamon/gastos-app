@@ -46,7 +46,7 @@ describe('parsePromocionBody', () => {
   it('normaliza lugar, ordena y deduplica días y tarjetas', () => {
     expect(parsePromocionBody(bodyOk({ tarjeta_ids: [2, 1, 2] }))).toEqual({
       lugar: 'Carrefour',
-      conceptoId: null,
+      conceptoIds: [],
       porcentaje: 20,
       topeMensual: 10000,
       dias: [2, 4],
@@ -59,9 +59,9 @@ describe('parsePromocionBody', () => {
     })
   })
 
-  it('acepta sólo efectivo (sin tarjetas) y concepto vinculado', () => {
-    const r = parsePromocionBody(bodyOk({ tarjeta_ids: [], efectivo: true, concepto_id: 7 }))
-    expect(r).toMatchObject({ tarjetaIds: [], efectivo: true, conceptoId: 7 })
+  it('acepta sólo efectivo (sin tarjetas) y varios conceptos vinculados (sin repetir)', () => {
+    const r = parsePromocionBody(bodyOk({ tarjeta_ids: [], efectivo: true, concepto_ids: [7, 3, 7] }))
+    expect(r).toMatchObject({ tarjetaIds: [], efectivo: true, conceptoIds: [7, 3] })
   })
 
   it.each([
@@ -75,7 +75,7 @@ describe('parsePromocionBody', () => {
     ['día no entero', { dias: [1.5] }],
     ['sin tarjetas ni efectivo', { tarjeta_ids: [], efectivo: false }],
     ['tarjeta inválida', { tarjeta_ids: [0] }],
-    ['concepto inválido', { concepto_id: -1 }],
+    ['concepto inválido', { concepto_ids: [5, -1] }],
     ['vigente_desde inválida', { vigente_desde: '15/10/2026' }],
     ['vigente_hasta inválida', { vigente_hasta: 'mañana' }],
     ['vigencia invertida', { vigente_desde: '2026-10-20', vigente_hasta: '2026-10-10' }],
@@ -114,14 +114,14 @@ describe('parseUsoBody', () => {
 })
 
 describe('toPromocionResponse', () => {
-  it('mapea a snake_case con tarjetas y concepto', () => {
+  it('mapea a snake_case con tarjetas y conceptos', () => {
     const r = toPromocionResponse({
-      id: 1, lugar: 'Coto', conceptoId: 3, concepto: { nombre: 'Coto' }, porcentaje: 15, topeMensual: 8000,
+      id: 1, lugar: 'Coto', conceptos: [{ id: 3, nombre: 'Coto' }, { id: 4, nombre: 'Coto Digital' }], porcentaje: 15, topeMensual: 8000,
       dias: [4, 1], efectivo: true, activa: true, notas: null,
       tarjetas: [{ id: 9, nombre: 'Visa', banco: 'Galicia', marca: 'visa', bancoLogo: 'galicia', bancoIcono: null }],
     })
     expect(r).toMatchObject({
-      concepto_id: 3, concepto_nombre: 'Coto', tope_mensual: 8000, dias: [1, 4], tarjeta_ids: [9], efectivo: true,
+      concepto_ids: [3, 4], concepto_nombres: ['Coto', 'Coto Digital'], tope_mensual: 8000, dias: [1, 4], tarjeta_ids: [9], efectivo: true,
     })
     expect(r.tarjetas[0]).toEqual({ id: 9, nombre: 'Visa', banco: 'Galicia', marca: 'visa', banco_logo: 'galicia', banco_icono: null })
   })

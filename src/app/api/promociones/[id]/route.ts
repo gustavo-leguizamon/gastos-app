@@ -4,8 +4,8 @@ import { parsePromocionBody, toPromocionResponse } from '@/lib/promociones-compu
 import { validarReferenciasPromocion } from '@/lib/promociones-refs'
 
 /**
- * `PUT /api/promociones/[id]` — edita una promoción. Las tarjetas se **reemplazan** (`set`):
- * el body trae la lista completa, no un diff.
+ * `PUT /api/promociones/[id]` — edita una promoción. Las tarjetas y los conceptos se
+ * **reemplazan** (`set`): el body trae la lista completa, no un diff.
  */
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const id = Number(params.id)
@@ -25,7 +25,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     where: { id },
     data: {
       lugar: data.lugar,
-      conceptoId: data.conceptoId,
       porcentaje: data.porcentaje,
       topeMensual: data.topeMensual,
       dias: data.dias,
@@ -35,8 +34,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       vigenteDesde: data.vigenteDesde,
       vigenteHasta: data.vigenteHasta,
       tarjetas: { set: data.tarjetaIds.map(t => ({ id: t })) },
+      conceptos: { set: data.conceptoIds.map(c => ({ id: c })) },
     },
-    include: { concepto: true, tarjetas: true },
+    include: { conceptos: true, tarjetas: true },
   })
   return NextResponse.json(toPromocionResponse(actualizada))
 }

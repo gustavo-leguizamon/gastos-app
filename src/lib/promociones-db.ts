@@ -8,7 +8,7 @@ import {
 } from '@/lib/promociones-compute'
 
 /**
- * Promociones (filas de Prisma con `concepto`, `tarjetas` y los `usos` del período incluidos)
+ * Promociones (filas de Prisma con `conceptos`, `tarjetas` y los `usos` del período incluidos)
  * con su **progreso en `(mes, anio)`**: consumo de los gastos asociados + usos manuales, y si
  * están vigentes en ese mes. Lo comparten el listado y las sugerencias del form de gasto, para
  * que las dos pantallas no puedan calcular distinto "cuánto queda".
