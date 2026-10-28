@@ -19,12 +19,19 @@ export async function POST(req: NextRequest) {
   const target = await prisma.concepto.findUnique({ where: { id: targetId } })
   if (!target) return NextResponse.json({ error: 'Concepto destino no encontrado' }, { status: 404 })
 
+  // Las promos vinculadas al origen: al borrarlo la tabla puente lo suelta (cascade) y la promo
+  // dejaría de sugerirse sin avisar. Se les conecta el destino (idempotente si ya lo tenían).
+  const promos = await prisma.promocion.findMany({
+    where: { conceptos: { some: { id: sourceId } } },
+    select: { id: true },
+  })
+
   const [gastos, items] = await prisma.$transaction([
     prisma.gasto.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
     prisma.gastoItem.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
-    // Sin esto la promo vinculada al origen perdería el vínculo (FK `SetNull`) y dejaría de
-    // medir el consumo automático sin avisar.
-    prisma.promocion.updateMany({ where: { conceptoId: sourceId }, data: { conceptoId: targetId } }),
+    ...promos.map(p =>
+      prisma.promocion.update({ where: { id: p.id }, data: { conceptos: { connect: { id: targetId } } } }),
+    ),
     prisma.concepto.delete({ where: { id: sourceId } }),
   ])
 

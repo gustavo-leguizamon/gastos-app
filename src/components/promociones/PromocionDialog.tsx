@@ -14,7 +14,6 @@ import toast from 'react-hot-toast'
 import BrandLogo from '@/components/shared/BrandLogo'
 import AppDateField from '@/components/shared/AppDateField'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
-import AppSelect from '@/components/shared/AppSelect'
 import AppTextField from '@/components/shared/AppTextField'
 import PaymentsIcon from '@mui/icons-material/Payments'
 import AppToggle from '@/components/shared/AppToggle'
@@ -55,7 +54,7 @@ const fmtARS = (n: number) =>
 export default function PromocionDialog({ open, onClose, onSaved, editando, tarjetas, mes, anio }: Props) {
   const [conceptos, setConceptos] = useState<Concepto[]>([])
   const [lugar, setLugar] = useState('')
-  const [conceptoId, setConceptoId] = useState<number | null>(null)
+  const [conceptoIds, setConceptoIds] = useState<number[]>([])
   const [porcentaje, setPorcentaje] = useState('')
   const [tope, setTope] = useState('')
   const [dias, setDias] = useState<number[]>([])
@@ -71,7 +70,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     if (!open) return
     fetch('/api/conceptos').then(r => r.json()).then(setConceptos).catch(() => {})
     setLugar(editando?.lugar ?? '')
-    setConceptoId(editando?.concepto_id ?? null)
+    setConceptoIds(editando?.concepto_ids ?? [])
     setPorcentaje(editando ? String(editando.porcentaje) : '')
     setTope(editando ? String(editando.tope_mensual) : '')
     setDias(editando?.dias ?? [])
@@ -122,7 +121,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lugar,
-          concepto_id: conceptoId,
+          concepto_ids: conceptoIds,
           porcentaje: pct,
           tope_mensual: topeNum,
           dias,
@@ -200,22 +199,22 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
             }}
           />
 
-          <AppSelect
-            label="Concepto vinculado (opcional)"
+          <AppMultiSelect
+            label="Conceptos vinculados (opcional)"
             size="small"
             fullWidth
-            emptyLabel="Sin vincular"
             options={conceptos.map(c => ({ value: c.id, label: c.nombre }))}
-            value={conceptoId}
+            value={conceptoIds}
             onChange={v => {
-              const id = v == null ? null : Number(v)
-              setConceptoId(id)
-              if (id != null && !lugar.trim()) setLugar(conceptos.find(c => c.id === id)?.nombre ?? '')
+              const ids = v.map(Number)
+              setConceptoIds(ids)
+              if (ids.length && !lugar.trim()) setLugar(conceptos.find(c => c.id === ids[0])?.nombre ?? '')
             }}
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
-            Al cargar un gasto de ese concepto con uno de estos medios de pago, la promo se te sugiere y queda
-            asociada. Sin vincular no se sugiere: sólo suman los gastos que asocies a mano y los usos manuales.
+            Al cargar un gasto de cualquiera de esos conceptos con uno de estos medios de pago, la promo se te
+            sugiere y queda asociada. Sin vincular no se sugiere: sólo suman los gastos que asocies a mano y los
+            usos manuales.
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 2 }}>

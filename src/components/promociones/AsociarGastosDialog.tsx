@@ -115,7 +115,7 @@ export default function AsociarGastosDialog({ promo, mes, anio, onClose, onSaved
         {error && <Alert severity="warning">{error}</Alert>}
         {!items && !error && <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={28} /></Box>}
         {items && items.length === 0 && (
-          <Alert severity="info">No hay gastos de este concepto con estos medios de pago en el mes.</Alert>
+          <Alert severity="info">No hay gastos de estos conceptos con estos medios de pago en el mes.</Alert>
         )}
 
         {items && items.map(c => (
