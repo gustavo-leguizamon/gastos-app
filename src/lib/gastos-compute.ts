@@ -75,6 +75,7 @@ export function toGastoResponse(g: any) {
     tarjeta_marca: g.tarjeta?.marca ?? null,
     tarjeta_banco_logo: g.tarjeta?.bancoLogo ?? null,
     categoria_id: g.categoriaId ?? null,
+    promocion_id: g.promocionId ?? null,
     categoria: g.categoria ? { id: g.categoria.id, nombre: g.categoria.nombre } : null,
     etiqueta_ids: (g.etiquetas ?? []).map((c: any) => c.id),
     etiquetas: (g.etiquetas ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })),

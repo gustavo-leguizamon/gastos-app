@@ -32,6 +32,8 @@ export const gastoFormSchema = yup.object({
   notas: yup.string().optional().default(''),
   confirmado: yup.boolean().required().default(true),
   categoria_id: yup.number().nullable().default(null),
+  // Promoción de reintegro a la que cuenta el gasto (asociación explícita). Ver promociones.md.
+  promocion_id: yup.number().nullable().default(null),
   etiqueta_ids: yup.array().of(yup.number()).default([]),
   es_tarjeta: yup.boolean().required().default(false),
   pagado_completo: yup.boolean().required().default(false),
