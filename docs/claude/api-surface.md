@@ -45,9 +45,9 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre todas las routes y f
 | `POST /api/presupuestos/copiar` | Copia los topes del mes anterior, sin pisar los ya cargados. 409 si no hay ninguno. |
 | `GET/POST /api/promociones` | Promociones de reintegro. El GET (`mes`, `anio`) devuelve `{ mes, anio, promociones, totales }`, cada promo con `vigente` (en el período), `usos` del período y `progreso` (consumo de los gastos **asociados** + manual, reintegrado topeado, gasto mínimo para el tope, disponible). El POST valida con `parsePromocionBody` (400 si concepto/tarjeta no existen). Ver `docs/claude/promociones.md`. |
 | `GET /api/promociones/sugeridas` | Promos a ofrecer en el form de gasto según concepto (`descripcion`), medio de pago (`tipo_pago`, `tarjeta_id`) y vigencia en `mes`/`anio`; `promocion_id` fuerza incluir la ya asociada. Devuelve `{ id, lugar, porcentaje, disponible, tope_alcanzado, coincide }[]`. |
-| `GET /api/promociones/[id]/candidatos` | Gastos del mes candidatos a asociar a la promo (`mes`, `anio`); 400 sin concepto vinculado. |
+| `GET /api/promociones/[id]/candidatos` | Gastos del mes candidatos a asociar a la promo (`mes`, `anio`); 400 sin conceptos vinculados. |
 | `POST /api/promociones/[id]/asociar` | `{ gasto_ids, asociar }`: asocia (pisa la anterior) o desasocia (sólo los de esta promo) gastos. |
-| `PUT/DELETE /api/promociones/[id]` | Edita (las tarjetas se reemplazan con `set`) / borra la promo y sus usos (cascade). |
+| `PUT/DELETE /api/promociones/[id]` | Edita (tarjetas y conceptos se reemplazan con `set`) / borra la promo y sus usos (cascade). |
 | `POST /api/promociones/[id]/usos` | Registra un consumo con promo a mano `{ fecha, monto_gasto, notas? }`; `mes`/`anio` salen de la fecha. |
 | `DELETE /api/promociones/[id]/usos/[usoId]` | Quita un uso manual (busca por los dos ids). |
 | `POST /api/presupuestos/generar` | Propuesta de topes desde un objetivo de ahorro, en las dos bases. **No persiste.** Body `{ mes, anio, objetivo, ingresos_esperados, meses_historico?, categorias_fijas? }`. |

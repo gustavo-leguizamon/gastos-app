@@ -538,8 +538,8 @@ export interface ProgresoPromocion {
 export interface Promocion {
   id: number
   lugar: string
-  concepto_id: number | null
-  concepto_nombre: string | null
+  concepto_ids: number[]
+  concepto_nombres: string[]
   porcentaje: number
   tope_mensual: number
   /** 0 = lunes … 6 = domingo. */

@@ -136,15 +136,15 @@ export default function PromoCard({ promo, hoy, onUso, onAsociar, onEditar, onBo
             : <>Te faltan gastar <b>{fmtARS(p.gasto_restante)}</b> para el reintegro máximo.</>}
         </Typography>
 
-        {!promo.concepto_id && (
+        {promo.concepto_ids.length === 0 && (
           <Typography variant="caption" color="text.secondary">
-            Sin concepto vinculado: no se sugiere al cargar gastos. Sólo suma lo que registres a mano.
+            Sin conceptos vinculados: no se sugiere al cargar gastos. Sólo suma lo que registres a mano.
           </Typography>
         )}
         {promo.notas && <Typography variant="caption" color="text.secondary">{promo.notas}</Typography>}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {promo.concepto_id && (
+          {promo.concepto_ids.length > 0 && (
             <Button size="small" startIcon={<LinkIcon />} onClick={onAsociar}>Gastos que cuentan</Button>
           )}
           <Button size="small" startIcon={<AddIcon />} onClick={onUso}>Registrar uso</Button>

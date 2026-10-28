@@ -174,7 +174,7 @@ model Concepto {
   createdAt   DateTime    @default(now())
   gastos      Gasto[]
   items       GastoItem[]
-  promociones Promocion[]
+  promociones Promocion[] @relation("PromocionConceptos")
 }
 
 model Gasto {
@@ -441,6 +441,9 @@ model PushSubscription {
 model Promocion {
   id           Int      @id @default(autoincrement())
   lugar        String
+  /// LEGACY: antes la promo tenía un solo concepto. Ahora son varios (`conceptos`, M2M); la
+  /// migración copió este valor a la tabla puente. La app ya no lo lee ni lo escribe — queda
+  /// hasta una migración posterior para no romper el código que todavía corre en producción.
   conceptoId   Int?
   porcentaje   Float
   topeMensual  Float
@@ -455,10 +458,10 @@ model Promocion {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  concepto Concepto?      @relation(fields: [conceptoId], references: [id], onDelete: SetNull)
-  tarjetas Tarjeta[]      @relation("PromocionTarjetas")
-  usos     PromocionUso[]
-  gastos   Gasto[]
+  conceptos Concepto[]     @relation("PromocionConceptos")
+  tarjetas  Tarjeta[]      @relation("PromocionTarjetas")
+  usos      PromocionUso[]
+  gastos    Gasto[]
 }
 
 /// Consumo con promo registrado a mano ("gasté $X el día Y"). Suma al consumo que sale de los

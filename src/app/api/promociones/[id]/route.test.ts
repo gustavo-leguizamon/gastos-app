@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db', () => ({
   prisma: {
     promocion: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    concepto: { findUnique: vi.fn() },
+    concepto: { count: vi.fn() },
     tarjeta: { count: vi.fn() },
   },
 }))
@@ -35,15 +35,26 @@ describe('PUT /api/promociones/[id]', () => {
     expect(mp.promocion.update).not.toHaveBeenCalled()
   })
 
-  it('reemplaza las tarjetas con set (no las acumula)', async () => {
+  it('reemplaza tarjetas y conceptos con set (no los acumula); sin conceptos los deja vacíos', async () => {
     mp.promocion.findUnique.mockResolvedValue({ id: 1 })
-    mp.promocion.update.mockResolvedValue({ id: 1, lugar: 'Coto', tarjetas: [], dias: [1] })
+    mp.promocion.update.mockResolvedValue({ id: 1, lugar: 'Coto', tarjetas: [], conceptos: [], dias: [1] })
     const res = await PUT(body(ok), params('1'))
     expect(res.status).toBe(200)
     expect(mp.promocion.update.mock.calls[0][0]).toMatchObject({
       where: { id: 1 },
-      data: { lugar: 'Coto', topeMensual: 8000, tarjetas: { set: [{ id: 10 }, { id: 11 }] }, conceptoId: null },
+      data: { lugar: 'Coto', topeMensual: 8000, tarjetas: { set: [{ id: 10 }, { id: 11 }] }, conceptos: { set: [] } },
     })
+
+    mp.concepto.count.mockResolvedValue(2)
+    await PUT(body({ ...ok, concepto_ids: [5, 6] }), params('1'))
+    expect(mp.promocion.update.mock.calls[1][0].data.conceptos).toEqual({ set: [{ id: 5 }, { id: 6 }] })
+  })
+
+  it('400 si algún concepto no existe', async () => {
+    mp.promocion.findUnique.mockResolvedValue({ id: 1 })
+    mp.concepto.count.mockResolvedValue(1)
+    expect((await PUT(body({ ...ok, concepto_ids: [5, 6] }), params('1'))).status).toBe(400)
+    expect(mp.promocion.update).not.toHaveBeenCalled()
   })
 })
 

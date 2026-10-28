@@ -7,9 +7,9 @@ import { medioCoincide } from '@/lib/promociones-compute'
  * para la promo, para asociarlos de una vez (ej. el primer mes, con gastos cargados antes de
  * que existiera la promo).
  *
- * Candidato = gasto no-resumen del concepto vinculado cuyo medio de pago entra en la promo, más
- * los que ya están asociados (aunque hoy no coincidan, para poder desasociarlos). 400 si la
- * promo no tiene concepto vinculado: sin él no hay criterio para listar.
+ * Candidato = gasto no-resumen de alguno de los conceptos vinculados cuyo medio de pago entra en
+ * la promo, más los que ya están asociados (aunque hoy no coincidan, para poder desasociarlos).
+ * 400 si la promo no tiene conceptos vinculados: sin ellos no hay criterio para listar.
  */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const id = Number(params.id)
@@ -21,21 +21,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'mes (1-12) y anio son requeridos' }, { status: 400 })
   }
 
-  const promo = await prisma.promocion.findUnique({ where: { id }, include: { tarjetas: true } })
+  const promo = await prisma.promocion.findUnique({ where: { id }, include: { tarjetas: true, conceptos: true } })
   if (!promo) return NextResponse.json({ error: 'No encontrada' }, { status: 404 })
-  if (promo.conceptoId == null) {
-    return NextResponse.json({ error: 'La promoción no tiene un concepto vinculado' }, { status: 400 })
+  const conceptoIds = promo.conceptos.map(c => c.id)
+  if (conceptoIds.length === 0) {
+    return NextResponse.json({ error: 'La promoción no tiene conceptos vinculados' }, { status: 400 })
   }
 
   const gastos = await prisma.gasto.findMany({
-    where: { mes, anio, esTarjeta: false, OR: [{ conceptoId: promo.conceptoId }, { promocionId: id }] },
+    where: { mes, anio, esTarjeta: false, OR: [{ conceptoId: { in: conceptoIds } }, { promocionId: id }] },
     include: { concepto: true, tarjeta: true },
     orderBy: [{ fechaVencimiento: 'asc' }, { id: 'asc' }],
   })
 
   const medios = { tarjetaIds: promo.tarjetas.map(t => t.id), efectivo: promo.efectivo }
   const items = gastos
-    .filter(g => g.promocionId === id || (g.conceptoId === promo.conceptoId && medioCoincide(medios, g)))
+    .filter(g => g.promocionId === id || (conceptoIds.includes(g.conceptoId) && medioCoincide(medios, g)))
     .map(g => ({
       id: g.id,
       descripcion: g.concepto?.nombre ?? '',
