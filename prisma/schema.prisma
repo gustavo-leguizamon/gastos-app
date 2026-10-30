@@ -458,10 +458,11 @@ model Promocion {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  conceptos Concepto[]     @relation("PromocionConceptos")
-  tarjetas  Tarjeta[]      @relation("PromocionTarjetas")
-  usos      PromocionUso[]
-  gastos    Gasto[]
+  conceptos  Concepto[]           @relation("PromocionConceptos")
+  tarjetas   Tarjeta[]            @relation("PromocionTarjetas")
+  usos       PromocionUso[]
+  gastos     Gasto[]
+  reintegros PromocionReintegro[]
 }
 
 /// Consumo con promo registrado a mano ("gasté $X el día Y"). Suma al consumo que sale de los
@@ -479,4 +480,23 @@ model PromocionUso {
   promocion Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
 
   @@index([promocionId, anio, mes])
+}
+
+/// Vencimiento del reintegro de una promo **en un mes puntual** (cargado a mano: la fecha varía de
+/// un mes a otro y entre promos, y no se puede derivar). Es lo único que se persiste del reintegro:
+/// el monto se calcula. `utilizado` apaga los avisos cuando ya se gastó el saldo.
+model PromocionReintegro {
+  id          Int      @id @default(autoincrement())
+  promocionId Int
+  mes         Int
+  anio        Int
+  /// YYYY-MM-DD, inclusive: el último día para usar el reintegro. null = sin vencimiento.
+  venceEl     String?
+  utilizado   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  promocion Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+
+  @@unique([promocionId, mes, anio])
 }

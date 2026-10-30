@@ -16,10 +16,12 @@ import LinkIcon from '@mui/icons-material/Link'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import EventIcon from '@mui/icons-material/Event'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { DIAS_CORTOS } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 import MediosPromo from './MediosPromo'
+import VencimientoChip from './VencimientoChip'
 
 const fmtARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -45,6 +47,9 @@ function Dato({ label, valor, color, ayuda }: { label: string; valor: string; co
 interface Props {
   promo: PromocionConProgreso
   hoy: number | null
+  /** Fecha de hoy (`YYYY-MM-DD`, local) para medir cuánto falta al vencimiento del reintegro. */
+  hoyFecha: string
+  onVencimiento: () => void
   onUso: () => void
   onAsociar: () => void
   onEditar: () => void
@@ -56,7 +61,7 @@ interface Props {
  * Una promo con lo que hace falta para decidir: cuánto gastaste, cuánto tenés que gastar en
  * total para llegar al tope, cuánto llevás reintegrado y cuánto te queda por ganar.
  */
-export default function PromoCard({ promo, hoy, onUso, onAsociar, onEditar, onBorrar, onBorrarUso }: Props) {
+export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, onAsociar, onEditar, onBorrar, onBorrarUso }: Props) {
   const [verUsos, setVerUsos] = useState(false)
   const p = promo.progreso
   const completa = p.estado === 'tope_alcanzado'
@@ -129,6 +134,22 @@ export default function PromoCard({ promo, hoy, onUso, onAsociar, onEditar, onBo
           <Dato label="Reintegrado" valor={fmtARS(p.reintegrado)} color="success.main" />
           <Dato label="Por reintegrar" valor={fmtARS(p.disponible)} color={completa ? 'text.secondary' : 'primary.main'} />
         </Box>
+
+        {(p.reintegrado > 0 || promo.reintegro) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="caption" color="text.secondary">Vencimiento del reintegro:</Typography>
+            {promo.reintegro?.utilizado ? (
+              <Chip
+                size="small" color="success" variant="outlined" icon={<CheckCircleIcon />}
+                label="Ya lo usé" onClick={onVencimiento}
+              />
+            ) : promo.reintegro?.vence_el ? (
+              <VencimientoChip venceEl={promo.reintegro.vence_el} hoy={hoyFecha} onClick={onVencimiento} />
+            ) : (
+              <Button size="small" startIcon={<EventIcon />} onClick={onVencimiento}>Cargar fecha</Button>
+            )}
+          </Box>
+        )}
 
         <Typography variant="body2" color={completa ? 'success.main' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {completa

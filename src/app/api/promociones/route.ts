@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
   }
 
   const filas = await prisma.promocion.findMany({
-    include: { ...INCLUDE, usos: { where: { mes, anio }, orderBy: { fecha: 'desc' } } },
+    include: {
+      ...INCLUDE,
+      usos: { where: { mes, anio }, orderBy: { fecha: 'desc' } },
+      reintegros: { where: { mes, anio } },
+    },
     orderBy: { lugar: 'asc' },
   })
 
