@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import {
   toPromocionResponse,
+  toReintegroResponse,
   toUsoResponse,
   consumoAutomatico,
   progresoPromocion,
@@ -8,7 +9,7 @@ import {
 } from '@/lib/promociones-compute'
 
 /**
- * Promociones (filas de Prisma con `conceptos`, `tarjetas` y los `usos` del período incluidos)
+ * Promociones (filas de Prisma con `conceptos`, `tarjetas` y los `usos`/`reintegros` del período incluidos)
  * con su **progreso en `(mes, anio)`**: consumo de los gastos asociados + usos manuales, y si
  * están vigentes en ese mes. Lo comparten el listado y las sugerencias del form de gasto, para
  * que las dos pantallas no puedan calcular distinto "cuánto queda".
@@ -35,6 +36,8 @@ export async function promocionesConProgreso(promociones: any[], mes: number, an
       /** Vigente en el período consultado (`activa` es el interruptor manual, aparte). */
       vigente: vigenteEnMes(p, mes, anio),
       usos: usos.map(toUsoResponse),
+      /** Vencimiento cargado del reintegro de ESTE período (`null` = nada cargado). */
+      reintegro: toReintegroResponse((p.reintegros ?? [])[0]),
       progreso: progresoPromocion({ porcentaje: p.porcentaje, topeMensual: p.topeMensual }, auto, manual),
     }
   })

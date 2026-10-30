@@ -166,6 +166,78 @@ export function toUsoResponse(row: any) {
   }
 }
 
+// ── Vencimiento del reintegro ────────────────────────────────────────────────────────
+
+export interface ReintegroData {
+  mes: number
+  anio: number
+  venceEl: string | null
+  utilizado: boolean
+}
+
+/**
+ * Valida el body del vencimiento de un reintegro (`mes`, `anio`, `vence_el` opcional,
+ * `utilizado`). `vence_el` vacío = sin vencimiento. `null` si es inválido (la route responde 400).
+ */
+export function parseReintegroBody(body: any): ReintegroData | null {
+  if (!body || typeof body !== 'object') return null
+  const mes = Number(body.mes)
+  const anio = Number(body.anio)
+  if (!Number.isInteger(mes) || mes < 1 || mes > 12 || !Number.isInteger(anio)) return null
+  const venceEl = parseFechaOpcional(body.vence_el)
+  if (venceEl === false) return null
+  return { mes, anio, venceEl, utilizado: body.utilizado === true }
+}
+
+/** Fila de Prisma → `{ vence_el, utilizado }`; `null` si no hay nada cargado para ese mes. */
+export function toReintegroResponse(row: any) {
+  if (!row) return null
+  return { vence_el: row.venceEl ?? null, utilizado: !!row.utilizado }
+}
+
+/**
+ * Días de calendario desde `hoy` hasta `fecha` (ambas `YYYY-MM-DD`): `0` = vence hoy, negativo =
+ * ya venció. Se calcula en UTC sobre el string (igual que `diaSemanaDeFecha`) para que el huso
+ * horario no corra un día. `null` si alguna fecha es inválida.
+ */
+export function diasHasta(hoy: string, fecha: string): number | null {
+  if (!mesAnioDeFecha(hoy) || !mesAnioDeFecha(fecha)) return null
+  const t = (f: string) => {
+    const [y, m, d] = f.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((t(fecha) - t(hoy)) / 86400000)
+}
+
+export type NivelVencimiento = 'vencido' | 'urgente' | 'proximo' | 'ok'
+
+/** Hasta cuántos días antes del vencimiento es "urgente" (rojo) y "próximo" (naranja). */
+export const DIAS_URGENTE = 7
+export const DIAS_PROXIMO = 15
+
+/**
+ * Cuánto falta para que venza un reintegro y cómo mostrarlo: `vencido` (ya pasó), `urgente`
+ * (≤ 7 días, incluye hoy), `proximo` (≤ 15) u `ok`. `null` sin fecha de vencimiento válida.
+ */
+export function estadoVencimiento(venceEl: string | null | undefined, hoy: string) {
+  if (!venceEl) return null
+  const dias = diasHasta(hoy, venceEl)
+  if (dias == null) return null
+  const nivel: NivelVencimiento =
+    dias < 0 ? 'vencido' : dias <= DIAS_URGENTE ? 'urgente' : dias <= DIAS_PROXIMO ? 'proximo' : 'ok'
+  return { dias, nivel }
+}
+
+/**
+ * Los reintegros pendientes de usar (con fecha de vencimiento y sin marcar como utilizados),
+ * los que vencen antes primero. Los ya vencidos van al principio: son los que más urgen mirar.
+ */
+export function reintegrosPendientes<T extends { vence_el: string | null; utilizado: boolean }>(items: T[]): T[] {
+  return items
+    .filter(i => !i.utilizado && !!i.vence_el)
+    .sort((a, b) => (a.vence_el as string).localeCompare(b.vence_el as string))
+}
+
 // ── Consumo ──────────────────────────────────────────────────────────────────────────
 
 export interface PromoMedios {

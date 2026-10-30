@@ -12,6 +12,11 @@ import {
   promosDelDia,
   semanaPromos,
   ordenarPorDisponible,
+  parseReintegroBody,
+  toReintegroResponse,
+  diasHasta,
+  estadoVencimiento,
+  reintegrosPendientes,
 } from './promociones-compute'
 
 const bodyOk = (over: Record<string, any> = {}) => ({
@@ -274,5 +279,92 @@ describe('semana', () => {
     })
     const orden = ordenarPorDisponible([mk(1, 99999, 1000), mk(2, 0, 500), mk(3, 0, 2000)])
     expect(orden.map(p => p.id)).toEqual([3, 2, 1])
+  })
+})
+
+describe('parseReintegroBody', () => {
+  it('toma mes, año, fecha y la marca de utilizado', () => {
+    expect(parseReintegroBody({ mes: 10, anio: 2026, vence_el: '2026-12-15', utilizado: true })).toEqual({
+      mes: 10, anio: 2026, venceEl: '2026-12-15', utilizado: true,
+    })
+  })
+
+  it('fecha vacía = sin vencimiento; utilizado por defecto es false', () => {
+    expect(parseReintegroBody({ mes: 10, anio: 2026, vence_el: '' })).toEqual({
+      mes: 10, anio: 2026, venceEl: null, utilizado: false,
+    })
+    expect(parseReintegroBody({ mes: 10, anio: 2026 })?.venceEl).toBeNull()
+  })
+
+  it.each([
+    ['sin body', null],
+    ['mes 13', { mes: 13, anio: 2026 }],
+    ['mes 0', { mes: 0, anio: 2026 }],
+    ['sin año', { mes: 10 }],
+    ['fecha inválida', { mes: 10, anio: 2026, vence_el: '15/12/2026' }],
+  ])('rechaza %s', (_n, body) => {
+    expect(parseReintegroBody(body)).toBeNull()
+  })
+})
+
+describe('toReintegroResponse', () => {
+  it('mapea a snake_case y devuelve null si no hay fila', () => {
+    expect(toReintegroResponse({ venceEl: '2026-12-15', utilizado: false })).toEqual({ vence_el: '2026-12-15', utilizado: false })
+    expect(toReintegroResponse({ venceEl: null, utilizado: true })).toEqual({ vence_el: null, utilizado: true })
+    expect(toReintegroResponse(undefined)).toBeNull()
+  })
+})
+
+describe('diasHasta', () => {
+  it('0 = hoy, positivo = faltan, negativo = ya venció', () => {
+    expect(diasHasta('2026-10-30', '2026-10-30')).toBe(0)
+    expect(diasHasta('2026-10-30', '2026-11-04')).toBe(5)
+    expect(diasHasta('2026-10-30', '2026-10-28')).toBe(-2)
+  })
+
+  it('cruza fin de mes y de año sin correr un día', () => {
+    expect(diasHasta('2026-12-30', '2027-01-02')).toBe(3)
+    expect(diasHasta('2026-02-27', '2026-03-01')).toBe(2)
+  })
+
+  it('null con fechas inválidas', () => {
+    expect(diasHasta('hoy', '2026-10-30')).toBeNull()
+    expect(diasHasta('2026-10-30', 'mañana')).toBeNull()
+  })
+})
+
+describe('estadoVencimiento', () => {
+  const hoy = '2026-10-30'
+
+  it.each([
+    ['2026-10-29', 'vencido', -1],
+    ['2026-10-30', 'urgente', 0], // vence hoy: todavía se puede usar, pero es lo más urgente
+    ['2026-11-06', 'urgente', 7],
+    ['2026-11-07', 'proximo', 8],
+    ['2026-11-14', 'proximo', 15],
+    ['2026-11-15', 'ok', 16],
+  ])('%s → %s', (fecha, nivel, dias) => {
+    expect(estadoVencimiento(fecha, hoy)).toEqual({ dias, nivel })
+  })
+
+  it('null sin fecha o con fecha inválida', () => {
+    expect(estadoVencimiento(null, hoy)).toBeNull()
+    expect(estadoVencimiento('', hoy)).toBeNull()
+    expect(estadoVencimiento('x', hoy)).toBeNull()
+  })
+})
+
+describe('reintegrosPendientes', () => {
+  const r = (vence_el: string | null, utilizado = false) => ({ vence_el, utilizado })
+
+  it('descarta los utilizados y los sin fecha, y ordena por vencimiento (los vencidos primero)', () => {
+    const lista = [r('2026-12-01'), r('2026-10-20'), r('2026-11-05', true), r(null), r('2026-11-10')]
+    expect(reintegrosPendientes(lista).map(i => i.vence_el)).toEqual(['2026-10-20', '2026-11-10', '2026-12-01'])
+  })
+
+  it('no muta la lista original', () => {
+    const lista = [r('2026-12-01'), r('2026-10-20')]
+    reintegrosPendientes(lista)
+    expect(lista.map(i => i.vence_el)).toEqual(['2026-12-01', '2026-10-20'])
   })
 })

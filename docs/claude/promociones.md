@@ -6,9 +6,10 @@ Sección `/promociones` (desde `TopBar`, icono `LocalOfferIcon`). Responde: **"�
 
 - **`Promocion`**: `lugar`, `porcentaje`, `topeMensual` (reintegro máximo por mes, en ARS), `dias Int[]` (**0 = lunes … 6 = domingo**), `tarjetas` (M2M implícita `_PromocionTarjetas` con `Tarjeta`), `efectivo`, `activa`, `notas`, `conceptos` (M2M implícita `_PromocionConceptos` con `Concepto`: **varios** conceptos por promo), `vigenteDesde?`/`vigenteHasta?` (YYYY-MM-DD inclusive; `null` = sin límite de ese lado).
 - **`Gasto.promocionId?`** (FK `SetNull`, indexada): la promo a la que **cuenta** ese gasto. Es la fuente del consumo automático.
+- **`PromocionReintegro`**: el **vencimiento del reintegro de una promo en un mes** (`promocionId`, `mes`, `anio`, `venceEl?` YYYY-MM-DD inclusive, `utilizado`; unique `(promocionId, mes, anio)`, cascade desde la promo). Se carga **a mano** porque la fecha cambia de un mes a otro y entre promos: no hay regla de la que derivarla. Es lo único que se persiste del reintegro — el monto se sigue calculando.
 - **`PromocionUso`**: consumo cargado a mano (`fecha` string, `mes`/`anio` derivados, `montoGasto`). `onDelete: Cascade` desde la promo.
 
-Migraciones: `20261028100000_add_promociones/`, `20261029100000_promocion_gasto_vigencia/` y `20261030100000_promocion_varios_conceptos/` (aditivas). La última crea la tabla puente, copia el `conceptoId` que ya tenía cada promo y suelta su FK; la columna `Promocion.conceptoId` queda como **legacy** (la app no la lee ni la escribe) para no romper el código que corre en producción contra la misma base.
+Migraciones: `20261028100000_add_promociones/`, `20261029100000_promocion_gasto_vigencia/` y `20261030100000_promocion_varios_conceptos/` y `20261031100000_promocion_reintegro_vencimiento/` (aditivas). La última crea la tabla puente, copia el `conceptoId` que ya tenía cada promo y suelta su FK; la columna `Promocion.conceptoId` queda como **legacy** (la app no la lee ni la escribe) para no romper el código que corre en producción contra la misma base.
 
 Decisiones:
 
@@ -44,16 +45,27 @@ Los días sólo alimentan el calendario: no se verifican contra los gastos. Dobl
 1. **Al cargarlo** (`GastoForm` → `PromocionGastoField`): consulta `GET /api/promociones/sugeridas` (concepto + medio de pago + vigente en el mes del gasto). En el **alta**, la promo coincidente con tope disponible queda **elegida de entrada**; quien carga puede pasarla a "Sin promoción" (p. ej. una compra anterior al inicio). Editando no se cambia nada solo, y la promo ya asociada siempre se ofrece (`promocion_id` fuerza incluirla, con `coincide: false`). El campo no aparece si no hay promo para ofrecer, ni en un resumen de tarjeta. `GastoFormData.promocion_id` viaja al POST/PUT de gastos (el PUT sólo lo toca si la clave viene en el body).
 2. **A posteriori** (`AsociarGastosDialog`, botón "Gastos que cuentan" en la card, sólo con conceptos vinculados): lista los gastos del mes de **cualquiera de los conceptos** con medio válido (más los ya asociados) con un check cada uno, y sincroniza con `POST /api/promociones/[id]/asociar`. Es la forma de arreglar el primer mes o gastos cargados antes de la promo.
 
+### Vencimiento del reintegro
+
+Para no perder un reintegro por no usarlo a tiempo, cada reintegro puede llevar su fecha de vencimiento:
+
+- **Card de la promo** (`PromoCard`): bajo los datos, "Vencimiento del reintegro:" con un chip `dd/mm · vence en N días` (`VencimientoChip`) o "Cargar fecha" si no hay; "Ya lo usé" si se marcó como utilizado. Click abre `VencimientoReintegroDialog` (fecha + "Ya lo usé" + "Quitar vencimiento"). Es del **mes que se está mirando**. La fila sólo aparece si ya hay algo reintegrado o cargado.
+- **Panel "Reintegros para usar antes de que venzan"** (`ReintegrosPorVencer`, arriba de todo): los pendientes de **todos los meses** (el de octubre puede vencer en diciembre) con monto, mes de origen, chip de urgencia y botón "Ya lo usé". El borde toma el color del más urgente. No se muestra si no hay ninguno.
+- **Color** (`estadoVencimiento(venceEl, hoy)`): `vencido` y `urgente` (≤ 7 días, incluye hoy) en rojo, `proximo` (≤ 15) en naranja, `ok` neutro. Los días se cuentan en UTC sobre el string (`diasHasta`) y `hoy` es la fecha local del cliente.
+- Se listan sólo los **no utilizados con fecha y monto reintegrado > 0** (con 0 no hay nada que perder), ordenados por fecha (`reintegrosPendientes`). Los vencidos siguen apareciendo hasta marcarlos como usados o quitarles la fecha.
+
 ## API
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /api/promociones?mes=&anio=` | Promos con `vigente` (en el período), `usos` del período y `progreso`, más `totales` (sólo activas y vigentes). Una sola query de gastos asociados (`promocionesConProgreso`). |
+| `GET /api/promociones?mes=&anio=` | Promos con `vigente` (en el período), `reintegro` (vencimiento cargado del período o `null`), `usos` del período y `progreso`, más `totales` (sólo activas y vigentes). Una sola query de gastos asociados (`promocionesConProgreso`). |
 | `POST /api/promociones` | Alta (`parsePromocionBody`; 400 si algún concepto o alguna tarjeta no existen; `concepto_ids: number[]`, o la vigencia es inválida). |
 | `PUT/DELETE /api/promociones/[id]` | Edita (tarjetas y conceptos se **reemplazan** con `set`) / borra (cascade a los usos; los gastos quedan sin promo). |
 | `GET /api/promociones/sugeridas` | Para el form de gasto: promos activas que tienen el concepto del gasto (`descripcion`) entre los suyos, medio (`tipo_pago`, `tarjeta_id`) y vigentes en `mes`/`anio`, con `disponible`/`tope_alcanzado`. |
 | `GET /api/promociones/[id]/candidatos?mes=&anio=` | Gastos del mes que podrían contar (de cualquiera de los conceptos vinculados + medio válido, más los ya asociados); 400 sin conceptos vinculados. |
 | `POST /api/promociones/[id]/asociar` | `{ gasto_ids, asociar }`: asocia (pisa la anterior) o desasocia (sólo los de esta promo). |
+| `PUT /api/promociones/[id]/reintegro` | `{ mes, anio, vence_el, utilizado }`: carga/cambia el vencimiento del reintegro del mes (upsert por promo+mes+año). Sin fecha y sin `utilizado` **borra** la fila y devuelve `null`. |
+| `GET /api/promociones/vencimientos` | Reintegros pendientes con fecha, de cualquier mes, con `reintegrado` calculado en el mes de origen; omite los de monto 0. `force-dynamic`. |
 | `POST /api/promociones/[id]/usos` | Registra un uso manual `{ fecha, monto_gasto, notas? }`. |
 | `DELETE /api/promociones/[id]/usos/[usoId]` | Quita un uso (busca por ambos ids). |
 
@@ -65,4 +77,4 @@ De arriba hacia abajo: período (compartido con `/gastos` vía el store) → 3 K
 
 ## Tests
 
-`promociones-compute.test.ts` (puro) y `api/promociones/route.test.ts`, `[id]/route.test.ts`, `[id]/usos/route.test.ts`, `sugeridas/route.test.ts`, `[id]/candidatos/route.test.ts`, `[id]/asociar/route.test.ts`; `gastos/route.test.ts` y `gastos/[id]/route.test.ts` cubren `promocion_id`, `propina.test.ts` que la propina no la hereda, y `conceptos/merge/route.test.ts` que la promo siga al concepto destino.
+`promociones-compute.test.ts` (puro) y `api/promociones/route.test.ts`, `[id]/route.test.ts`, `[id]/usos/route.test.ts`, `sugeridas/route.test.ts`, `[id]/candidatos/route.test.ts`, `[id]/asociar/route.test.ts`, `[id]/reintegro/route.test.ts`, `vencimientos/route.test.ts`; `gastos/route.test.ts` y `gastos/[id]/route.test.ts` cubren `promocion_id`, `propina.test.ts` que la propina no la hereda, y `conceptos/merge/route.test.ts` que la promo siga al concepto destino.

@@ -48,6 +48,8 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre todas las routes y f
 | `GET /api/promociones/[id]/candidatos` | Gastos del mes candidatos a asociar a la promo (`mes`, `anio`); 400 sin conceptos vinculados. |
 | `POST /api/promociones/[id]/asociar` | `{ gasto_ids, asociar }`: asocia (pisa la anterior) o desasocia (sólo los de esta promo) gastos. |
 | `PUT/DELETE /api/promociones/[id]` | Edita (tarjetas y conceptos se reemplazan con `set`) / borra la promo y sus usos (cascade). |
+| `PUT /api/promociones/[id]/reintegro` | Vencimiento del reintegro de la promo en un mes `{ mes, anio, vence_el, utilizado }` (upsert; sin fecha y sin `utilizado` borra la fila). |
+| `GET /api/promociones/vencimientos` | Reintegros pendientes de usar con fecha de vencimiento (cualquier mes) y su monto reintegrado; omite los de monto 0. |
 | `POST /api/promociones/[id]/usos` | Registra un consumo con promo a mano `{ fecha, monto_gasto, notas? }`; `mes`/`anio` salen de la fecha. |
 | `DELETE /api/promociones/[id]/usos/[usoId]` | Quita un uso manual (busca por los dos ids). |
 | `POST /api/presupuestos/generar` | Propuesta de topes desde un objetivo de ahorro, en las dos bases. **No persiste.** Body `{ mes, anio, objetivo, ingresos_esperados, meses_historico?, categorias_fijas? }`. |
