@@ -48,6 +48,7 @@ describe('GET /api/promociones', () => {
       where: { mes: 10, anio: 2026 },
       orderBy: { fecha: 'desc' },
     })
+    expect(mp.promocion.findMany.mock.calls[0][0].include.reintegros).toEqual({ where: { mes: 10, anio: 2026 } })
     expect(mp.gasto.findMany).toHaveBeenCalledTimes(1)
     // El criterio es la asociación explícita, no el concepto: promo sin concepto también cuenta.
     expect(mp.gasto.findMany.mock.calls[0][0].where).toEqual({
@@ -80,6 +81,16 @@ describe('GET /api/promociones', () => {
     })
     expect(p.usos).toHaveLength(1)
     expect(data.totales).toMatchObject({ tope_total: 10000, reintegrado: 4000, disponible: 6000, completas: 0 })
+  })
+
+  it('expone el vencimiento del reintegro del período (null si no hay nada cargado)', async () => {
+    mp.promocion.findMany.mockResolvedValue([
+      rawPromo({ reintegros: [{ venceEl: '2026-12-15', utilizado: false }] }),
+      rawPromo({ id: 2, reintegros: [] }),
+    ])
+    const data = await (await GET(url('mes=10&anio=2026'))).json()
+    expect(data.promociones[0].reintegro).toEqual({ vence_el: '2026-12-15', utilizado: false })
+    expect(data.promociones[1].reintegro).toBeNull()
   })
 
   it('una promo que arranca después del período no es vigente y no suma al total', async () => {

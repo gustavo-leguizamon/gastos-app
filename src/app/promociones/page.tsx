@@ -17,13 +17,15 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import MediosPromo from '@/components/promociones/MediosPromo'
 import PromoCard from '@/components/promociones/PromoCard'
 import PromocionDialog from '@/components/promociones/PromocionDialog'
+import ReintegrosPorVencer from '@/components/promociones/ReintegrosPorVencer'
+import VencimientoReintegroDialog from '@/components/promociones/VencimientoReintegroDialog'
 import SemanaPromos from '@/components/promociones/SemanaPromos'
 import AsociarGastosDialog from '@/components/promociones/AsociarGastosDialog'
 import UsoPromoDialog from '@/components/promociones/UsoPromoDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import { shiftMonth } from '@/lib/fechas'
 import { DIAS_SEMANA, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia } from '@/lib/promociones-compute'
-import type { Promocion, PromocionConProgreso, PromocionesResponse, Tarjeta } from '@/lib/types'
+import type { Promocion, PromocionConProgreso, PromocionesResponse, ReintegroPorVencer, ReintegroPromo, Tarjeta } from '@/lib/types'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -64,6 +66,10 @@ export default function PromocionesPage() {
   const [aBorrar, setABorrar] = useState<PromocionConProgreso | null>(null)
   const [usoDe, setUsoDe] = useState<PromocionConProgreso | null>(null)
   const [asociarDe, setAsociarDe] = useState<PromocionConProgreso | null>(null)
+  const [porVencer, setPorVencer] = useState<ReintegroPorVencer[]>([])
+  const [vencDe, setVencDe] = useState<{
+    promocionId: number; lugar: string; mes: number; anio: number; actual: ReintegroPromo | null
+  } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,6 +84,18 @@ export default function PromocionesPage() {
   }, [filtros.mes, filtros.anio])
 
   useEffect(() => { load() }, [load])
+
+  // Los reintegros por vencer son de todos los meses: no dependen del período que se mira.
+  const loadVencimientos = useCallback(async () => {
+    try {
+      const r = await fetch('/api/promociones/vencimientos', { cache: 'no-store' })
+      setPorVencer(r.ok ? await r.json() : [])
+    } catch {
+      setPorVencer([])
+    }
+  }, [])
+  useEffect(() => { loadVencimientos() }, [loadVencimientos])
+  const recargar = useCallback(async () => { await Promise.all([load(), loadVencimientos()]) }, [load, loadVencimientos])
   useEffect(() => { fetch('/api/tarjetas').then(r => r.json()).then(setTarjetas).catch(() => {}) }, [])
 
   const hoy = hoyLocal()
@@ -115,6 +133,17 @@ export default function PromocionesPage() {
     await load()
   }
 
+  const marcarUsado = async (i: ReintegroPorVencer) => {
+    const res = await fetch('/api/promociones/' + i.promocion_id + '/reintegro', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mes: i.mes, anio: i.anio, vence_el: i.vence_el, utilizado: true }),
+    })
+    if (!res.ok) { toast.error('Error al marcar como usado'); return }
+    toast.success('Reintegro marcado como usado')
+    await recargar()
+  }
+
   const irAMes = (delta: number) => {
     const n = shiftMonth(filtros.mes, filtros.anio, delta)
     setFiltros({ mes: n.mes, anio: n.anio })
@@ -134,6 +163,16 @@ export default function PromocionesPage() {
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={abrirNueva}>Nueva promoción</Button>
       </Box>
+
+      <ReintegrosPorVencer
+        items={porVencer}
+        hoy={hoy}
+        onEditar={i => setVencDe({
+          promocionId: i.promocion_id, lugar: i.lugar, mes: i.mes, anio: i.anio,
+          actual: { vence_el: i.vence_el, utilizado: i.utilizado },
+        })}
+        onUsado={marcarUsado}
+      />
 
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>}
       {!loading && !data && <Alert severity="error">No se pudieron cargar las promociones.</Alert>}
@@ -197,6 +236,10 @@ export default function PromocionesPage() {
                   key={p.id}
                   promo={p}
                   hoy={esMesActual ? diaHoy : null}
+                  hoyFecha={hoy}
+                  onVencimiento={() => setVencDe({
+                    promocionId: p.id, lugar: p.lugar, mes: filtros.mes, anio: filtros.anio, actual: p.reintegro,
+                  })}
                   onUso={() => setUsoDe(p)}
                   onAsociar={() => setAsociarDe(p)}
                   onEditar={() => abrirEditar(p)}
@@ -231,6 +274,7 @@ export default function PromocionesPage() {
         onClose={() => setAsociarDe(null)}
         onSaved={load}
       />
+      <VencimientoReintegroDialog objetivo={vencDe} onClose={() => setVencDe(null)} onSaved={recargar} />
       <ConfirmDialog
         open={!!aBorrar}
         title="Eliminar promoción"

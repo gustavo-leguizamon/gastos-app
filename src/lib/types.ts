@@ -555,9 +555,30 @@ export interface Promocion {
   vigente_hasta: string | null
 }
 
+/** Vencimiento del reintegro de una promo en un mes (cargado a mano). */
+export interface ReintegroPromo {
+  /** YYYY-MM-DD, último día para usarlo; `null` = sin vencimiento. */
+  vence_el: string | null
+  /** Ya se usó: apaga los avisos. */
+  utilizado: boolean
+}
+
+/** Un reintegro pendiente de usar con fecha de vencimiento (`GET /api/promociones/vencimientos`). */
+export interface ReintegroPorVencer extends ReintegroPromo {
+  promocion_id: number
+  lugar: string
+  /** Mes en que se generó el reintegro. */
+  mes: number
+  anio: number
+  /** Lo que hay para usar (reintegrado de ese mes). */
+  reintegrado: number
+}
+
 export interface PromocionConProgreso extends Promocion {
   /** Vigente en el período consultado (`activa` es el interruptor manual, aparte). */
   vigente: boolean
+  /** Vencimiento del reintegro de este período; `null` = nada cargado. */
+  reintegro: ReintegroPromo | null
   usos: PromocionUso[]
   progreso: ProgresoPromocion
 }
