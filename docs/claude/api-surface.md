@@ -25,6 +25,7 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre todas las routes y f
 | `PATCH /api/gastos/[id]/periodo` | **Mueve el gasto a otro mes.** Body `{ mes, anio, mover_fecha?: boolean }`. Con `mover_fecha` reubica la `fechaVencimiento` conservando el día (recortado al último del mes destino). Endpoint acotado a propósito: no puede pisar montos ni clasificación. Pagos y sub-items viajan con el gasto. 400 body/id inválido, 404 si no existe. Ver `docs/claude/gastos-core.md`. |
 | `GET/POST /api/gastos/[id]/pagos` | List / add payments for a gasto |
 | `PUT/DELETE /api/gastos/[id]/pagos/[pagoId]` | Edit / remove a payment |
+| `POST /api/gastos/[id]/pagos/[pagoId]/reimputar` | Reimputa un pago de crédito: recalcula el resumen de tarjeta destino con los cierres cargados hoy y **mueve** el sub-item propagado (crea el resumen/sub-item si faltan). Responde `{ moved, created, mes, anio }`. 400 si el gasto no es de crédito o sin cierres, 404 si el pago no es del gasto. Ver `docs/claude/tarjetas.md`. |
 | `GET/POST /api/gastos/[id]/items` | List / add sub-items for a gasto |
 | `PUT/PATCH/DELETE /api/gastos/[id]/items/[itemId]` | Full edit / partial toggle / remove a sub-item |
 | `GET /api/resumen` | Aggregated summary cards; accepts `mes`, `anio`, `casa_id`, and `today` (YYYY-MM-DD local date) params. Incluye además `total_ingresos`, `total_debito` (gastos con `tipo_pago = 'D'`), `total_ahorro` (= ingresos − `total_debito`) y `ahorro_pct` — ver `docs/claude/ingresos.md`. Y `detalle_proximo_mes`: el desglose por unidad de `total_proximo_mes` (ver `docs/claude/gastos-core.md` → Estimado próximo mes). |
@@ -75,6 +76,8 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre todas las routes y f
 | `PUT/DELETE /api/divisas/operaciones/[id]` | Editar / borrar una operación. 400 con id o body inválido, 404 si no existe (sin actualizar ni borrar). |
 | `GET/POST /api/divisas/cotizaciones` | Histórico de cotizaciones de referencia. `GET` filtra por `moneda_id`, cronológico ascendente. `POST` **upsertea** sobre `(monedaId, fecha)`: hay una por día y recargarla corrige el valor en vez de dejar dos compitiendo por valuar la tenencia. |
 | `DELETE /api/divisas/cotizaciones/[id]` | Borrar una cotización. 400 id inválido, 404 si no existe. |
+| `GET/POST /api/divisas/plataformas` | Plataformas de compra con cotización de venta y comisión (`comision_tipo` `PORCENTAJE`/`FIJA`, `comision_moneda` `ARS`/`DIVISA`, `activa`). `GET` filtra por `moneda_id`, orden por nombre. `POST` valida con `parsePlataformaBody` → 400 sin tocar la DB. Ver `docs/claude/divisas.md`. |
+| `PUT/DELETE /api/divisas/plataformas/[id]` | Editar / borrar una plataforma. 400 con id o body inválido, 404 si no existe. |
 | `GET/POST /api/sueldos` | List / create sueldos. Sin restricción propia: alcanza con estar logueado (ver `docs/claude/sueldos.md`). |
 | `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
 | `GET/POST/DELETE /api/push/subscribe` | Suscripciones Web Push del usuario logueado (email de la sesión). `POST` upsertea por `endpoint` (body `{ endpoint, p256dh, auth }`, 400 si falta alguno); `DELETE` borra la de este browser (body `{ endpoint }`, filtrado también por email); `GET` devuelve `{ subscriptions: n }`. 401 sin sesión. Ver `docs/claude/auth-pwa.md`. |
