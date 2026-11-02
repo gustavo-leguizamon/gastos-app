@@ -24,7 +24,7 @@ import ClearIcon from '@mui/icons-material/Clear'
 import TuneIcon from '@mui/icons-material/Tune'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import BrandLogo from '@/components/shared/BrandLogo'
+import { TarjetaOpcion } from '@/components/shared/TarjetaIconos'
 import { tarjetasVisiblesEn } from '@/lib/tarjetas-baja'
 import type { Casa, Categoria, Etiqueta, Tarjeta, FiltrosGastos } from '@/lib/types'
 
@@ -294,12 +294,7 @@ export default function FiltrosGastos({ filtros, setFiltros, estadoPago, setEsta
               ...tarjetasVisibles.map((t) => ({
                 value: t.id,
                 label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
-                render: () => (
-                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                    <BrandLogo marca={t.marca} width={30} height={22} />
-                    <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
-                  </Box>
-                ),
+                render: () => <TarjetaOpcion t={t} />,
               })),
             ]}
             value={tarjetaIds}

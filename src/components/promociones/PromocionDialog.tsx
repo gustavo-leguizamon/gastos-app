@@ -11,7 +11,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
-import BrandLogo from '@/components/shared/BrandLogo'
+import { TarjetaOpcion } from '@/components/shared/TarjetaIconos'
 import AppDateField from '@/components/shared/AppDateField'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import AppTextField from '@/components/shared/AppTextField'
@@ -90,12 +90,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
       return {
         value: t.id,
         label,
-        render: () => (
-          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-            <BrandLogo marca={t.marca} width={30} height={22} />
-            <span>{label}</span>
-          </Box>
-        ),
+        render: () => <TarjetaOpcion t={t} />,
       }
     })],
     [tarjetas, mes, anio, tarjetaIds],

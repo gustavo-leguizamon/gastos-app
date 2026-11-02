@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import BrandLogo from '@/components/shared/BrandLogo'
+import { TarjetaOpcion, TarjetaIconos } from '@/components/shared/TarjetaIconos'
 import PromocionGastoField from './PromocionGastoField'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -333,13 +333,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
     ...tarjetasDisponibles.map(t => ({
       value: `C:${t.id}`,
       label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
-      render: () => (
-        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-          <BrandLogo marca={t.marca} width={30} height={22} />
-          <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
-        </Box>
-      ),
-      adornment: () => <BrandLogo marca={t.marca} width={30} height={22} />,
+      render: () => <TarjetaOpcion t={t} />,
+      adornment: () => <TarjetaIconos t={t} />,
     })),
   ]), [tarjetasDisponibles])
 
@@ -373,13 +368,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           options={tarjetasDisponibles.map(t => ({
             value: t.id,
             label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
-            render: () => (
-              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                <BrandLogo marca={t.marca} width={30} height={22} />
-                <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
-              </Box>
-            ),
-            adornment: () => <BrandLogo marca={t.marca} width={30} height={22} />,
+            render: () => <TarjetaOpcion t={t} />,
+            adornment: () => <TarjetaIconos t={t} />,
           }))}
           value={field.value ?? null}
           onChange={(v) => field.onChange(v == null ? null : Number(v))}
