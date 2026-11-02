@@ -20,6 +20,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import AddIcon from '@mui/icons-material/Add'
+import SyncAltIcon from '@mui/icons-material/SyncAlt'
+import Tooltip from '@mui/material/Tooltip'
 import toast from 'react-hot-toast'
 import type { Gasto, Pago } from '@/lib/types'
 
@@ -46,6 +48,7 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
   const [monto, setMonto] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [reimputandoId, setReimputandoId] = useState<number | null>(null)
   const [editing, setEditing] = useState<EditState | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
   const theme = useTheme()
@@ -108,6 +111,25 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
       toast.error(e instanceof Error ? e.message : 'Error al registrar el pago')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleReimputar = async (pagoId: number) => {
+    setReimputandoId(pagoId)
+    try {
+      const res = await fetch(`/api/gastos/${gasto.id}/pagos/${pagoId}/reimputar`, { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || 'Error al reimputar el pago')
+      if (data?.moved) {
+        toast.success(`Pago reimputado al resumen ${String(data.mes).padStart(2, '0')}/${data.anio}`)
+        onChanged(true)
+      } else {
+        toast.success('El pago ya está en el resumen correcto')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al reimputar el pago')
+    } finally {
+      setReimputandoId(null)
     }
   }
 
@@ -189,6 +211,15 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
                       <Typography variant="body2" fontWeight={600}>{fmtARS(p.monto)}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex' }}>
+                      {esCredito && (
+                        <Tooltip title="Reimputar al resumen que corresponde (según los cierres cargados)">
+                          <span>
+                            <IconButton size="small" onClick={() => handleReimputar(p.id)} disabled={reimputandoId === p.id}>
+                              {reimputandoId === p.id ? <CircularProgress size={14} /> : <SyncAltIcon fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                       <IconButton size="small" onClick={() => startEdit(p)}>
                         <EditIcon fontSize="small" />
                       </IconButton>
