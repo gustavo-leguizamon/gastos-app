@@ -7,7 +7,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
-import BrandLogo from '@/components/shared/BrandLogo'
+import { TarjetaOpcion } from '@/components/shared/TarjetaIconos'
 import { shiftMonth } from '@/lib/fechas'
 import type { FiltrosReporte, Casa, Categoria, Etiqueta, Tarjeta, Concepto } from '@/lib/types'
 
@@ -129,12 +129,7 @@ export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset
           options={tarjetas.map((t) => ({
             value: t.id,
             label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
-            render: () => (
-              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                <BrandLogo marca={t.marca} width={30} height={22} />
-                <span>{t.nombre}{t.banco ? ` (${t.banco})` : ''}</span>
-              </Box>
-            ),
+            render: () => <TarjetaOpcion t={t} />,
           }))}
           value={filtros.tarjeta_ids}
           onChange={(v) => setFiltros({ ...filtros, tarjeta_ids: v.map(Number) })}

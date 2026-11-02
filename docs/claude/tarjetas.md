@@ -201,3 +201,7 @@ El módulo lee el par en las **dos convenciones** (`bajaMes`/`baja_mes`) porque 
 | `/configuracion` | **No recorta** — es donde se revierte. La tarjeta de baja se muestra grisada, con un chip `Baja MM/AAAA`. |
 
 **En `/configuracion`:** en el form de edición de la tarjeta, un toggle *"Dada de baja (ya no la tengo)"* que al activarse propone el **mes actual** y despliega los selects de mes/año. El warning de **"cierre incompleto"** se suprime en las tarjetas de baja: no van a tener el cierre del mes nunca, y dejarlo prendido sería una alerta permanente imposible de resolver.
+
+## Selectores de tarjeta: banco + marca
+
+Todos los selectores de tarjeta (`GastoForm` medio de pago y tarjeta, `FiltrosGastos`, `ReportesFiltros`, `PromocionDialog`) usan `TarjetaOpcion` / `TarjetaIconos` (`src/components/shared/TarjetaIconos.tsx`): primero el icono del **banco** (`BancoLogo`, sólo si hay imagen subida o se resuelve el banco), luego el de la **marca** (`BrandLogo`) y después el texto `Nombre (Banco)`. En el campo cerrado del select (`adornment`) se muestran los mismos dos iconos. Todo selector de tarjeta nuevo debe usar estos componentes.
