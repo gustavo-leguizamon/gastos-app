@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { normalizeNombre } from '@/lib/conceptos'
 import { promocionesConProgreso } from '@/lib/promociones-db'
-import { medioCoincide, vigenteEnMes } from '@/lib/promociones-compute'
+import { diaCoincide, medioCoincide, vigenteEnMes } from '@/lib/promociones-compute'
 
 /**
  * `GET /api/promociones/sugeridas` — qué promos ofrecerle al form de gasto.
  *
  * Params: `descripcion` (texto del concepto), `tipo_pago` (`C`/`D`), `tarjeta_id`, `mes`,
- * `anio` y `promocion_id` (opcional).
+ * `anio`, `fecha` (`YYYY-MM-DD` del día de carga, opcional) y `promocion_id` (opcional).
  *
  * Una promo se sugiere si está **activa**, tiene el concepto del gasto entre los suyos, el medio de pago entra
- * (tarjeta de la promo, o débito sin tarjeta si vale en efectivo) y está **vigente** en el mes
- * del gasto. `promocion_id` fuerza a incluir esa promo aunque ya no coincida (con
+ * (tarjeta de la promo, o débito sin tarjeta si vale en efectivo), está **vigente** en el mes
+ * del gasto y, si viene `fecha`, **vale ese día de la semana** (una promo de martes no se ofrece un sábado). `promocion_id` fuerza a incluir esa promo aunque ya no coincida (con
  * `coincide: false`): al editar un gasto ya asociado, la opción actual no puede desaparecer
  * del select o se perdería la asociación sin avisar.
  *
@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
   const tarjetaId = tarjetaNum != null && Number.isInteger(tarjetaNum) && tarjetaNum > 0 ? tarjetaNum : null
   const forzadaRaw = searchParams.get('promocion_id')
   const forzadaId = forzadaRaw && Number(forzadaRaw) > 0 ? Number(forzadaRaw) : null
+
+  const fecha = searchParams.get('fecha')
 
   const nombre = normalizeNombre(searchParams.get('descripcion') ?? '')
   const concepto = nombre
@@ -58,6 +60,7 @@ export async function GET(req: NextRequest) {
         concepto != null &&
         p.conceptos.some(c => c.id === concepto.id) &&
         vigenteEnMes(p, mes, anio) &&
+        diaCoincide(p, fecha) &&
         medioCoincide({ tarjetaIds: p.tarjetas.map(t => t.id), efectivo: p.efectivo }, { tipoPago, tarjetaId }),
     }))
     .filter(c => c.coincide || c.fila.id === forzadaId)

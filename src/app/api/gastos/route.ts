@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
 import { parseGastoIdsBatch } from '@/lib/gastos-batch'
+import { cuotasFuturasDebito } from '@/lib/cuotas-futuras'
 
 const INCLUDE = {
   casa: true,
@@ -62,6 +63,48 @@ export async function POST(req: NextRequest) {
     },
     include: INCLUDE,
   })
+
+  // Débito en cuotas: cargar de una vez las cuotas de los meses siguientes (sin duplicar
+  // si ya hay un gasto del mismo concepto/casa en ese mes).
+  const futuras = cuotasFuturasDebito({
+    tipoPago: body.tipo_pago,
+    cuotaActual: body.cuota_actual,
+    cuotasTotales: body.cuotas_totales,
+    mes: body.mes,
+    anio: body.anio,
+    fechaVencimiento: body.fecha_vencimiento,
+  })
+  if (futuras.length > 0) {
+    const existentes = await prisma.gasto.findMany({
+      where: { casaId: body.casa_id, conceptoId, OR: futuras.map(f => ({ mes: f.mes, anio: f.anio })) },
+      select: { mes: true, anio: true },
+    })
+    const ocupados = new Set(existentes.map(e => `${e.anio}-${e.mes}`))
+    for (const f of futuras.filter(f => !ocupados.has(`${f.anio}-${f.mes}`))) {
+      await prisma.gasto.create({
+        data: {
+          casaId: body.casa_id,
+          conceptoId,
+          fechaVencimiento: f.fechaVencimiento,
+          tipoPago: 'D',
+          monedaId: body.moneda_id,
+          tipoCambio: body.tipo_cambio ?? 1,
+          totalMoneda: body.total_moneda,
+          totalPagado: 0,
+          pasajeMesSiguiente: 0,
+          cuotaActual: f.cuotaActual,
+          cuotasTotales: body.cuotas_totales,
+          mes: f.mes,
+          anio: f.anio,
+          notas: body.notas || null,
+          confirmado: false,
+          categoriaId: body.categoria_id ?? null,
+          etiquetas: { connect: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
+          esTarjeta: false,
+        },
+      })
+    }
+  }
 
   return NextResponse.json(toGastoResponse(gasto), { status: 201 })
 }

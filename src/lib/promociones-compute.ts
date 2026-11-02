@@ -258,6 +258,15 @@ export function medioCoincide(
 }
 
 /**
+ * Si la promo vale el día de la semana de `fecha` (`YYYY-MM-DD`). Sin fecha válida no hay
+ * criterio y no se descarta nada.
+ */
+export function diaCoincide(promo: { dias: number[] }, fecha: unknown): boolean {
+  const dia = diaSemanaDeFecha(fecha)
+  return dia == null || promo.dias.includes(dia)
+}
+
+/**
  * Si la promo está vigente en algún día del mes `(mes, anio)`. Sin límite de un lado = abierta
  * de ese lado. Compara strings `YYYY-MM-DD` (orden lexicográfico = cronológico): el último día
  * del mes se toma como `-31`, válido para comparar aunque el mes tenga menos días.

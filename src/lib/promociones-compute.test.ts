@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   diaSemanaDeFecha,
+  diaCoincide,
   parsePromocionBody,
   parseUsoBody,
   toPromocionResponse,
@@ -366,5 +367,17 @@ describe('reintegrosPendientes', () => {
     const lista = [r('2026-12-01'), r('2026-10-20')]
     reintegrosPendientes(lista)
     expect(lista.map(i => i.vence_el)).toEqual(['2026-12-01', '2026-10-20'])
+  })
+})
+
+describe('diaCoincide', () => {
+  it('vale sólo los días de la promo', () => {
+    expect(diaCoincide({ dias: [1] }, '2026-10-27')).toBe(true) // martes
+    expect(diaCoincide({ dias: [1] }, '2026-10-31')).toBe(false) // sábado
+  })
+
+  it('sin fecha válida no descarta', () => {
+    expect(diaCoincide({ dias: [1] }, null)).toBe(true)
+    expect(diaCoincide({ dias: [1] }, 'basura')).toBe(true)
   })
 })

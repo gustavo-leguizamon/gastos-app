@@ -55,6 +55,17 @@ describe('GET /api/promociones/sugeridas', () => {
     })
   })
 
+  it('sólo ofrece la promo el día de la semana en que vale (martes sí, sábado no)', async () => {
+    expect(await (await GET(url(`${base}&fecha=2026-10-27`))).json()).toHaveLength(1)
+    expect(await (await GET(url(`${base}&fecha=2026-10-31`))).json()).toEqual([])
+  })
+
+  it('la promo forzada se mantiene aunque el día no coincida, marcada como que ya no coincide', async () => {
+    const res = await (await GET(url(`${base}&fecha=2026-10-31&promocion_id=1`))).json()
+    expect(res).toHaveLength(1)
+    expect(res[0].coincide).toBe(false)
+  })
+
   it('sugiere la promo desde cualquiera de sus conceptos vinculados, y no desde otro', async () => {
     mp.concepto.findFirst.mockResolvedValue({ id: 6, nombre: 'Rappi' })
     expect(await (await GET(url(base))).json()).toHaveLength(1)
