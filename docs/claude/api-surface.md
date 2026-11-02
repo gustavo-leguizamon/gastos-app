@@ -75,6 +75,8 @@ Lo cubre `src/app/api/prerender-guard.test.ts`, que recorre todas las routes y f
 | `PUT/DELETE /api/divisas/operaciones/[id]` | Editar / borrar una operación. 400 con id o body inválido, 404 si no existe (sin actualizar ni borrar). |
 | `GET/POST /api/divisas/cotizaciones` | Histórico de cotizaciones de referencia. `GET` filtra por `moneda_id`, cronológico ascendente. `POST` **upsertea** sobre `(monedaId, fecha)`: hay una por día y recargarla corrige el valor en vez de dejar dos compitiendo por valuar la tenencia. |
 | `DELETE /api/divisas/cotizaciones/[id]` | Borrar una cotización. 400 id inválido, 404 si no existe. |
+| `GET/POST /api/divisas/plataformas` | Plataformas de compra con cotización de venta y comisión (`comision_tipo` `PORCENTAJE`/`FIJA`, `comision_moneda` `ARS`/`DIVISA`, `activa`). `GET` filtra por `moneda_id`, orden por nombre. `POST` valida con `parsePlataformaBody` → 400 sin tocar la DB. Ver `docs/claude/divisas.md`. |
+| `PUT/DELETE /api/divisas/plataformas/[id]` | Editar / borrar una plataforma. 400 con id o body inválido, 404 si no existe. |
 | `GET/POST /api/sueldos` | List / create sueldos. Sin restricción propia: alcanza con estar logueado (ver `docs/claude/sueldos.md`). |
 | `PUT/DELETE /api/sueldos/[id]` | Edit / remove sueldo — mismo guard |
 | `GET/POST/DELETE /api/push/subscribe` | Suscripciones Web Push del usuario logueado (email de la sesión). `POST` upsertea por `endpoint` (body `{ endpoint, p256dh, auth }`, 400 si falta alguno); `DELETE` borra la de este browser (body `{ endpoint }`, filtrado también por email); `GET` devuelve `{ subscriptions: n }`. 401 sin sesión. Ver `docs/claude/auth-pwa.md`. |

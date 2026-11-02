@@ -17,6 +17,7 @@ model Moneda {
   inversiones  Inversion[]
   operaciones  OperacionDivisa[]
   cotizaciones CotizacionDivisa[]
+  plataformasDivisa PlataformaDivisa[]
 }
 
 model Casa {
@@ -370,6 +371,32 @@ model CotizacionDivisa {
   moneda Moneda @relation(fields: [monedaId], references: [id])
 
   @@unique([monedaId, fecha])
+}
+
+/// Plataforma donde se puede comprar una divisa, con la cotización a la que vende y la
+/// comisión que cobra. Es una tabla de precios para comparar, no un registro de lo operado
+/// (eso es `OperacionDivisa`). Qué entrega cada una por un monto se deriva
+/// (`divisas-plataformas.ts`).
+model PlataformaDivisa {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  monedaId       Int
+  /// ARS por unidad a la que la plataforma vende la divisa.
+  cotizacion     Float
+  /// 'PORCENTAJE' (comision = %) | 'FIJA' (comision = monto por operación).
+  comisionTipo   String   @default("PORCENTAJE")
+  comision       Float    @default(0)
+  /// 'ARS' | 'DIVISA' — de qué lado se descuenta, igual que en `OperacionDivisa`.
+  comisionMoneda String   @default("ARS")
+  nota           String?
+  /// Las inactivas no entran a la comparación (se conservan para reactivarlas).
+  activa         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  moneda Moneda @relation(fields: [monedaId], references: [id])
+
+  @@index([monedaId])
 }
 
 model Settings {
