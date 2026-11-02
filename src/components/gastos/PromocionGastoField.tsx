@@ -70,7 +70,10 @@ export default function PromocionGastoField({
 
     let cancelado = false
     const t = setTimeout(async () => {
-      const qs = new URLSearchParams({ descripcion, tipo_pago: tipoPago, mes: String(mes), anio: String(anio) })
+      // El gasto no guarda fecha de compra: el día de la promo se mide contra hoy (fecha local, no UTC).
+      const d = new Date()
+      const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const qs = new URLSearchParams({ descripcion, tipo_pago: tipoPago, mes: String(mes), anio: String(anio), fecha })
       if (tarjetaId) qs.set('tarjeta_id', String(tarjetaId))
       if (valueRef.current != null) qs.set('promocion_id', String(valueRef.current))
       try {
