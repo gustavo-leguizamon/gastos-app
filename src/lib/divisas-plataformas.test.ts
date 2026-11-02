@@ -22,38 +22,38 @@ const plat = (over: Partial<PlataformaDivisa> = {}): PlataformaDivisa => ({
 })
 
 describe('entregaPlataforma', () => {
-  it('sin comisión: monto / cotización', () => {
-    expect(entregaPlataforma(plat(), 100000)).toEqual({ divisa: 100, comision_ars: 0 })
+  it('sin comisión: monto / cotización, y se paga el monto', () => {
+    expect(entregaPlataforma(plat(), 100000)).toEqual({ divisa: 100, comision_ars: 0, total_ars: 100000 })
   })
 
-  it('comisión % en pesos: se suma encima, el monto es lo que sale de la cuenta', () => {
-    // 101000 = Q·1000·1.01 → Q = 100
-    expect(entregaPlataforma(plat({ comision: 1 }), 101000)).toEqual({ divisa: 100, comision_ars: 1000 })
+  it('comisión % en pesos: se suma encima del monto de la compra (3% sobre 10.000 → salen 10.300)', () => {
+    expect(entregaPlataforma(plat({ comision: 3 }), 10000)).toEqual({ divisa: 10, comision_ars: 300, total_ars: 10300 })
   })
 
-  it('comisión fija en pesos: se descuenta del monto antes de comprar', () => {
-    expect(entregaPlataforma(plat({ comision_tipo: 'FIJA', comision: 1000 }), 101000)).toEqual({
+  it('comisión fija en pesos: se suma encima', () => {
+    expect(entregaPlataforma(plat({ comision_tipo: 'FIJA', comision: 1000 }), 100000)).toEqual({
       divisa: 100,
       comision_ars: 1000,
+      total_ars: 101000,
     })
   })
 
-  it('comisión % en divisa: se resta de lo comprado', () => {
-    // 100 brutos − 1% = 99; comisión = 1 × 1000
+  it('comisión % en divisa: se resta de lo comprado y el total es el monto', () => {
     expect(entregaPlataforma(plat({ comision: 1, comision_moneda: 'DIVISA' }), 100000)).toEqual({
       divisa: 99,
       comision_ars: 1000,
+      total_ars: 100000,
     })
   })
 
   it('comisión fija en divisa', () => {
     expect(
       entregaPlataforma(plat({ comision_tipo: 'FIJA', comision: 2, comision_moneda: 'DIVISA' }), 100000),
-    ).toEqual({ divisa: 98, comision_ars: 2000 })
+    ).toEqual({ divisa: 98, comision_ars: 2000, total_ars: 100000 })
   })
 
-  it('null si el monto no cubre la comisión o los datos no sirven', () => {
-    expect(entregaPlataforma(plat({ comision_tipo: 'FIJA', comision: 5000 }), 5000)).toBeNull()
+  it('null si la comisión en divisa se come la compra o los datos no sirven', () => {
+    expect(entregaPlataforma(plat({ comision_tipo: 'FIJA', comision: 100, comision_moneda: 'DIVISA' }), 100000)).toBeNull()
     expect(entregaPlataforma(plat(), 0)).toBeNull()
     expect(entregaPlataforma(plat({ cotizacion: 0 }), 1000)).toBeNull()
   })
@@ -63,14 +63,25 @@ describe('compararPlataformas', () => {
   const barata = plat({ id: 1, nombre: 'Barata', cotizacion: 1000, comision: 2 })
   const cara = plat({ id: 2, nombre: 'Cara', cotizacion: 1010, comision: 0 })
 
-  it('ordena de mejor a peor y marca sólo la primera', () => {
-    // barata: 1000·1.02 = 1020 efectiva; cara: 1010 efectiva → gana la "cara" sin comisión
+  it('ordena por cotización efectiva y marca sólo la primera', () => {
+    // barata: 1000·1,02 = 1020 efectiva; cara: 1010 → gana la "cara" sin comisión
     const r = compararPlataformas([barata, cara], 1010000)
     expect(r.map((x) => x.plataforma.nombre)).toEqual(['Cara', 'Barata'])
     expect(r.map((x) => x.es_mejor)).toEqual([true, false])
+    expect(r[0].cotizacion_efectiva).toBe(1010)
+    expect(r[1].cotizacion_efectiva).toBe(1020)
     expect(r[0].sobrecosto_pct).toBe(0)
     expect(r[1].sobrecosto_pct).toBeCloseTo(0.99, 2)
-    expect(r[1].divisa_menos).toBeGreaterThan(0)
+    expect(r[1].sobrecosto_ars).toBeGreaterThan(0)
+  })
+
+  it('compara una comisión en pesos contra una en divisa por la efectiva', () => {
+    const enPesos = plat({ id: 1, nombre: 'Pesos', cotizacion: 1000, comision: 3 })
+    const enDivisa = plat({ id: 2, nombre: 'Divisa', cotizacion: 1000, comision: 2, comision_moneda: 'DIVISA' })
+    const r = compararPlataformas([enPesos, enDivisa], 100000)
+    expect(r[0].plataforma.nombre).toBe('Divisa')
+    expect(r[0].total_ars).toBe(100000)
+    expect(r[1].total_ars).toBe(103000)
   })
 
   it('una comisión fija pesa distinto según el monto', () => {
@@ -80,9 +91,9 @@ describe('compararPlataformas', () => {
     expect(compararPlataformas([fija, pct], 5000000)[0].plataforma.nombre).toBe('Fija')
   })
 
-  it('las que no alcanzan quedan al final y sin mejor', () => {
-    const fija = plat({ id: 3, nombre: 'Fija', comision_tipo: 'FIJA', comision: 50000 })
-    const r = compararPlataformas([fija, barata], 10000)
+  it('las que no sirven quedan al final y sin mejor', () => {
+    const come = plat({ id: 3, nombre: 'Come', comision_tipo: 'FIJA', comision: 100, comision_moneda: 'DIVISA' })
+    const r = compararPlataformas([come, barata], 10000)
     expect(r[0].plataforma.nombre).toBe('Barata')
     expect(r[1].divisa_obtenida).toBeNull()
     expect(r[1].es_mejor).toBe(false)

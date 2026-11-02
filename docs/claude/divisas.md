@@ -171,17 +171,18 @@ cotización a la que **vende** la divisa y la comisión que cobra. Se llega desd
   texto libre y sin relación con esta tabla): es lo que se edita cuando cambian los precios.
 - **Cálculo** (`src/lib/divisas-plataformas.ts`, puro y testeado). Nada del resultado se
   persiste porque depende del monto (una comisión fija pesa más en una compra chica).
-  `entregaPlataforma(p, montoArs)` trata el monto como **lo que sale de la cuenta**: comisión %
-  en pesos → `Q = X / (c·(1+p))`; fija en pesos → `Q = (X − f)/c`; en divisa se resta de lo
-  comprado (`%`: `X/c·(1−p)`; fija: `X/c − f`). `null` si no alcanza para la comisión.
-  `compararPlataformas` ordena de mejor a peor (más divisa recibida), con
-  `cotizacion_efectiva`, `comision_ars` (la de divisa valuada a la cotización de la
-  plataforma), `sobrecosto_pct`/`divisa_menos` contra la mejor y `es_mejor`; las que no
-  alcanzan van al final.
+  `entregaPlataforma(p, montoArs)` trata el monto como **el valor de la compra** (`X/c` dólares
+  brutos) y la comisión se cobra **sobre ese precio final**: en pesos **se suma encima** (3% sobre
+  10.000 → salen 10.300; fija: `X + f`), en divisa **se resta** de lo comprado (`%`: `X/c·(1−p)`;
+  fija: `X/c − f`). Devuelve `divisa`, `comision_ars` y `total_ars` (lo que sale de la cuenta);
+  `null` si la comisión en divisa se come la compra. `compararPlataformas` ordena por
+  **cotización efectiva** (`total_ars / divisa`, comparable aunque una cobre en pesos y otra en
+  dólares), con `sobrecosto_pct`/`sobrecosto_ars` contra la mejor y `es_mejor`; las que no sirven
+  van al final.
 - **API**: `GET/POST /api/divisas/plataformas`, `PUT/DELETE .../[id]` (ver `api-surface.md`).
   Validación con `parsePlataformaBody`: cotización > 0, comisión ≥ 0 y, si es `%`, < 100.
-- **UI**: input de monto (default 1.000.000 ARS), tabs por divisa, una card por plataforma
-  activa con lo que recibís / cotización efectiva / comisión en pesos / diferencia contra la
+- **UI**: input de monto de la compra sin comisión (default 1.000.000 ARS), tabs por divisa, una card por plataforma
+  activa con lo que recibís / total a pagar / cotización efectiva / comisión en pesos / diferencia contra la
   mejor (la ganadora resaltada). Las inactivas (`activa = false`) quedan fuera de la
   comparación pero se conservan, en una lista aparte. Cada card muestra cuándo se actualizó
   la cotización (`updated_at`): es el dato que se desactualiza.

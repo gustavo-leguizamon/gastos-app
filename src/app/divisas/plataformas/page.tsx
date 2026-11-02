@@ -134,8 +134,8 @@ export default function PlataformasDivisaPage() {
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Cargá a qué cotización vende cada plataforma y qué comisión cobra. Con el monto que
-        pensás gastar se calcula cuánta divisa te queda en cada una y cuál conviene. La
+        Cargá a qué cotización vende cada plataforma y qué comisión cobra. Con el monto de
+        la compra se calcula cuánto pagás en total (la comisión en pesos se suma encima) y cuál conviene. La
         cotización cambia seguido: actualizala antes de decidir.
       </Typography>
 
@@ -154,7 +154,7 @@ export default function PlataformasDivisaPage() {
       )}
 
       <AppTextField
-        label="Monto a gastar (ARS)"
+        label="Monto de la compra (ARS, sin comisión)"
         type="number"
         value={monto}
         onChange={(e) => setMonto(e.target.value)}
@@ -213,7 +213,7 @@ export default function PlataformasDivisaPage() {
                     <Box
                       sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' },
+                        gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' },
                         gap: 0.75,
                         pt: 1,
                         mt: 1,
@@ -224,6 +224,10 @@ export default function PlataformasDivisaPage() {
                       <Box>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Recibís</Typography>
                         <Typography variant="body1" fontWeight={700}>{fmtDivisa(r.divisa_obtenida, simbolo)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Total a pagar</Typography>
+                        <Typography variant="body1" fontWeight={600}>{fmtArs(r.total_ars as number)}</Typography>
                       </Box>
                       <Box>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>Cotización efectiva</Typography>
@@ -241,7 +245,7 @@ export default function PlataformasDivisaPage() {
                         >
                           {r.es_mejor
                             ? '—'
-                            : `${fmtDivisa(-(r.divisa_menos as number), simbolo)} (${fmtPct(r.sobrecosto_pct)})`}
+                            : `+${fmtArs(r.sobrecosto_ars as number)} (${fmtPct(r.sobrecosto_pct)})`}
                         </Typography>
                       </Box>
                     </Box>
