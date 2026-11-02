@@ -594,3 +594,20 @@ export interface PromocionesResponse {
     completas: number
   }
 }
+
+/** Plataforma donde se puede comprar una divisa: cotización de venta + comisión, para comparar. */
+export interface PlataformaDivisa {
+  id: number
+  nombre: string
+  moneda_id: number
+  /** ARS por unidad a la que la plataforma vende la divisa. */
+  cotizacion: number
+  comision_tipo: 'PORCENTAJE' | 'FIJA'
+  /** Porcentaje (0-100) o monto fijo, según `comision_tipo`. */
+  comision: number
+  comision_moneda: 'ARS' | 'DIVISA'
+  nota: string | null
+  activa: boolean
+  /** ISO de la última edición: qué tan vieja es la cotización. */
+  updated_at: string
+}

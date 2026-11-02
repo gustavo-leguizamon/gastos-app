@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
@@ -275,7 +277,10 @@ export default function DivisasPage() {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1, flexWrap: 'wrap' }}>
         <Typography variant="h5" fontWeight={700}>Divisas</Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button size="small" variant="outlined" startIcon={<CompareArrowsIcon />} component={Link} href="/divisas/plataformas">
+            Plataformas
+          </Button>
           <Button
             size="small"
             variant="outlined"
