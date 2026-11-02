@@ -368,6 +368,10 @@ Ambos llaman `triggerRefresh()` al terminar.
 
 Las fechas de cierre no se copian (viven en `TarjetaCierre` por mes/año independientes).
 
+### Débito en cuotas: carga automática de los meses siguientes
+
+`POST /api/gastos` con `tipo_pago === 'D'` y `cuota_actual < cuotas_totales` crea además un gasto por cada mes siguiente hasta la última cuota (2/4 en nov → 3/4 en dic, 4/4 en ene). Lógica pura en `src/lib/cuotas-futuras.ts` (`cuotasFuturasDebito`, testeada): conserva el día de vencimiento (recortado al último del mes), con wraparound de año. Las cuotas futuras se crean con `confirmado: false`, `totalPagado 0`, sin pasaje ni sub-items, y heredan monto, moneda, notas, categoría y etiquetas. Se **saltea** cualquier mes donde ya exista un gasto de la misma casa y concepto (no duplica). Crédito no aplica (vive en el resumen de tarjeta). Sólo en el alta: editar un gasto no regenera ni sincroniza las cuotas ya creadas.
+
 ## Acciones masivas (clasificación + borrado)
 
 Permite, desde la grilla, seleccionar varios gastos a la vez y **asignar/quitar la categoría única**, **agregar/quitar una etiqueta** o **eliminarlos** a todos ellos.

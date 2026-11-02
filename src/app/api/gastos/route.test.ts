@@ -64,6 +64,32 @@ describe('GET /api/gastos', () => {
   })
 })
 
+describe('POST /api/gastos — débito en cuotas', () => {
+  const body = {
+    casa_id: 5, concepto_id: 7, fecha_vencimiento: '2026-11-10', tipo_pago: 'D', moneda_id: 1,
+    total_moneda: 500, mes: 11, anio: 2026, cuota_actual: 2, cuotas_totales: 4, etiqueta_ids: [],
+  }
+
+  it('crea las cuotas de los meses siguientes saltando los meses ya ocupados', async () => {
+    mockPrisma.gasto.create.mockReset()
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, etiquetas: [] }))
+    mockPrisma.gasto.findMany.mockResolvedValue([{ mes: 12, anio: 2026 }])
+
+    await POST({ json: async () => body } as any)
+
+    const datas = mockPrisma.gasto.create.mock.calls.map((c: any) => c[0].data)
+    expect(datas).toHaveLength(2) // la original + 4/4 en enero (diciembre ya existía)
+    expect(datas[1]).toMatchObject({ mes: 1, anio: 2027, cuotaActual: 4, cuotasTotales: 4, confirmado: false, totalPagado: 0, fechaVencimiento: '2027-01-10' })
+  })
+
+  it('no genera cuotas para crédito', async () => {
+    mockPrisma.gasto.create.mockReset()
+    mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, etiquetas: [] }))
+    await POST({ json: async () => ({ ...body, tipo_pago: 'C' }) } as any)
+    expect(mockPrisma.gasto.create).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('POST /api/gastos', () => {
   it('mapea el body snake_case → data camelCase y responde 201', async () => {
     mockPrisma.gasto.create.mockImplementation(async ({ data }: any) => rawGasto({ ...data, id: 99, etiquetas: [] }))
