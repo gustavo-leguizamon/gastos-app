@@ -5,6 +5,8 @@ import {
   parseCopiarBody,
   parseNombreCatalogo,
   esCompleto,
+  pasoLlevo,
+  ajustarLlevo,
   parseSubunidadDe,
   inferirSubunidad,
   aPrecioBase,
@@ -142,6 +144,31 @@ describe('parseUnidadPatch', () => {
   })
   it.each([[{}], [{ nombre: '  ' }], [{ subunidad_de: 'g' }], [null]])('rechaza %j', (b) => {
     expect(parseUnidadPatch(b)).toBeNull()
+  })
+})
+
+describe('pasoLlevo / ajustarLlevo (botones +/−)', () => {
+  it('el paso es 1, o 100 si la unidad es g/ml', () => {
+    expect(pasoLlevo(null)).toBe(1)
+    expect(pasoLlevo('kg')).toBe(100)
+    expect(pasoLlevo('l')).toBe(100)
+  })
+
+  it('suma y resta un paso', () => {
+    expect(ajustarLlevo(2, 1, null)).toBe(3)
+    expect(ajustarLlevo(2, -1, null)).toBe(1)
+    expect(ajustarLlevo(250, 1, 'kg')).toBe(350)
+  })
+
+  it('nunca baja de 0', () => {
+    expect(ajustarLlevo(0, -1, null)).toBe(0)
+    expect(ajustarLlevo(0.5, -1, null)).toBe(0)
+    expect(ajustarLlevo(50, -1, 'kg')).toBe(0)
+  })
+
+  it('conserva los decimales que ya había y no arrastra ruido de float', () => {
+    expect(ajustarLlevo(1.5, 1, null)).toBe(2.5)
+    expect(ajustarLlevo(0.1 + 0.2, 1, null)).toBe(1.3)
   })
 })
 

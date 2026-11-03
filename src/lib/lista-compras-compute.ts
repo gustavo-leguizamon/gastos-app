@@ -155,6 +155,19 @@ export function parseUnidadPatch(body: any): { nombre?: string; subunidadDe?: Su
   return Object.keys(patch).length ? patch : null
 }
 
+/**
+ * Cuánto suman/restan los botones +/− de "lo llevado": 1 en general, 100 si la unidad es g o ml
+ * (de a 1 g no se llega nunca; las cantidades en gramos se compran de a cientos).
+ */
+export function pasoLlevo(sub: SubunidadDe | null): number {
+  return sub ? 100 : 1
+}
+
+/** Suma (`1`) o resta (`-1`) un paso a lo llevado. Nunca baja de 0 y redondea el ruido de float. */
+export function ajustarLlevo(actual: number, direccion: 1 | -1, sub: SubunidadDe | null): number {
+  return Math.max(0, Math.round((actual + direccion * pasoLlevo(sub)) * 1000) / 1000)
+}
+
 /** Tolerancia para comparar cantidades en float (0.1 + 0.2 ≠ 0.3). */
 const EPS = 1e-9
 

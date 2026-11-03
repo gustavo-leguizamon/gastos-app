@@ -19,8 +19,13 @@ interface Props {
   onCrear: (nombre: string) => Promise<OpcionCatalogo | null>
   /** Permite dejar el campo sin valor (rubro sí, unidad no). */
   clearable?: boolean
-  width?: number | string
+  /** Número (px), string o valores por breakpoint: `{ xs: '100%', sm: 150 }`. */
+  width?: number | string | Record<string, number | string>
   disabled?: boolean
+  /** Ocupa todo el ancho disponible (en un contenedor flex, `flex: 1`). */
+  fullWidth?: boolean
+  /** Campo de 56px en vez de 40px: más cómodo de tocar en el celular. */
+  medium?: boolean
 }
 
 /**
@@ -28,12 +33,12 @@ interface Props {
  * tipeado no existe, aparece "Agregar «…»" que lo crea y lo selecciona. No admite texto
  * libre: lo que queda seleccionado siempre es una fila de la tabla.
  */
-export default function CatalogoSelect({ label, options, value, onChange, onCrear, clearable = false, width = 160, disabled }: Props) {
+export default function CatalogoSelect({ label, options, value, onChange, onCrear, clearable = false, width = 160, disabled, fullWidth, medium }: Props) {
   const seleccionada = options.find((o) => o.id === value) ?? null
 
   return (
     <Autocomplete<Opcion, false, boolean, false>
-      size="small"
+      size={medium ? 'medium' : 'small'}
       options={options}
       value={seleccionada}
       disableClearable={!clearable as any}
@@ -63,7 +68,7 @@ export default function CatalogoSelect({ label, options, value, onChange, onCrea
       )}
       noOptionsText="Escribí para agregar"
       renderInput={(params) => <TextField {...params} label={label} />}
-      sx={{ width }}
+      sx={fullWidth ? { flex: 1, minWidth: 0 } : { width }}
     />
   )
 }
