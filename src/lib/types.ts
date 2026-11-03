@@ -611,3 +611,20 @@ export interface PlataformaDivisa {
   /** ISO de la última edición: qué tan vieja es la cotización. */
   updated_at: string
 }
+
+// ── Lista de compras ──────────────────────────────────────────────────────────
+export type {
+  ItemResponse as ListaCompraItem,
+  Referencia as ListaCompraReferencia,
+  TotalesLista as ListaCompraTotales,
+} from './lista-compras-compute'
+
+export interface ArticuloCatalogo {
+  id: number
+  nombre: string
+  unidad_id: number
+  unidad: string
+  rubro_id: number | null
+  rubro: string | null
+  ultimo_precio: number | null
+}

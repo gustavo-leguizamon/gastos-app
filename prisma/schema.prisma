@@ -527,3 +527,65 @@ model PromocionReintegro {
 
   @@unique([promocionId, mes, anio])
 }
+
+/// Catálogo de artículos que se compran habitualmente (supermercado, limpieza, farmacia…).
+/// Es el "qué": se carga una vez y se reutiliza mes a mes. El nombre es único sin distinguir
+/// mayúsculas (se resuelve en las routes, no con un índice).
+model Articulo {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  unidadId  Int
+  /// null = sin rubro.
+  rubroId   Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unidad Unidad  @relation(fields: [unidadId], references: [id])
+  rubro  Rubro?  @relation(fields: [rubroId], references: [id], onDelete: SetNull)
+  items  ListaCompraItem[]
+}
+
+/// Unidades con las que se cuentan los artículos (un, kg, l, pack…). Tabla propia para que en
+/// pantalla se elija de las existentes o se agregue una nueva, en vez de tipear texto libre.
+/// Nombre único sin distinguir mayúsculas (se resuelve en las routes).
+model Unidad {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  /// "kg" o "l" si esta unidad es la milésima parte de esa base (g → kg, ml → l); null = sin
+  /// equivalencia. Permite cargar y ver el precio por kg/litro en artículos comprados en g/ml.
+  subunidadDe String?
+  createdAt DateTime @default(now())
+
+  articulos Articulo[]
+}
+
+/// Agrupador de artículos (Almacén, Limpieza…). Mismo criterio que `Unidad`.
+model Rubro {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  createdAt DateTime @default(now())
+
+  articulos Articulo[]
+}
+
+/// Una línea de la lista de compras de un mes: cuánto se necesita de un artículo y, una vez
+/// comprado, a qué precio unitario salió. Ese precio es la referencia del mes siguiente.
+/// `cantidadComprada` es lo que se lleva comprado hasta ahora (se completa en varias compras);
+/// "comprado" se deriva (`cantidadComprada >= cantidad`), no se guarda.
+/// `precioUnitario` null = todavía no se compró / no se sabe (distinto de 0).
+model ListaCompraItem {
+  id             Int      @id @default(autoincrement())
+  articuloId     Int
+  mes            Int
+  anio           Int
+  cantidad       Float    @default(1)
+  precioUnitario Float?
+  cantidadComprada Float  @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  articulo Articulo @relation(fields: [articuloId], references: [id], onDelete: Cascade)
+
+  @@unique([articuloId, mes, anio])
+  @@index([anio, mes])
+}
