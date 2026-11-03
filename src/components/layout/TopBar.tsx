@@ -29,12 +29,14 @@ import BarChartIcon from '@mui/icons-material/BarChart'
 import SavingsIcon from '@mui/icons-material/Savings'
 import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import PaymentsIcon from '@mui/icons-material/Payments'
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart'
 import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange'
 
 const NAV = [
   { label: 'Gastos', href: '/gastos', icon: <ReceiptLongIcon fontSize="small" /> },
   { label: 'Ingresos', href: '/ingresos', icon: <PaymentsIcon fontSize="small" /> },
   { label: 'Presupuestos', href: '/presupuestos', icon: <SavingsIcon fontSize="small" /> },
+  { label: 'Lista de compras', href: '/lista-compras', icon: <ShoppingCartIcon fontSize="small" /> },
   { label: 'Promociones', href: '/promociones', icon: <LocalOfferIcon fontSize="small" /> },
   { label: 'Reportes', href: '/reportes', icon: <BarChartIcon fontSize="small" /> },
   { label: 'Inversiones', href: '/inversiones', icon: <TrendingUpIcon fontSize="small" /> },
