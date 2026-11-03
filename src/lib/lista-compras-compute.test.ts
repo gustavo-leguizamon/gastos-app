@@ -5,6 +5,7 @@ import {
   parseCopiarBody,
   parseNombreCatalogo,
   esCompleto,
+  estadoCantidad,
   normalizarBusqueda,
   coincideBusqueda,
   parseColapsados,
@@ -387,6 +388,29 @@ describe('coincideBusqueda (buscador de la lista)', () => {
   })
 })
 
+describe('estadoCantidad (lo llevado vs. lo pedido)', () => {
+  it('sin nada llevado no es alerta: está pendiente', () => {
+    expect(estadoCantidad(5, 0)).toBe('sin_compras')
+  })
+  it('por debajo: algo llevado pero menos de lo pedido (cualquier diferencia)', () => {
+    expect(estadoCantidad(5, 1)).toBe('por_debajo')
+    expect(estadoCantidad(5, 4.9)).toBe('por_debajo')
+  })
+  it('completo: justo lo pedido', () => {
+    expect(estadoCantidad(5, 5)).toBe('completo')
+  })
+  it('por encima: cualquier cantidad de más, por poca que sea', () => {
+    expect(estadoCantidad(5, 5.1)).toBe('por_encima')
+    expect(estadoCantidad(5, 6)).toBe('por_encima')
+  })
+  it('tolera el error de float: 0.1 + 0.2 es justo 0.3, no "de más"', () => {
+    expect(estadoCantidad(0.3, 0.1 + 0.2)).toBe('completo')
+  })
+  it('en gramos: 500 pedidos, 650 llevados → de más', () => {
+    expect(estadoCantidad(500, 650)).toBe('por_encima')
+  })
+})
+
 describe('esCompleto', () => {
   it('completo cuando lo llevado alcanza o supera lo pedido', () => {
     expect(esCompleto(3, 3)).toBe(true)
@@ -481,7 +505,7 @@ describe('toItemResponse', () => {
   it('mapea a snake_case y deriva el total', () => {
     expect(toItemResponse(row, null)).toEqual({
       id: 1, articulo_id: 7, nombre: 'Yerba', unidad_id: 3, unidad: 'kg', subunidad_de: null, rubro_id: null, rubro: null, mes: 11, anio: 2026,
-      cantidad: 3, precio_unitario: 150, cantidad_comprada: 3, faltante: 0, comprado: true,
+      cantidad: 3, precio_unitario: 150, cantidad_comprada: 3, faltante: 0, exceso: 0, estado_cantidad: 'completo', comprado: true,
       total: 450, total_llevado: 450, compras: [], referencia: null,
     })
   })
@@ -496,8 +520,16 @@ describe('toItemResponse', () => {
     expect(r).toMatchObject({ cantidad_comprada: 1, faltante: 2, comprado: false, total: 450, total_llevado: 150 })
   })
 
-  it('comprar de más: completo y faltante nunca negativo', () => {
-    expect(toItemResponse({ ...row, cantidadComprada: 5 }, null)).toMatchObject({ comprado: true, faltante: 0 })
+  it('comprar de más: completo, faltante nunca negativo y el exceso se informa', () => {
+    expect(toItemResponse({ ...row, cantidadComprada: 5 }, null)).toMatchObject({ comprado: true, faltante: 0, exceso: 2, estado_cantidad: 'por_encima' })
+  })
+
+  it('compra parcial: por debajo y sin exceso', () => {
+    expect(toItemResponse({ ...row, cantidadComprada: 1 }, null)).toMatchObject({ exceso: 0, estado_cantidad: 'por_debajo' })
+  })
+
+  it('sin nada comprado: sin_compras (pendiente, no alerta)', () => {
+    expect(toItemResponse({ ...row, cantidadComprada: 0 }, null)).toMatchObject({ exceso: 0, estado_cantidad: 'sin_compras' })
   })
 
   it('con unidad g/ml expone la equivalencia para cargar el precio por kg/litro', () => {
@@ -526,7 +558,7 @@ describe('totalesLista', () => {
       { cantidad: 3, cantidad_comprada: 0, precio_unitario: null, referencia: ref(50) }, // estima 150 (referencia), nada gastado
       { cantidad: 1, cantidad_comprada: 0, precio_unitario: null, referencia: null },    // sin dato
     ])
-    expect(t).toEqual({ items: 3, comprados: 1, parciales: 0, pendientes: 2, gastado: 200, estimado: 350, sin_precio: 1 })
+    expect(t).toEqual({ items: 3, comprados: 1, parciales: 0, excedidos: 0, pendientes: 2, gastado: 200, estimado: 350, sin_precio: 1 })
   })
 
   it('compras parciales: cuentan como en curso y gastan sólo lo llevado', () => {
@@ -542,7 +574,17 @@ describe('totalesLista', () => {
     expect(t).toMatchObject({ gastado: 0, estimado: 200 })
   })
 
+  it('cuenta los excedidos (se llevó más de lo pedido) aparte de los parciales', () => {
+    const t = totalesLista([
+      { cantidad: 2, cantidad_comprada: 3, precio_unitario: 100, referencia: null }, // de más
+      { cantidad: 2, cantidad_comprada: 2, precio_unitario: 100, referencia: null }, // justo
+      { cantidad: 4, cantidad_comprada: 1, precio_unitario: 100, referencia: null }, // por debajo
+      { cantidad: 1, cantidad_comprada: 0, precio_unitario: 100, referencia: null }, // sin empezar
+    ])
+    expect(t).toMatchObject({ comprados: 2, parciales: 1, excedidos: 1, pendientes: 2 })
+  })
+
   it('lista vacía', () => {
-    expect(totalesLista([])).toEqual({ items: 0, comprados: 0, parciales: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 })
+    expect(totalesLista([])).toEqual({ items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 })
   })
 })

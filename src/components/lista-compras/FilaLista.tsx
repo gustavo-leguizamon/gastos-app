@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton'
 import LinearProgress from '@mui/material/LinearProgress'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
+import { alpha, type Theme } from '@mui/material/styles'
 import AddIcon from '@mui/icons-material/Add'
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -115,23 +116,32 @@ const alEnter = (e: React.KeyboardEvent) => {
 }
 
 /** Barra de progreso + "Faltan X u" cuando la compra está en curso o completa. */
-function Progreso({ item, parcial, progreso }: { item: ListaCompraItem; parcial: boolean; progreso: number }) {
-  if (!parcial && !item.comprado) return null
+function Progreso({ item, progreso }: { item: ListaCompraItem; progreso: number }) {
+  const estado = item.estado_cantidad
+  if (estado === 'sin_compras') return null
+  const color = estado === 'por_encima' ? 'error' : estado === 'por_debajo' ? 'warning' : 'success'
+  const n = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 3 })
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.25 }}>
-      <LinearProgress
-        variant="determinate"
-        value={progreso}
-        color={item.comprado ? 'success' : 'warning'}
-        sx={{ flex: 1, height: 6, borderRadius: 3 }}
-      />
-      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-        {item.comprado
-          ? 'Completo'
-          : `Faltan ${item.faltante.toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${item.unidad}`}
+      <LinearProgress variant="determinate" value={progreso} color={color} sx={{ flex: 1, height: 6, borderRadius: 3 }} />
+      <Typography variant="caption" color={`${color}.main`} fontWeight={estado === 'completo' ? 400 : 700} sx={{ whiteSpace: 'nowrap' }}>
+        {estado === 'por_encima' && `⚠ Pasaste por ${n(item.exceso)} ${item.unidad}`}
+        {estado === 'por_debajo' && `Faltan ${n(item.faltante)} ${item.unidad}`}
+        {estado === 'completo' && 'Completo'}
       </Typography>
     </Box>
   )
+}
+
+/**
+ * Resalte de la fila según lo llevado vs. lo pedido: se pasó → borde y fondo rojos; por debajo →
+ * naranjas; justo o sin empezar → sin resalte. Es la parte que se ve de un vistazo en la lista.
+ */
+function estiloEstado(item: ListaCompraItem) {
+  const color = item.estado_cantidad === 'por_encima' ? 'error' : item.estado_cantidad === 'por_debajo' ? 'warning' : null
+  return color
+    ? { borderLeftColor: `${color}.main`, bgcolor: (t: Theme) => alpha(t.palette[color].main, 0.07) }
+    : { borderLeftColor: 'transparent' }
 }
 
 /** Referencia de la última compra (por kg/l si la unidad es g/ml) y precio por unidad de la línea. */
@@ -221,7 +231,11 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         py: 1,
         borderBottom: '1px solid',
         borderColor: 'divider',
-        opacity: item.comprado ? 0.65 : 1,
+        // Sólo se atenúa lo que quedó justo: lo que se pasó o falta tiene que seguir llamando la atención.
+        opacity: item.estado_cantidad === 'completo' ? 0.65 : 1,
+        borderLeft: '4px solid',
+        pl: 0.5,
+        ...estiloEstado(item),
       }}
     >
       <Checkbox
@@ -233,10 +247,10 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         inputProps={{ 'aria-label': `Comprado: ${item.nombre}` }}
       />
       <Box sx={{ flex: '1 1 160px', minWidth: 140 }}>
-        <Typography variant="body2" fontWeight={600} sx={{ textDecoration: item.comprado ? 'line-through' : 'none' }}>
+        <Typography variant="body2" fontWeight={600} sx={{ textDecoration: item.estado_cantidad === 'completo' ? 'line-through' : 'none' }}>
           {item.nombre}
         </Typography>
-        <Progreso item={item} parcial={c.parcial} progreso={c.progreso} />
+        <Progreso item={item} progreso={c.progreso} />
         <Referencia item={item} c={c} />
         <ToggleCompras n={item.compras.length} abierto={verCompras} onClick={() => setVerCompras((v) => !v)} />
       </Box>
@@ -333,7 +347,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
   const botonPaso = { border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }
 
   return (
-    <Box sx={{ py: 1.5, borderBottom: '1px solid', borderColor: 'divider', opacity: item.comprado ? 0.65 : 1 }}>
+    <Box sx={{ py: 1.5, pl: 1, borderBottom: '1px solid', borderColor: 'divider', borderLeft: '4px solid', opacity: item.estado_cantidad === 'completo' ? 0.65 : 1, ...estiloEstado(item) }}>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
         <Checkbox
           checked={item.comprado}
@@ -344,7 +358,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           sx={{ mt: -0.5, ml: -1 }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body1" fontWeight={600} sx={{ textDecoration: item.comprado ? 'line-through' : 'none', wordBreak: 'break-word' }}>
+          <Typography variant="body1" fontWeight={600} sx={{ textDecoration: item.estado_cantidad === 'completo' ? 'line-through' : 'none', wordBreak: 'break-word' }}>
             {item.nombre}
           </Typography>
           <ButtonBase
@@ -385,7 +399,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
         </Box>
       </Collapse>
 
-      <Progreso item={item} parcial={c.parcial} progreso={c.progreso} />
+      <Progreso item={item} progreso={c.progreso} />
       <Referencia item={item} c={c} />
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>

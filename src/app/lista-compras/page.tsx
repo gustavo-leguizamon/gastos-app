@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -8,6 +8,11 @@ import ButtonBase from '@mui/material/ButtonBase'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Collapse from '@mui/material/Collapse'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import Fab from '@mui/material/Fab'
 import Grid from '@mui/material/Grid'
 import InputAdornment from '@mui/material/InputAdornment'
 import IconButton from '@mui/material/IconButton'
@@ -22,6 +27,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ClearIcon from '@mui/icons-material/Clear'
+import CloseIcon from '@mui/icons-material/Close'
 import SearchIcon from '@mui/icons-material/Search'
 import SettingsIcon from '@mui/icons-material/Settings'
 import toast from 'react-hot-toast'
@@ -57,7 +63,9 @@ export default function ListaComprasPage() {
   const [rubroId, setRubroId] = useState<number | null>(null)
   const [cantidad, setCantidad] = useState('1')
   const [adminAbierto, setAdminAbierto] = useState(false)
-  const [formAbierto, setFormAbierto] = useState(false)
+  // Diálogo de alta del celular (y el botón flotante que lo abre).
+  const [altaAbierta, setAltaAbierta] = useState(false)
+  const nombreRef = useRef<HTMLInputElement>(null)
   // Rubros plegados (por nombre). Se recuerdan en este navegador: es una comodidad por usuario.
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
   const [colapsadosListos, setColapsadosListos] = useState(false)
@@ -147,6 +155,8 @@ export default function ListaComprasPage() {
     const alta: AltaItem = { nombre: n, unidad_id: unidadId, rubro_id: rubroId, cantidad: c }
     if (await agregar(alta)) {
       setNombre(''); setCantidad('1'); setSugerido(null)
+      toast.success(`Agregado: ${n}`)
+      nombreRef.current?.focus() // el diálogo queda abierto para cargar el siguiente
       // Si el artículo cae en un rubro plegado, se despliega: si no, parecería que no se agregó.
       const destino = rubros.find((r) => r.id === rubroId)?.nombre ?? 'Sin rubro'
       setColapsados((prev) => {
@@ -166,93 +176,13 @@ export default function ListaComprasPage() {
       color: 'text.primary',
     },
     { label: 'Gastado', value: fmtARS(totales.gastado), hint: 'Lo que ya compraste: cantidad llevada × precio', color: 'warning.main' },
-    { label: 'Comprados', value: `${totales.comprados} / ${totales.items}`, hint: totales.parciales > 0 ? `${totales.parciales} en curso · ${totales.pendientes} sin completar` : `${totales.pendientes} pendiente(s)`, color: 'success.main' },
+    { label: 'Comprados', value: `${totales.comprados} / ${totales.items}`, hint: (totales.parciales > 0 ? `${totales.parciales} en curso · ${totales.pendientes} sin completar` : `${totales.pendientes} pendiente(s)`) + (totales.excedidos > 0 ? ` · ⚠ ${totales.excedidos} de más` : ''), color: 'success.main' },
   ]
 
   const abrirAdmin = () => { recargarOpciones(); setAdminAbierto(true) }
 
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: { xs: 2, md: 3 }, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Lista de compras</Typography>
-          {!compacta && (
-            <Typography variant="body2" color="text.secondary">
-              Lo que necesitás comprar en el mes, con el precio de la última vez como referencia
-            </Typography>
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <IconButton size={compacta ? 'medium' : 'small'} onClick={prevMes} aria-label="Mes anterior"><ChevronLeftIcon /></IconButton>
-          <Typography variant="body1" fontWeight={600} sx={{ minWidth: { xs: 130, md: 150 }, textAlign: 'center' }}>
-            {MESES[mes - 1]} {anio}
-          </Typography>
-          <IconButton size={compacta ? 'medium' : 'small'} onClick={nextMes} aria-label="Mes siguiente"><ChevronRightIcon /></IconButton>
-        </Box>
-      </Box>
-
-      {compacta ? (
-        // Un solo cuadro de tres renglones en vez de tres tarjetas: ahorra media pantalla.
-        <Card variant="outlined" sx={{ mb: 2 }}>
-          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
-            {KPIS.map((k) => (
-              <Box key={k.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', py: 0.5 }}>
-                <Typography variant="body2" color="text.secondary">{k.label}</Typography>
-                <Typography variant="subtitle1" fontWeight={700} sx={{ color: k.color }}>{k.value}</Typography>
-              </Box>
-            ))}
-            {totales.sin_precio > 0 && (
-              <Typography variant="caption" color="text.secondary">{totales.sin_precio} sin precio ni referencia (no cuentan en el estimado)</Typography>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          {KPIS.map((k) => (
-            <Grid item xs={12} sm={4} key={k.label}>
-              <Card variant="outlined" sx={{ height: '100%' }}>
-                <CardContent sx={{ pb: '16px !important' }}>
-                  <Typography variant="body2" color="text.secondary" fontWeight={500}>{k.label}</Typography>
-                  <Typography variant="h6" fontWeight={700} sx={{ color: k.color }}>{k.value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{k.hint}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-
-      <Card sx={{ mb: { xs: 2, md: 3 } }}>
-        <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-            {compacta ? (
-              // En el celular el formulario arranca plegado: la lista es lo que más se usa.
-              <Button
-                onClick={() => setFormAbierto((v) => !v)}
-                startIcon={<AddIcon />}
-                endIcon={formAbierto ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                aria-expanded={formAbierto}
-                sx={{ fontWeight: 600, py: 1 }}
-              >
-                Agregar artículo
-              </Button>
-            ) : (
-              <Typography variant="subtitle1" fontWeight={600}>Agregar artículo</Typography>
-            )}
-            <Tooltip title="Unidades y rubros">
-              <span>
-                {compacta ? (
-                  <IconButton onClick={abrirAdmin} aria-label="Administrar unidades y rubros"><SettingsIcon /></IconButton>
-                ) : (
-                  <Button size="small" startIcon={<SettingsIcon />} onClick={abrirAdmin}>
-                    Administrar unidades y rubros
-                  </Button>
-                )}
-              </span>
-            </Tooltip>
-          </Box>
-
-          <Collapse in={!compacta || formAbierto}>
+  /** Formulario de alta: inline en escritorio, dentro del diálogo a pantalla completa en el celular. */
+  const formularioAlta = (
             <Box
               component="form"
               onSubmit={submit}
@@ -276,7 +206,7 @@ export default function ListaComprasPage() {
                     </Box>
                   </li>
                 )}
-                renderInput={(params) => <TextField {...params} size={compacta ? 'medium' : 'small'} label="Artículo" />}
+                renderInput={(params) => <TextField {...params} inputRef={nombreRef} autoFocus={altaAbierta} size={compacta ? 'medium' : 'small'} label="Artículo" />}
                 sx={{ width: { xs: '100%', md: 'auto' }, flex: { md: '1 1 220px' }, minWidth: { md: 200 } }}
               />
               {/* Cantidad y unidad van juntas en un renglón: son lo que se completa siempre. */}
@@ -317,7 +247,88 @@ export default function ListaComprasPage() {
                 Agregar
               </Button>
             </Box>
-          </Collapse>
+  )
+
+  return (
+    // Margen abajo en el celular: el botón flotante no tiene que tapar los botones de la última fila.
+    <Box sx={{ pb: compacta ? 10 : 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: { xs: 2, md: 3 }, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h5" fontWeight={700}>Lista de compras</Typography>
+          {!compacta && (
+            <Typography variant="body2" color="text.secondary">
+              Lo que necesitás comprar en el mes, con el precio de la última vez como referencia
+            </Typography>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <IconButton size={compacta ? 'medium' : 'small'} onClick={prevMes} aria-label="Mes anterior"><ChevronLeftIcon /></IconButton>
+          <Typography variant="body1" fontWeight={600} sx={{ minWidth: { xs: 130, md: 150 }, textAlign: 'center' }}>
+            {MESES[mes - 1]} {anio}
+          </Typography>
+          <IconButton size={compacta ? 'medium' : 'small'} onClick={nextMes} aria-label="Mes siguiente"><ChevronRightIcon /></IconButton>
+        </Box>
+      </Box>
+
+      {compacta ? (
+        // Un solo cuadro de tres renglones en vez de tres tarjetas: ahorra media pantalla.
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
+            {KPIS.map((k) => (
+              <Box key={k.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', py: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">{k.label}</Typography>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ color: k.color }}>{k.value}</Typography>
+              </Box>
+            ))}
+            {totales.sin_precio > 0 && (
+              <Typography variant="caption" color="text.secondary">{totales.sin_precio} sin precio ni referencia (no cuentan en el estimado)</Typography>
+            )}
+            {totales.excedidos > 0 && (
+              <Typography variant="caption" color="error.main" fontWeight={700} sx={{ display: 'block' }}>⚠ {totales.excedidos} artículo{totales.excedidos === 1 ? '' : 's'} con más de lo pedido</Typography>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {KPIS.map((k) => (
+            <Grid item xs={12} sm={4} key={k.label}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent sx={{ pb: '16px !important' }}>
+                  <Typography variant="body2" color="text.secondary" fontWeight={500}>{k.label}</Typography>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: k.color }}>{k.value}</Typography>
+                  <Typography variant="caption" color="text.secondary">{k.hint}</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+
+      <Card sx={{ mb: { xs: 2, md: 3 } }}>
+        <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+            {compacta ? (
+              <Button onClick={() => setAltaAbierta(true)} startIcon={<AddIcon />} sx={{ fontWeight: 600, py: 1 }}>
+                Agregar artículo
+              </Button>
+            ) : (
+              <Typography variant="subtitle1" fontWeight={600}>Agregar artículo</Typography>
+            )}
+            <Tooltip title="Unidades y rubros">
+              <span>
+                {compacta ? (
+                  <IconButton onClick={abrirAdmin} aria-label="Administrar unidades y rubros"><SettingsIcon /></IconButton>
+                ) : (
+                  <Button size="small" startIcon={<SettingsIcon />} onClick={abrirAdmin}>
+                    Administrar unidades y rubros
+                  </Button>
+                )}
+              </span>
+            </Tooltip>
+          </Box>
+
+          {/* En escritorio el alta va en la tarjeta; en el celular, en un diálogo (ver abajo). */}
+          {!compacta && formularioAlta}
         </CardContent>
       </Card>
 
@@ -393,6 +404,9 @@ export default function ListaComprasPage() {
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                   {buscando ? `${visibles.length} de ${filas.length} · ` : ''}{resumen.comprados}/{resumen.items} comprados{plegado && resumen.estimado > 0 ? ` · ${fmtARS(resumen.estimado)}` : ''}
+                  {/* Las alertas se ven aunque el rubro esté plegado. */}
+                  {resumen.excedidos > 0 && <Box component="span" sx={{ color: 'error.main', fontWeight: 700, ml: 1 }}>⚠ {resumen.excedidos} de más</Box>}
+                  {resumen.parciales > 0 && <Box component="span" sx={{ color: 'warning.main', fontWeight: 700, ml: 1 }}>{resumen.parciales} por debajo</Box>}
                 </Typography>
               </ButtonBase>
               <Collapse in={!plegado} unmountOnExit>
@@ -418,6 +432,28 @@ export default function ListaComprasPage() {
           })}
         </CardContent>
       </Card>
+
+      {/* Celular: el alta siempre a un toque, sin subir hasta el principio de la página. */}
+      {compacta && !altaAbierta && (
+        <Fab
+          color="primary"
+          aria-label="Agregar artículo"
+          onClick={() => setAltaAbierta(true)}
+          sx={{ position: 'fixed', right: 16, bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+        >
+          <AddIcon />
+        </Fab>
+      )}
+      <Dialog open={compacta && altaAbierta} onClose={() => setAltaAbierta(false)} fullScreen>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
+          Agregar artículo
+          <IconButton onClick={() => setAltaAbierta(false)} aria-label="Cerrar"><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent>{formularioAlta}</DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAltaAbierta(false)}>Listo</Button>
+        </DialogActions>
+      </Dialog>
 
       <ConfirmDialog
         open={!!aQuitar}
