@@ -178,7 +178,8 @@ export function useListaCompras(mes: number, anio: number) {
   useEffect(() => { loadCatalogo() }, [loadCatalogo])
   useEffect(() => { loadOpciones() }, [loadOpciones])
 
-  const agregar = useCallback(async (input: AltaItem) => {
+  /** Da de alta la línea y devuelve la creada (`null` si falló). `recargar: false` en altas en tanda. */
+  const agregar = useCallback(async (input: AltaItem, recargar = true): Promise<ListaCompraItem | null> => {
     try {
       const res = await fetch('/api/lista-compras', {
         method: 'POST',
@@ -186,17 +187,21 @@ export function useListaCompras(mes: number, anio: number) {
         body: JSON.stringify({ ...input, mes, anio }),
       })
       if (res.status === 409) {
-        toast.error('Ese artículo ya está en la lista de este mes')
-        return false
+        toast.error(`"${input.nombre}" ya está en la lista de este mes`)
+        return null
       }
       if (!res.ok) throw new Error()
-      await Promise.all([load(), loadCatalogo()])
-      return true
+      const creada: ListaCompraItem = await res.json()
+      if (recargar) await Promise.all([load(), loadCatalogo()])
+      return creada
     } catch {
-      toast.error('Error al agregar el artículo')
-      return false
+      toast.error(`Error al agregar "${input.nombre}"`)
+      return null
     }
   }, [mes, anio, load, loadCatalogo])
+
+  /** Recarga la lista y el catálogo (al terminar un alta en tanda). */
+  const recargarTodo = useCallback(() => Promise.all([load(), loadCatalogo()]).then(() => undefined), [load, loadCatalogo])
 
   const cambiar = useCallback(async (id: number, cambio: CambioItem) => {
     try {
@@ -227,7 +232,7 @@ export function useListaCompras(mes: number, anio: number) {
   }, [load])
 
   /** Alta/edición/baja de una compra: el server recalcula lo llevado y el promedio, así que se recarga todo. */
-  const guardarCompra = useCallback(async (itemId: number, input: CompraInput, compraId?: number) => {
+  const guardarCompra = useCallback(async (itemId: number, input: CompraInput, compraId?: number, recargar = true) => {
     try {
       const res = await fetch(`/api/lista-compras/${itemId}/compras${compraId ? `/${compraId}` : ''}`, {
         method: compraId ? 'PUT' : 'POST',
@@ -235,8 +240,10 @@ export function useListaCompras(mes: number, anio: number) {
         body: JSON.stringify(input),
       })
       if (!res.ok) throw new Error()
-      toast.success(compraId ? 'Compra actualizada' : 'Compra registrada')
-      await Promise.all([load(), loadCatalogo()])
+      if (recargar) {
+        toast.success(compraId ? 'Compra actualizada' : 'Compra registrada')
+        await Promise.all([load(), loadCatalogo()])
+      }
       return true
     } catch {
       toast.error('Error al guardar la compra')
@@ -293,5 +300,5 @@ export function useListaCompras(mes: number, anio: number) {
     fijarSubunidad,
     guardarCompra,
     borrarCompra,
-    items, totales, catalogo, loading, agregar, cambiar, eliminar, copiarDelMesAnterior }
+    items, totales, catalogo, loading, agregar, recargarTodo, cambiar, eliminar, copiarDelMesAnterior }
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ultimosDeArticulo,
   parseItemBody,
   parseItemPatch,
   parseCopiarBody,
@@ -586,5 +587,19 @@ describe('totalesLista', () => {
 
   it('lista vacía', () => {
     expect(totalesLista([])).toEqual({ items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 })
+  })
+})
+
+describe('ultimosDeArticulo', () => {
+  it('toma la cantidad de la línea más reciente y el último precio que haya tenido', () => {
+    expect(ultimosDeArticulo([
+      { cantidad: 3, precioUnitario: null },
+      { cantidad: 2, precioUnitario: 150 },
+      { cantidad: 1, precioUnitario: 100 },
+    ])).toEqual({ cantidad: 3, precio: 150 })
+  })
+  it('sin líneas, todo null; un precio en 0 cuenta', () => {
+    expect(ultimosDeArticulo([])).toEqual({ cantidad: null, precio: null })
+    expect(ultimosDeArticulo([{ cantidad: 1, precioUnitario: 0 }]).precio).toBe(0)
   })
 })
