@@ -14,12 +14,18 @@ export interface OpcionCatalogo {
   subunidad_de?: 'kg' | 'l' | null
 }
 
+/** Una compra puntual: cantidad, precio (por la unidad de la línea; null = sin anotar) y fecha local. */
+export interface CompraInput {
+  cantidad: number
+  precio_unitario: number | null
+  fecha: string
+}
+
 export interface AltaItem {
   nombre: string
   unidad_id: number
   rubro_id: number | null
   cantidad: number
-  precio_unitario: number | null
 }
 
 export interface CambioItem {
@@ -220,6 +226,36 @@ export function useListaCompras(mes: number, anio: number) {
     }
   }, [load])
 
+  /** Alta/edición/baja de una compra: el server recalcula lo llevado y el promedio, así que se recarga todo. */
+  const guardarCompra = useCallback(async (itemId: number, input: CompraInput, compraId?: number) => {
+    try {
+      const res = await fetch(`/api/lista-compras/${itemId}/compras${compraId ? `/${compraId}` : ''}`, {
+        method: compraId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(compraId ? 'Compra actualizada' : 'Compra registrada')
+      await Promise.all([load(), loadCatalogo()])
+      return true
+    } catch {
+      toast.error('Error al guardar la compra')
+      return false
+    }
+  }, [load, loadCatalogo])
+
+  const borrarCompra = useCallback(async (itemId: number, compraId: number) => {
+    try {
+      const res = await fetch(`/api/lista-compras/${itemId}/compras/${compraId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      await Promise.all([load(), loadCatalogo()])
+      return true
+    } catch {
+      toast.error('Error al borrar la compra')
+      return false
+    }
+  }, [load, loadCatalogo])
+
   const copiarDelMesAnterior = useCallback(async () => {
     try {
       const res = await fetch('/api/lista-compras/copiar', {
@@ -255,5 +291,7 @@ export function useListaCompras(mes: number, anio: number) {
     renombrarOpcion,
     borrarOpcion,
     fijarSubunidad,
+    guardarCompra,
+    borrarCompra,
     items, totales, catalogo, loading, agregar, cambiar, eliminar, copiarDelMesAnterior }
 }

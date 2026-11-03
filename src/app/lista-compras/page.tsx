@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import ButtonBase from '@mui/material/ButtonBase'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Collapse from '@mui/material/Collapse'
 import Grid from '@mui/material/Grid'
+import InputAdornment from '@mui/material/InputAdornment'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
@@ -19,6 +21,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import ClearIcon from '@mui/icons-material/Clear'
+import SearchIcon from '@mui/icons-material/Search'
 import SettingsIcon from '@mui/icons-material/Settings'
 import toast from 'react-hot-toast'
 import TextField from '@/components/shared/AppTextField'
@@ -26,11 +30,14 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import CatalogoAdminDialog from '@/components/lista-compras/CatalogoAdminDialog'
 import CatalogoSelect from '@/components/lista-compras/CatalogoSelect'
+import CompraDialog from '@/components/lista-compras/CompraDialog'
 import FilaLista from '@/components/lista-compras/FilaLista'
 import { fmtARS, parseNum } from '@/components/lista-compras/formato'
 import { useListaCompras, type AltaItem } from '@/components/lista-compras/useListaCompras'
-import { desdePrecioBase } from '@/lib/lista-compras-compute'
-import type { ArticuloCatalogo, ListaCompraItem } from '@/lib/types'
+import { coincideBusqueda, parseColapsados, totalesLista } from '@/lib/lista-compras-compute'
+import type { ArticuloCatalogo, ListaCompraCompra, ListaCompraItem } from '@/lib/types'
+
+const CLAVE_COLAPSADOS = 'lista-compras:rubros-colapsados'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -42,21 +49,24 @@ export default function ListaComprasPage() {
   const {
     items, totales, catalogo, loading, unidades, rubros, crearUnidad, crearRubro,
     recargarOpciones, renombrarOpcion, borrarOpcion, fijarSubunidad,
-    agregar, cambiar, eliminar, copiarDelMesAnterior,
+    agregar, cambiar, eliminar, copiarDelMesAnterior, guardarCompra, borrarCompra,
   } = useListaCompras(mes, anio)
 
   const [nombre, setNombre] = useState('')
   const [unidadId, setUnidadId] = useState<number | null>(null)
   const [rubroId, setRubroId] = useState<number | null>(null)
   const [cantidad, setCantidad] = useState('1')
-  const [precio, setPrecio] = useState('')
   const [adminAbierto, setAdminAbierto] = useState(false)
   const [formAbierto, setFormAbierto] = useState(false)
+  // Rubros plegados (por nombre). Se recuerdan en este navegador: es una comodidad por usuario.
+  const [colapsados, setColapsados] = useState<Set<string>>(new Set())
+  const [colapsadosListos, setColapsadosListos] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
   const [aQuitar, setAQuitar] = useState<ListaCompraItem | null>(null)
+  // Compra que se está registrando (compra = null) o editando, y compra a confirmar para borrar.
+  const [compraDialog, setCompraDialog] = useState<{ item: ListaCompraItem; compra: ListaCompraCompra | null } | null>(null)
+  const [compraABorrar, setCompraABorrar] = useState<{ item: ListaCompraItem; compra: ListaCompraCompra } | null>(null)
   const [sugerido, setSugerido] = useState<ArticuloCatalogo | null>(null)
-
-  // Si la unidad elegida es g/ml, el precio del alta se tipea por kg/litro.
-  const baseAlta = unidades.find((u) => u.id === unidadId)?.subunidad_de ?? null
 
   const prevMes = () => (mes === 1 ? setFiltros({ mes: 12, anio: anio - 1 }) : setFiltros({ mes: mes - 1 }))
   const nextMes = () => (mes === 12 ? setFiltros({ mes: 1, anio: anio + 1 }) : setFiltros({ mes: mes + 1 }))
@@ -64,6 +74,16 @@ export default function ListaComprasPage() {
   // Los artículos que ya están en la lista no se ofrecen de nuevo.
   const enLista = useMemo(() => new Set(items.map((i) => i.articulo_id)), [items])
   const opciones = useMemo(() => catalogo.filter((a) => !enLista.has(a.id)), [catalogo, enLista])
+
+  // Se lee al montar (no en el estado inicial: el server no tiene localStorage y desajustaría el HTML).
+  useEffect(() => {
+    try { setColapsados(new Set(parseColapsados(localStorage.getItem(CLAVE_COLAPSADOS)))) } catch { /* sin storage: arranca todo abierto */ }
+    setColapsadosListos(true)
+  }, [])
+  useEffect(() => {
+    if (!colapsadosListos) return // no pisar lo guardado con el estado vacío del primer render
+    try { localStorage.setItem(CLAVE_COLAPSADOS, JSON.stringify(Array.from(colapsados))) } catch { /* ignorar */ }
+  }, [colapsados, colapsadosListos])
 
   // Si la unidad/rubro elegidos en el formulario se borraron, se limpian.
   useEffect(() => {
@@ -88,13 +108,32 @@ export default function ListaComprasPage() {
     return Array.from(m.entries()).sort(([a], [b]) => (a === 'Sin rubro' ? 1 : b === 'Sin rubro' ? -1 : a.localeCompare(b, 'es')))
   }, [items])
 
+  const alternarRubro = (nombre: string) =>
+    setColapsados((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(nombre)) next.add(nombre)
+      return next
+    })
+  const todosPlegados = grupos.length > 0 && grupos.every(([n]) => colapsados.has(n))
+
+  // Buscador: deja sólo las líneas que coinciden y los rubros que tienen alguna. `filas` conserva
+  // todas las del rubro (para el resumen del encabezado) y `visibles` las que se muestran.
+  const buscando = busqueda.trim() !== ''
+  const gruposVista = useMemo(
+    () => grupos.flatMap(([nombre, filas]) => {
+      const visibles = buscando ? filas.filter((i) => coincideBusqueda(i, busqueda)) : filas
+      return visibles.length ? [{ nombre, filas, visibles }] : []
+    }),
+    [grupos, busqueda, buscando],
+  )
+  const coincidencias = gruposVista.reduce((n, g) => n + g.visibles.length, 0)
+
   const elegir = (a: ArticuloCatalogo | null) => {
     setSugerido(a)
     if (a) {
       setNombre(a.nombre)
       setUnidadId(a.unidad_id)
       setRubroId(a.rubro_id)
-      setPrecio('')
     }
   }
 
@@ -102,14 +141,20 @@ export default function ListaComprasPage() {
     e.preventDefault()
     const n = nombre.trim()
     const c = parseNum(cantidad)
-    const p = parseNum(precio)
     if (!n) return toast.error('Completá el nombre del artículo')
     if (c == null || !Number.isFinite(c) || c <= 0) return toast.error('La cantidad tiene que ser mayor a 0')
-    if (p !== null && (!Number.isFinite(p) || p < 0)) return toast.error('El precio no es válido')
     if (unidadId == null) return toast.error('Elegí la unidad')
-    const alta: AltaItem = { nombre: n, unidad_id: unidadId, rubro_id: rubroId, cantidad: c, precio_unitario: p == null ? null : desdePrecioBase(p, baseAlta) }
+    const alta: AltaItem = { nombre: n, unidad_id: unidadId, rubro_id: rubroId, cantidad: c }
     if (await agregar(alta)) {
-      setNombre(''); setCantidad('1'); setPrecio(''); setSugerido(null)
+      setNombre(''); setCantidad('1'); setSugerido(null)
+      // Si el artículo cae en un rubro plegado, se despliega: si no, parecería que no se agregó.
+      const destino = rubros.find((r) => r.id === rubroId)?.nombre ?? 'Sin rubro'
+      setColapsados((prev) => {
+        if (!prev.has(destino)) return prev
+        const next = new Set(prev)
+        next.delete(destino)
+        return next
+      })
     }
   }
 
@@ -265,14 +310,9 @@ export default function ListaComprasPage() {
                 width={compacta ? '100%' : 190}
                 medium={compacta}
               />
-              <TextField
-                size={compacta ? 'medium' : 'small'}
-                label={baseAlta ? `Precio por ${baseAlta} (opcional)` : 'Precio unitario (opcional)'}
-                value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
-                inputProps={{ inputMode: 'decimal' }}
-                sx={{ width: { xs: '100%', md: 180 } }}
-              />
+              <Typography variant="caption" color="text.secondary" sx={{ width: { xs: '100%', md: 'auto' }, maxWidth: { md: 240 } }}>
+                El precio se carga al registrar cada compra: el del artículo es el promedio de lo que fuiste comprando.
+              </Typography>
               <Button type="submit" variant="contained" size={compacta ? 'large' : 'medium'} startIcon={<AddIcon />} sx={{ width: { xs: '100%', md: 'auto' } }}>
                 Agregar
               </Button>
@@ -285,6 +325,15 @@ export default function ListaComprasPage() {
         <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="subtitle1" fontWeight={600}>Lista de {MESES[mes - 1]}</Typography>
+            {grupos.length > 1 && !buscando && (
+              <Button
+                size={compacta ? 'medium' : 'small'}
+                startIcon={todosPlegados ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                onClick={() => setColapsados(todosPlegados ? new Set() : new Set(grupos.map(([n]) => n)))}
+              >
+                {todosPlegados ? 'Expandir todos' : 'Colapsar todos'}
+              </Button>
+            )}
             <Tooltip title="Trae los artículos y cantidades del último mes con lista. Los precios no se copian: quedan como referencia.">
               <Button size={compacta ? 'medium' : 'small'} startIcon={<ContentCopyIcon />} onClick={copiarDelMesAnterior}>
                 Copiar del mes anterior
@@ -292,16 +341,62 @@ export default function ListaComprasPage() {
             </Tooltip>
           </Box>
 
+          <TextField
+            type="search"
+            size={compacta ? 'medium' : 'small'}
+            fullWidth
+            placeholder="Buscar artículo o rubro"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setBusqueda('') }}
+            inputProps={{ 'aria-label': 'Buscar artículo o rubro', autoComplete: 'off' }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+              endAdornment: buscando ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda"><ClearIcon fontSize="small" /></IconButton>
+                </InputAdornment>
+              ) : undefined,
+            }}
+            sx={{ mb: 1.5 }}
+          />
+          {buscando && items.length > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {coincidencias === 0
+                ? `Ningún artículo coincide con "${busqueda.trim()}".`
+                : `${coincidencias} de ${items.length} artículo${items.length === 1 ? '' : 's'}`}
+            </Typography>
+          )}
+
           {!loading && items.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
               No hay artículos en la lista de este mes. Agregalos arriba o copiá los del mes anterior.
             </Typography>
           )}
 
-          {grupos.map(([rubroNombre, filas]) => (
-            <Box key={rubroNombre} sx={{ mb: 2 }}>
-              <Typography variant="overline" color="text.secondary" fontWeight={700}>{rubroNombre}</Typography>
-              {filas.map((i) => (
+          {gruposVista.map(({ nombre: rubroNombre, filas, visibles }) => {
+            // Buscando, los rubros con coincidencias se muestran desplegados aunque estén plegados.
+            const plegado = !buscando && colapsados.has(rubroNombre)
+            const resumen = totalesLista(filas)
+            return (
+            <Box key={rubroNombre} sx={{ mb: 1 }}>
+              {/* Encabezado tocable: pliega el rubro y, plegado, sigue mostrando cuánto va. */}
+              <ButtonBase
+                onClick={() => alternarRubro(rubroNombre)}
+                disabled={buscando}
+                aria-expanded={!plegado}
+                sx={{ width: '100%', justifyContent: 'space-between', gap: 1, py: compacta ? 1.25 : 0.75, px: 0.5, borderRadius: 1, textAlign: 'left', '&:hover': { bgcolor: 'action.hover' } }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                  {plegado ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+                  <Typography variant="overline" color="text.secondary" fontWeight={700} noWrap>{rubroNombre}</Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  {buscando ? `${visibles.length} de ${filas.length} · ` : ''}{resumen.comprados}/{resumen.items} comprados{plegado && resumen.estimado > 0 ? ` · ${fmtARS(resumen.estimado)}` : ''}
+                </Typography>
+              </ButtonBase>
+              <Collapse in={!plegado} unmountOnExit>
+              {visibles.map((i) => (
                 <FilaLista
                   key={i.id}
                   item={i}
@@ -311,11 +406,16 @@ export default function ListaComprasPage() {
                   onCrearRubro={crearRubro}
                   onCambiar={cambiar}
                   onEliminar={setAQuitar}
+                  onRegistrarCompra={(it) => setCompraDialog({ item: it, compra: null })}
+                  onEditarCompra={(it, compra) => setCompraDialog({ item: it, compra })}
+                  onBorrarCompra={(it, compra) => setCompraABorrar({ item: it, compra })}
                   compacta={compacta}
                 />
               ))}
+              </Collapse>
             </Box>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
 
@@ -329,6 +429,27 @@ export default function ListaComprasPage() {
           setAQuitar(null)
         }}
         onCancel={() => setAQuitar(null)}
+      />
+
+      {/* La línea se busca en `items` por id: así el diálogo ve la versión recién recargada. */}
+      <CompraDialog
+        open={!!compraDialog}
+        item={compraDialog ? items.find((i) => i.id === compraDialog.item.id) ?? compraDialog.item : null}
+        compra={compraDialog?.compra ?? null}
+        onClose={() => setCompraDialog(null)}
+        onGuardar={guardarCompra}
+      />
+
+      <ConfirmDialog
+        open={!!compraABorrar}
+        title="Borrar compra"
+        message={compraABorrar ? `¿Borrar la compra del ${compraABorrar.compra.fecha.split('-').reverse().join('/')} de "${compraABorrar.item.nombre}"? Se recalculan lo llevado y el precio promedio.` : ''}
+        confirmLabel="Borrar"
+        onConfirm={async () => {
+          if (compraABorrar) await borrarCompra(compraABorrar.item.id, compraABorrar.compra.id)
+          setCompraABorrar(null)
+        }}
+        onCancel={() => setCompraABorrar(null)}
       />
 
       <CatalogoAdminDialog
