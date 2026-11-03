@@ -314,6 +314,22 @@ export function esCompleto(cantidad: number, cantidadComprada: number): boolean 
   return cantidadComprada >= cantidad - EPS
 }
 
+/** Cómo viene lo llevado respecto de lo pedido (`cantidad`). */
+export type EstadoCantidad = 'sin_compras' | 'por_debajo' | 'completo' | 'por_encima'
+
+/**
+ * Compara lo llevado con la cantidad **pedida** (el "límite previsto") y dice si falta, está justo
+ * o se pasó. `sin_compras` es lo que todavía no se empezó a comprar: no es una alerta, es
+ * pendiente. `por_debajo` = algo llevado pero menos de lo pedido; `por_encima` = se llevó más
+ * (se compró de más). Cualquier diferencia cuenta, con tolerancia sólo para el error de float.
+ */
+export function estadoCantidad(cantidad: number, cantidadComprada: number): EstadoCantidad {
+  if (cantidadComprada <= EPS) return 'sin_compras'
+  if (cantidadComprada > cantidad + EPS) return 'por_encima'
+  if (cantidadComprada >= cantidad - EPS) return 'completo'
+  return 'por_debajo'
+}
+
 /**
  * Traduce el atajo `comprado` a una cantidad: `true` → lo pedido (el `cantidad` nuevo si el mismo
  * patch lo cambia), `false` → 0. Si el patch ya trae `cantidadComprada` explícita, esa gana.
@@ -389,6 +405,10 @@ export interface ItemResponse {
   cantidad_comprada: number
   /** Lo que falta para completar (0 si ya se llevó todo o más). */
   faltante: number
+  /** Cuánto se llevó de más respecto de lo pedido (0 si no se pasó). */
+  exceso: number
+  /** Lo llevado vs. lo pedido: sin compras / por debajo / completo / por encima (alerta). */
+  estado_cantidad: EstadoCantidad
   /** Derivado: `cantidad_comprada >= cantidad`. */
   comprado: boolean
   /** `cantidad × precio_unitario`, o `null` sin precio. Derivado, no se persiste. */
@@ -417,6 +437,8 @@ export function toItemResponse(row: any, referencia: Referencia | null): ItemRes
     precio_unitario: precio,
     cantidad_comprada: row.cantidadComprada,
     faltante: Math.max(0, row.cantidad - row.cantidadComprada),
+    exceso: Math.round(Math.max(0, row.cantidadComprada - row.cantidad) * 1e6) / 1e6,
+    estado_cantidad: estadoCantidad(row.cantidad, row.cantidadComprada),
     comprado: esCompleto(row.cantidad, row.cantidadComprada),
     total: precio == null ? null : row.cantidad * precio,
     total_llevado: precio == null ? null : row.cantidadComprada * precio,
@@ -431,6 +453,8 @@ export interface TotalesLista {
   comprados: number
   /** Líneas con algo comprado pero no todo. */
   parciales: number
+  /** Líneas donde se llevó MÁS de lo pedido (se compró de más). */
+  excedidos: number
   /** Líneas todavía no completas (incluye las parciales). */
   pendientes: number
   /** Lo que ya se gastó: cantidad llevada × precio, sólo en líneas con precio cargado. */
@@ -448,14 +472,16 @@ export function totalesLista(
   let estimado = 0
   let comprados = 0
   let parciales = 0
+  let excedidos = 0
   let sinPrecio = 0
   for (const i of items) {
     if (esCompleto(i.cantidad, i.cantidad_comprada)) comprados++
     else if (i.cantidad_comprada > 0) parciales++
+    if (estadoCantidad(i.cantidad, i.cantidad_comprada) === 'por_encima') excedidos++
     if (i.precio_unitario != null) gastado += i.cantidad_comprada * i.precio_unitario
     const base = i.precio_unitario ?? i.referencia?.precio_unitario ?? null
     if (base == null) sinPrecio++
     else estimado += i.cantidad * base
   }
-  return { items: items.length, comprados, parciales, pendientes: items.length - comprados, gastado, estimado, sin_precio: sinPrecio }
+  return { items: items.length, comprados, parciales, excedidos, pendientes: items.length - comprados, gastado, estimado, sin_precio: sinPrecio }
 }
