@@ -628,4 +628,6 @@ export interface ArticuloCatalogo {
   rubro_id: number | null
   rubro: string | null
   ultimo_precio: number | null
+  /** Cantidad de la línea más reciente (para precargar el alta). */
+  ultima_cantidad: number | null
 }

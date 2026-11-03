@@ -65,6 +65,8 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/data/')) return
+  // Motor y datos del OCR de la lista de compras (tesseract.js): pesan varios MB y el propio motor los guarda.
+  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'tessdata.projectnaptha.com') return
 
   event.respondWith(
     fetch(req)

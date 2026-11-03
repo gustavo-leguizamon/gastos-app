@@ -28,6 +28,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ClearIcon from '@mui/icons-material/Clear'
 import CloseIcon from '@mui/icons-material/Close'
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
 import SearchIcon from '@mui/icons-material/Search'
 import SettingsIcon from '@mui/icons-material/Settings'
 import toast from 'react-hot-toast'
@@ -38,6 +39,7 @@ import CatalogoAdminDialog from '@/components/lista-compras/CatalogoAdminDialog'
 import CatalogoSelect from '@/components/lista-compras/CatalogoSelect'
 import CompraDialog from '@/components/lista-compras/CompraDialog'
 import FilaLista from '@/components/lista-compras/FilaLista'
+import ImagenDialog, { type ImportItem } from '@/components/lista-compras/ImagenDialog'
 import { fmtARS, parseNum } from '@/components/lista-compras/formato'
 import { useListaCompras, type AltaItem } from '@/components/lista-compras/useListaCompras'
 import { coincideBusqueda, parseColapsados, totalesLista } from '@/lib/lista-compras-compute'
@@ -55,7 +57,7 @@ export default function ListaComprasPage() {
   const {
     items, totales, catalogo, loading, unidades, rubros, crearUnidad, crearRubro,
     recargarOpciones, renombrarOpcion, borrarOpcion, fijarSubunidad,
-    agregar, cambiar, eliminar, copiarDelMesAnterior, guardarCompra, borrarCompra,
+    agregar, recargarTodo, cambiar, eliminar, copiarDelMesAnterior, guardarCompra, borrarCompra,
   } = useListaCompras(mes, anio)
 
   const [nombre, setNombre] = useState('')
@@ -63,6 +65,7 @@ export default function ListaComprasPage() {
   const [rubroId, setRubroId] = useState<number | null>(null)
   const [cantidad, setCantidad] = useState('1')
   const [adminAbierto, setAdminAbierto] = useState(false)
+  const [imagenAbierta, setImagenAbierta] = useState(false)
   // Diálogo de alta del celular (y el botón flotante que lo abre).
   const [altaAbierta, setAltaAbierta] = useState(false)
   const nombreRef = useRef<HTMLInputElement>(null)
@@ -178,6 +181,29 @@ export default function ListaComprasPage() {
     { label: 'Gastado', value: fmtARS(totales.gastado), hint: 'Lo que ya compraste: cantidad llevada × precio', color: 'warning.main' },
     { label: 'Comprados', value: `${totales.comprados} / ${totales.items}`, hint: (totales.parciales > 0 ? `${totales.parciales} en curso · ${totales.pendientes} sin completar` : `${totales.pendientes} pendiente(s)`) + (totales.excedidos > 0 ? ` · ⚠ ${totales.excedidos} de más` : ''), color: 'success.main' },
   ]
+
+  /** Alta en tanda de lo detectado en una imagen; con precio, también la registra como comprada. */
+  const importarDeImagen = async (nuevos: ImportItem[], fecha: string) => {
+    let agregados = 0
+    let compras = 0
+    for (const n of nuevos) {
+      if (n.tipo === 'compra') {
+        // El artículo ya está en el mes: se suma una compra con el precio y la fecha del ticket.
+        if (await guardarCompra(n.item_id, { cantidad: n.cantidad, precio_unitario: n.precio_unitario, fecha }, undefined, false)) compras++
+        continue
+      }
+      const creada = await agregar({ nombre: n.nombre, unidad_id: n.unidad_id, rubro_id: n.rubro_id, cantidad: n.cantidad }, false)
+      if (!creada) continue
+      agregados++
+      if (n.precio_unitario != null && await guardarCompra(creada.id, { cantidad: n.cantidad, precio_unitario: n.precio_unitario, fecha }, undefined, false)) compras++
+    }
+    await recargarTodo()
+    if (agregados + compras > 0) {
+      toast.success([agregados > 0 && `${agregados} agregado(s) a la lista`, compras > 0 && `${compras} compra(s) registradas`].filter(Boolean).join(' · '))
+      // Los rubros plegados donde cayeron se despliegan, para que se vea lo agregado.
+      setColapsados(new Set())
+    }
+  }
 
   const abrirAdmin = () => { recargarOpciones(); setAdminAbierto(true) }
 
@@ -314,6 +340,18 @@ export default function ListaComprasPage() {
             ) : (
               <Typography variant="subtitle1" fontWeight={600}>Agregar artículo</Typography>
             )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Tooltip title="Cargar artículos desde la foto de una lista o de un ticket">
+              <span>
+                {compacta ? (
+                  <IconButton onClick={() => setImagenAbierta(true)} aria-label="Cargar desde una imagen"><PhotoCameraIcon /></IconButton>
+                ) : (
+                  <Button size="small" startIcon={<PhotoCameraIcon />} onClick={() => setImagenAbierta(true)}>
+                    Desde imagen
+                  </Button>
+                )}
+              </span>
+            </Tooltip>
             <Tooltip title="Unidades y rubros">
               <span>
                 {compacta ? (
@@ -325,6 +363,7 @@ export default function ListaComprasPage() {
                 )}
               </span>
             </Tooltip>
+            </Box>
           </Box>
 
           {/* En escritorio el alta va en la tarjeta; en el celular, en un diálogo (ver abajo). */}
@@ -486,6 +525,16 @@ export default function ListaComprasPage() {
           setCompraABorrar(null)
         }}
         onCancel={() => setCompraABorrar(null)}
+      />
+
+      <ImagenDialog
+        open={imagenAbierta}
+        unidades={unidades}
+        rubros={rubros}
+        catalogo={catalogo}
+        items={items}
+        onClose={() => setImagenAbierta(false)}
+        onImportar={importarDeImagen}
       />
 
       <CatalogoAdminDialog
