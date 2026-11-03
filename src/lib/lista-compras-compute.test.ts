@@ -5,6 +5,15 @@ import {
   parseCopiarBody,
   parseNombreCatalogo,
   esCompleto,
+  normalizarBusqueda,
+  coincideBusqueda,
+  parseColapsados,
+  precioUnitarioDeEntrada,
+  entradaDePrecio,
+  fechaValida,
+  parseCompraBody,
+  resumenCompras,
+  toCompraResponse,
   pasoLlevo,
   ajustarLlevo,
   parseSubunidadDe,
@@ -172,6 +181,212 @@ describe('pasoLlevo / ajustarLlevo (botones +/−)', () => {
   })
 })
 
+describe('fechaValida', () => {
+  it('acepta fechas reales YYYY-MM-DD', () => {
+    expect(fechaValida('2026-11-03')).toBe(true)
+    expect(fechaValida('2028-02-29')).toBe(true) // bisiesto
+  })
+  it.each([['2026-02-30'], ['2026-13-01'], ['2027-02-29'], ['03/11/2026'], ['2026-1-3'], [''], [20261103], [null]])('rechaza %s', (f) => {
+    expect(fechaValida(f)).toBe(false)
+  })
+})
+
+describe('parseCompraBody', () => {
+  const ok = { cantidad: 2, precio_unitario: 1000, fecha: '2026-11-03' }
+
+  it('mapea a camelCase', () => {
+    expect(parseCompraBody(ok)).toEqual({ cantidad: 2, precioUnitario: 1000, fecha: '2026-11-03' })
+  })
+  it('el precio es opcional (null/ausente/vacío = sin anotar); 0 es un precio válido', () => {
+    expect(parseCompraBody({ ...ok, precio_unitario: null })?.precioUnitario).toBeNull()
+    expect(parseCompraBody({ cantidad: 1, fecha: '2026-11-03' })?.precioUnitario).toBeNull()
+    expect(parseCompraBody({ ...ok, precio_unitario: '' })?.precioUnitario).toBeNull()
+    expect(parseCompraBody({ ...ok, precio_unitario: 0 })?.precioUnitario).toBe(0)
+  })
+  it.each([
+    [{ ...ok, cantidad: 0 }],
+    [{ ...ok, cantidad: -1 }],
+    [{ ...ok, cantidad: 'x' }],
+    [{ ...ok, precio_unitario: -5 }],
+    [{ ...ok, precio_unitario: 'abc' }],
+    [{ ...ok, fecha: undefined }], // la fecha local la manda el cliente: obligatoria
+    [{ ...ok, fecha: '2026-02-30' }],
+    [null],
+  ])('rechaza %j', (b) => {
+    expect(parseCompraBody(b)).toBeNull()
+  })
+})
+
+describe('toCompraResponse', () => {
+  it('snake_case y sin precio = null', () => {
+    expect(toCompraResponse({ id: 1, itemId: 9, cantidad: 3, precioUnitario: undefined, fecha: '2026-11-03', createdAt: new Date() }))
+      .toEqual({ id: 1, cantidad: 3, precio_unitario: null, fecha: '2026-11-03' })
+  })
+})
+
+describe('resumenCompras (promedio ponderado)', () => {
+  it('suma lo llevado y pondera el precio por cantidad: 2 kg a 1000 + 3 kg a 1100 = 1060', () => {
+    const r = resumenCompras([{ cantidad: 2, precioUnitario: 1000 }, { cantidad: 3, precioUnitario: 1100 }])
+    expect(r.cantidadComprada).toBe(5)
+    expect(r.precioPromedio).toBeCloseTo(1060)
+  })
+
+  it('cantidad × promedio coincide con lo realmente pagado (el gastado no se desvía)', () => {
+    const compras = [{ cantidad: 2, precioUnitario: 1000 }, { cantidad: 3, precioUnitario: 1100 }]
+    const r = resumenCompras(compras)
+    expect(r.cantidadComprada * (r.precioPromedio as number)).toBeCloseTo(2 * 1000 + 3 * 1100)
+  })
+
+  it('no es el promedio simple: pesa más la compra grande', () => {
+    const r = resumenCompras([{ cantidad: 1, precioUnitario: 1000 }, { cantidad: 9, precioUnitario: 2000 }])
+    expect(r.precioPromedio).toBeCloseTo(1900) // simple daría 1500
+  })
+
+  it('las compras sin precio suman cantidad pero no entran al promedio', () => {
+    const r = resumenCompras([{ cantidad: 2, precioUnitario: 1000 }, { cantidad: 3, precioUnitario: null }])
+    expect(r.cantidadComprada).toBe(5)
+    expect(r.precioPromedio).toBe(1000)
+  })
+
+  it('sin ningún precio el promedio es null (la línea conserva el suyo)', () => {
+    expect(resumenCompras([{ cantidad: 2, precioUnitario: null }]).precioPromedio).toBeNull()
+  })
+
+  it('sin compras: 0 llevado y sin promedio', () => {
+    expect(resumenCompras([])).toEqual({ cantidadComprada: 0, precioPromedio: null })
+  })
+
+  it('un precio en 0 cuenta (regalo/promo): baja el promedio', () => {
+    expect(resumenCompras([{ cantidad: 1, precioUnitario: 0 }, { cantidad: 1, precioUnitario: 100 }]).precioPromedio).toBe(50)
+  })
+
+  it('no arrastra ruido de float en lo llevado', () => {
+    expect(resumenCompras([{ cantidad: 0.1, precioUnitario: 1 }, { cantidad: 0.2, precioUnitario: 1 }]).cantidadComprada).toBe(0.3)
+  })
+})
+
+describe('precioUnitarioDeEntrada (unitario vs. total pagado)', () => {
+  it('total pagado en gramos: 500 g por $2.000 → $4 por g = $4.000 por kg', () => {
+    const porGramo = precioUnitarioDeEntrada('total', 2000, 500, 'kg')
+    expect(porGramo).toBe(4)
+    expect(aPrecioBase(porGramo as number, 'kg')).toBe(4000)
+  })
+
+  it('lo mismo con mililitros: 250 ml por $1.500 → $6 por ml = $6.000 por litro', () => {
+    const porMl = precioUnitarioDeEntrada('total', 1500, 250, 'l')
+    expect(porMl).toBe(6)
+    expect(aPrecioBase(porMl as number, 'l')).toBe(6000)
+  })
+
+  it('un total que no divide redondo no pierde precisión: 333 g por $1.000', () => {
+    const porGramo = precioUnitarioDeEntrada('total', 1000, 333, 'kg') as number
+    expect(aPrecioBase(porGramo, 'kg')).toBeCloseTo(3003.003003, 5)
+    expect(333 * porGramo).toBeCloseTo(1000) // el gastado vuelve a ser lo pagado
+  })
+
+  it('total pagado en una unidad sin equivalencia: 3 un por $900 → $300 c/u', () => {
+    expect(precioUnitarioDeEntrada('total', 900, 3, null)).toBe(300)
+  })
+
+  it('unitario por kg/litro se convierte a precio por g/ml; sin equivalencia queda igual', () => {
+    expect(precioUnitarioDeEntrada('unitario', 4000, 500, 'kg')).toBe(4)
+    expect(precioUnitarioDeEntrada('unitario', 150, 2, null)).toBe(150)
+  })
+
+  it('el modo unitario no depende de la cantidad', () => {
+    expect(precioUnitarioDeEntrada('unitario', 4000, null, 'kg')).toBe(4)
+  })
+
+  it('total sin cantidad válida no se puede calcular (null, nunca Infinity)', () => {
+    expect(precioUnitarioDeEntrada('total', 2000, null, 'kg')).toBeNull()
+    expect(precioUnitarioDeEntrada('total', 2000, 0, 'kg')).toBeNull()
+    expect(precioUnitarioDeEntrada('total', 2000, -5, 'kg')).toBeNull()
+  })
+
+  it('un total de 0 es válido (regalo): precio 0', () => {
+    expect(precioUnitarioDeEntrada('total', 0, 500, 'kg')).toBe(0)
+  })
+})
+
+describe('entradaDePrecio (inversa, para no perder el número al cambiar de modo)', () => {
+  it('unitario: por kg/litro si la unidad es g/ml', () => {
+    expect(entradaDePrecio('unitario', 4, 500, 'kg')).toBe(4000)
+    expect(entradaDePrecio('unitario', 150, 2, null)).toBe(150)
+  })
+
+  it('total: precio por unidad × cantidad, a centavos', () => {
+    expect(entradaDePrecio('total', 4, 500, 'kg')).toBe(2000)
+    expect(entradaDePrecio('total', 1000 / 333, 333, 'kg')).toBe(1000)
+  })
+
+  it('total sin cantidad válida → null', () => {
+    expect(entradaDePrecio('total', 4, null, 'kg')).toBeNull()
+    expect(entradaDePrecio('total', 4, 0, 'kg')).toBeNull()
+  })
+
+  it('ida y vuelta unitario → total → unitario conserva el precio', () => {
+    const unit = precioUnitarioDeEntrada('unitario', 4000, 500, 'kg') as number
+    const total = entradaDePrecio('total', unit, 500, 'kg') as number
+    expect(precioUnitarioDeEntrada('total', total, 500, 'kg')).toBeCloseTo(unit)
+  })
+})
+
+describe('parseColapsados (lo guardado en el navegador)', () => {
+  it('lee un array de nombres', () => {
+    expect(parseColapsados('["Almacén","Sin rubro"]')).toEqual(['Almacén', 'Sin rubro'])
+  })
+  it('descarta lo que no es texto', () => {
+    expect(parseColapsados('["Almacén", 3, null, {"a":1}]')).toEqual(['Almacén'])
+  })
+  it.each([[null], [''], ['no es json'], ['{"a":1}'], ['3'], ['null']])('%s → []', (raw) => {
+    expect(parseColapsados(raw)).toEqual([])
+  })
+})
+
+describe('normalizarBusqueda', () => {
+  it('minúsculas, sin acentos y espacios colapsados', () => {
+    expect(normalizarBusqueda('  CAFÉ   Molido ')).toBe('cafe molido')
+    expect(normalizarBusqueda('Limón')).toBe('limon')
+    expect(normalizarBusqueda('Añejo')).toBe('anejo') // la ñ se descompone: se busca igual con n
+  })
+})
+
+describe('coincideBusqueda (buscador de la lista)', () => {
+  const yerba = { nombre: 'Yerba mate', rubro: 'Almacén' }
+  const sinRubro = { nombre: 'Pilas AA', rubro: null }
+
+  it('texto vacío o sólo espacios: coincide todo', () => {
+    expect(coincideBusqueda(yerba, '')).toBe(true)
+    expect(coincideBusqueda(yerba, '   ')).toBe(true)
+  })
+
+  it('busca parte del nombre, sin importar mayúsculas ni acentos', () => {
+    expect(coincideBusqueda(yerba, 'yer')).toBe(true)
+    expect(coincideBusqueda(yerba, 'MATE')).toBe(true)
+    expect(coincideBusqueda({ nombre: 'Café', rubro: null }, 'cafe')).toBe(true)
+    expect(coincideBusqueda({ nombre: 'Cafe', rubro: null }, 'café')).toBe(true)
+  })
+
+  it('también busca en el rubro', () => {
+    expect(coincideBusqueda(yerba, 'almacen')).toBe(true)
+  })
+
+  it('todas las palabras tienen que estar, en cualquier orden', () => {
+    expect(coincideBusqueda(yerba, 'mate yerba')).toBe(true)
+    expect(coincideBusqueda(yerba, 'alm yer')).toBe(true)
+    expect(coincideBusqueda(yerba, 'yerba cafe')).toBe(false)
+  })
+
+  it('no coincide si no está', () => {
+    expect(coincideBusqueda(yerba, 'leche')).toBe(false)
+  })
+
+  it('un artículo sin rubro no falla y no coincide por "null"', () => {
+    expect(coincideBusqueda(sinRubro, 'pilas')).toBe(true)
+    expect(coincideBusqueda(sinRubro, 'null')).toBe(false)
+  })
+})
+
 describe('esCompleto', () => {
   it('completo cuando lo llevado alcanza o supera lo pedido', () => {
     expect(esCompleto(3, 3)).toBe(true)
@@ -267,8 +482,13 @@ describe('toItemResponse', () => {
     expect(toItemResponse(row, null)).toEqual({
       id: 1, articulo_id: 7, nombre: 'Yerba', unidad_id: 3, unidad: 'kg', subunidad_de: null, rubro_id: null, rubro: null, mes: 11, anio: 2026,
       cantidad: 3, precio_unitario: 150, cantidad_comprada: 3, faltante: 0, comprado: true,
-      total: 450, total_llevado: 450, referencia: null,
+      total: 450, total_llevado: 450, compras: [], referencia: null,
     })
+  })
+
+  it('incluye las compras registradas, ya mapeadas', () => {
+    const r = toItemResponse({ ...row, compras: [{ id: 4, itemId: 1, cantidad: 2, precioUnitario: 100, fecha: '2026-11-03', createdAt: new Date() }] }, null)
+    expect(r.compras).toEqual([{ id: 4, cantidad: 2, precio_unitario: 100, fecha: '2026-11-03' }])
   })
 
   it('compra parcial: no está completo, calcula lo que falta y lo gastado hasta ahora', () => {

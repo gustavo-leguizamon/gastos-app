@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import ButtonBase from '@mui/material/ButtonBase'
 import Checkbox from '@mui/material/Checkbox'
 import Collapse from '@mui/material/Collapse'
@@ -10,13 +11,14 @@ import LinearProgress from '@mui/material/LinearProgress'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import AddIcon from '@mui/icons-material/Add'
+import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import RemoveIcon from '@mui/icons-material/Remove'
 import toast from 'react-hot-toast'
 import TextField from '@/components/shared/AppTextField'
 import { ajustarLlevo, aPrecioBase, desdePrecioBase, variacionPrecio } from '@/lib/lista-compras-compute'
-import type { ListaCompraItem } from '@/lib/types'
+import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 import CatalogoSelect from './CatalogoSelect'
 import { fmtARS, parseNum } from './formato'
 import type { CambioItem, OpcionCatalogo } from './useListaCompras'
@@ -29,6 +31,10 @@ interface Props {
   onCrearRubro: (nombre: string) => Promise<OpcionCatalogo | null>
   onCambiar: (id: number, c: CambioItem) => void
   onEliminar: (item: ListaCompraItem) => void
+  /** Abre el diálogo para registrar una compra de la línea. */
+  onRegistrarCompra: (item: ListaCompraItem) => void
+  onEditarCompra: (item: ListaCompraItem, compra: ListaCompraCompra) => void
+  onBorrarCompra: (item: ListaCompraItem, compra: ListaCompraCompra) => void
   /** Pantalla chica: fila apilada, con botones grandes y +/− en lo llevado. */
   compacta?: boolean
 }
@@ -89,7 +95,10 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
 
   const parcial = !item.comprado && item.cantidad_comprada > 0
   const ref = item.referencia
+  // Con compras registradas, lo llevado y el precio salen de ellas y no se editan a mano.
+  const tiene = item.compras.length > 0
   return {
+    tiene,
     base, cantidad, setCantidad, precio, setPrecio, llevo, setLlevo,
     guardarLlevo, guardarCantidad, guardarPrecio, ajustar,
     parcial,
@@ -97,7 +106,7 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
     ref,
     variacion: variacionPrecio(item.precio_unitario, ref?.precio_unitario ?? null),
     placeholderPrecio: ref ? String(aPrecioBase(ref.precio_unitario, base)) : '',
-    labelPrecio: base ? `Precio por ${base}` : 'Precio unitario',
+    labelPrecio: tiene ? (base ? `Precio promedio por ${base}` : 'Precio promedio') : base ? `Precio por ${base}` : 'Precio unitario',
   }
 }
 
@@ -151,8 +160,57 @@ function Referencia({ item, c }: { item: ListaCompraItem; c: ReturnType<typeof u
   )
 }
 
-function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar }: Props) {
+
+/** "dd/mm/aaaa" desde el `YYYY-MM-DD` guardado (sin pasar por Date: correría el día en UTC). */
+const fechaCorta = (f: string) => f.split('-').reverse().join('/')
+
+/** Botón que muestra/oculta el detalle de compras: "3 compras ▾". */
+function ToggleCompras({ n, abierto, onClick }: { n: number; abierto: boolean; onClick: () => void }) {
+  if (n === 0) return null
+  return (
+    <ButtonBase onClick={onClick} aria-expanded={abierto} sx={{ typography: 'caption', color: 'primary.main', fontWeight: 600, py: 0.5 }}>
+      {n} compra{n === 1 ? '' : 's'} {abierto ? '▴' : '▾'}
+    </ButtonBase>
+  )
+}
+
+/** Compras de la línea (fecha, cantidad × precio) con editar/borrar y el promedio ponderado. */
+function ComprasDetalle({
+  item,
+  onEditar,
+  onBorrar,
+}: {
+  item: ListaCompraItem
+  onEditar: (c: ListaCompraCompra) => void
+  onBorrar: (c: ListaCompraCompra) => void
+}) {
+  const base = item.subunidad_de
+  const conPrecio = item.compras.some((c) => c.precio_unitario != null)
+  return (
+    <Box sx={{ mt: 0.5, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+      {item.compras.map((c) => (
+        <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 76 }}>{fechaCorta(c.fecha)}</Typography>
+          <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
+            {c.cantidad.toLocaleString('es-AR', { maximumFractionDigits: 3 })} {item.unidad}
+            {c.precio_unitario != null ? ` × ${fmtARS(aPrecioBase(c.precio_unitario, base))}${base ? `/${base}` : ''}` : ' · sin precio'}
+          </Typography>
+          <IconButton size="small" onClick={() => onEditar(c)} aria-label="Editar compra"><EditIcon fontSize="small" /></IconButton>
+          <IconButton size="small" onClick={() => onBorrar(c)} aria-label="Borrar compra"><DeleteIcon fontSize="small" /></IconButton>
+        </Box>
+      ))}
+      {conPrecio && item.precio_unitario != null && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          Promedio ponderado: <b>{fmtARS(aPrecioBase(item.precio_unitario, base))}{base ? `/${base}` : ''}</b>
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar, onRegistrarCompra, onEditarCompra, onBorrarCompra }: Props) {
   const c = useCamposFila(item, onCambiar)
+  const [verCompras, setVerCompras] = useState(false)
   return (
     <Box
       sx={{
@@ -170,6 +228,7 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         size="small"
         checked={item.comprado}
         indeterminate={c.parcial}
+        disabled={c.tiene}
         onChange={(e) => onCambiar(item.id, { comprado: e.target.checked })}
         inputProps={{ 'aria-label': `Comprado: ${item.nombre}` }}
       />
@@ -179,6 +238,7 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         </Typography>
         <Progreso item={item} parcial={c.parcial} progreso={c.progreso} />
         <Referencia item={item} c={c} />
+        <ToggleCompras n={item.compras.length} abierto={verCompras} onClick={() => setVerCompras((v) => !v)} />
       </Box>
       <Tooltip title="Se cambia en todos los meses: es del artículo">
         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -209,6 +269,7 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         onBlur={c.guardarLlevo}
         onKeyDown={alEnter}
         inputProps={{ inputMode: 'decimal' }}
+        disabled={c.tiene}
         sx={{ width: 110 }}
       />
       <TextField
@@ -230,6 +291,7 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         onBlur={c.guardarPrecio}
         onKeyDown={alEnter}
         inputProps={{ inputMode: 'decimal' }}
+        disabled={c.tiene}
         sx={{ width: 140 }}
       />
       <Typography variant="body2" fontWeight={700} sx={{ width: 110, textAlign: 'right' }}>
@@ -240,11 +302,21 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
           </Typography>
         )}
       </Typography>
+      <Tooltip title="Registrar una compra (cantidad, precio y fecha)">
+        <IconButton size="small" color="primary" onClick={() => onRegistrarCompra(item)} aria-label="Registrar compra">
+          <AddShoppingCartIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       <Tooltip title="Quitar de este mes">
         <IconButton size="small" onClick={() => onEliminar(item)}>
           <DeleteIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      {item.compras.length > 0 && (
+        <Collapse in={verCompras} unmountOnExit sx={{ flexBasis: '100%' }}>
+          <ComprasDetalle item={item} onEditar={(co) => onEditarCompra(item, co)} onBorrar={(co) => onBorrarCompra(item, co)} />
+        </Collapse>
+      )}
     </Box>
   )
 }
@@ -254,9 +326,10 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
  * con botones +/− (en el súper se toca, no se tipea) y el rubro/unidad del artículo —que casi no
  * se toca— plegados detrás del texto "Rubro · unidad".
  */
-function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar }: Props) {
+function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar, onRegistrarCompra, onEditarCompra, onBorrarCompra }: Props) {
   const c = useCamposFila(item, onCambiar)
   const [editandoArticulo, setEditandoArticulo] = useState(false)
+  const [verCompras, setVerCompras] = useState(false)
   const botonPaso = { border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }
 
   return (
@@ -265,6 +338,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
         <Checkbox
           checked={item.comprado}
           indeterminate={c.parcial}
+          disabled={c.tiene}
           onChange={(e) => onCambiar(item.id, { comprado: e.target.checked })}
           inputProps={{ 'aria-label': `Comprado: ${item.nombre}` }}
           sx={{ mt: -0.5, ml: -1 }}
@@ -315,9 +389,11 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
       <Referencia item={item} c={c} />
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-        <IconButton onClick={() => c.ajustar(-1)} disabled={item.cantidad_comprada <= 0} aria-label="Restar lo llevado" sx={botonPaso}>
-          <RemoveIcon />
-        </IconButton>
+        {!c.tiene && (
+          <IconButton onClick={() => c.ajustar(-1)} disabled={item.cantidad_comprada <= 0} aria-label="Restar lo llevado" sx={botonPaso}>
+            <RemoveIcon />
+          </IconButton>
+        )}
         <TextField
           label={`Llevo (${item.unidad})`}
           value={c.llevo}
@@ -325,11 +401,14 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           onBlur={c.guardarLlevo}
           onKeyDown={alEnter}
           inputProps={{ inputMode: 'decimal', style: { textAlign: 'center' } }}
+          disabled={c.tiene}
           sx={{ flex: 1 }}
         />
-        <IconButton onClick={() => c.ajustar(1)} aria-label="Sumar lo llevado" sx={botonPaso}>
-          <AddIcon />
-        </IconButton>
+        {!c.tiene && (
+          <IconButton onClick={() => c.ajustar(1)} aria-label="Sumar lo llevado" sx={botonPaso}>
+            <AddIcon />
+          </IconButton>
+        )}
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 1.5 }}>
@@ -349,6 +428,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           onBlur={c.guardarPrecio}
           onKeyDown={alEnter}
           inputProps={{ inputMode: 'decimal' }}
+          disabled={c.tiene}
         />
       </Box>
 
@@ -360,6 +440,15 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           {item.total == null ? 'Total —' : `Total ${fmtARS(item.total)}`}
         </Typography>
       </Box>
+      <Button variant="outlined" fullWidth startIcon={<AddShoppingCartIcon />} onClick={() => onRegistrarCompra(item)} sx={{ mt: 1.5, py: 1 }}>
+        Registrar compra
+      </Button>
+      <ToggleCompras n={item.compras.length} abierto={verCompras} onClick={() => setVerCompras((v) => !v)} />
+      {item.compras.length > 0 && (
+        <Collapse in={verCompras} unmountOnExit>
+          <ComprasDetalle item={item} onEditar={(co) => onEditarCompra(item, co)} onBorrar={(co) => onBorrarCompra(item, co)} />
+        </Collapse>
+      )}
     </Box>
   )
 }

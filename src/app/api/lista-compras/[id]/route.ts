@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { antesDe, INCLUDE_ARTICULO } from '@/lib/lista-compras-db'
+import { antesDe, INCLUDE_ITEM } from '@/lib/lista-compras-db'
 import { parseItemPatch, referenciaDe, resolverPatchComprado, toItemResponse } from '@/lib/lista-compras-compute'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
@@ -12,6 +12,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const existente = await prisma.listaCompraItem.findUnique({ where: { id } })
   if (!existente) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+
+  // Con compras registradas, lo llevado y el precio salen de ellas: editarlos a mano se pisaría
+  // en la próxima compra. Se cambian tocando las compras.
+  const tocaCompras = patch.cantidadComprada !== undefined || patch.comprado !== undefined || patch.precioUnitario !== undefined
+  if (tocaCompras && (await prisma.listaCompraCompra.count({ where: { itemId: id } })) > 0) {
+    return NextResponse.json(
+      { error: 'La línea tiene compras registradas: lo llevado y el precio se cambian desde las compras' },
+      { status: 409 },
+    )
+  }
 
   // Unidad y rubro son del artículo (valen para todos los meses); el resto, de la línea.
   // El atajo `comprado` se convierte en cantidad: lo único que se persiste es lo llevado.
@@ -29,7 +39,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     })
   }
 
-  const fila = await prisma.listaCompraItem.update({ where: { id }, data: linea, include: INCLUDE_ARTICULO })
+  const fila = await prisma.listaCompraItem.update({ where: { id }, data: linea, include: INCLUDE_ITEM })
   const historico = await prisma.listaCompraItem.findMany({
     where: { articuloId: fila.articuloId, precioUnitario: { not: null }, ...antesDe(fila.mes, fila.anio) },
     select: { cantidad: true, precioUnitario: true, mes: true, anio: true },

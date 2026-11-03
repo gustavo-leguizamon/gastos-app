@@ -45,6 +45,72 @@ export function parseItemBody(body: any): ItemBody | null {
   return { nombre, unidadId, rubroId, cantidad, precioUnitario, mes, anio }
 }
 
+/** `YYYY-MM-DD` real (rechaza 2026-02-30). Se parsea a mano: `new Date(str)` correría el día en UTC. */
+export function fechaValida(s: unknown): s is string {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const [y, m, d] = s.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
+export interface CompraBody {
+  cantidad: number
+  /** null = no se anotó el precio de esta compra. */
+  precioUnitario: number | null
+  fecha: string
+}
+
+/**
+ * Alta/edición de una compra: `{ cantidad > 0, precio_unitario?, fecha }`. La fecha la manda el
+ * cliente (fecha local, no la UTC del server) y es obligatoria.
+ */
+export function parseCompraBody(body: any): CompraBody | null {
+  if (!body || typeof body !== 'object') return null
+  const cantidad = Number(body.cantidad)
+  if (!Number.isFinite(cantidad) || cantidad <= 0) return null
+  const precioUnitario = parsePrecio(body.precio_unitario)
+  if (precioUnitario === undefined) return null
+  if (!fechaValida(body.fecha)) return null
+  return { cantidad, precioUnitario, fecha: body.fecha }
+}
+
+export interface CompraResponse {
+  id: number
+  cantidad: number
+  precio_unitario: number | null
+  fecha: string
+}
+
+export function toCompraResponse(row: any): CompraResponse {
+  return { id: row.id, cantidad: row.cantidad, precio_unitario: row.precioUnitario ?? null, fecha: row.fecha }
+}
+
+/**
+ * Lo que las compras le dicen a su línea: `cantidadComprada` = suma de todas, y
+ * `precioPromedio` = promedio **ponderado por cantidad** de las que tienen precio (null si
+ * ninguna). Es ponderado, no simple: 2 kg a $1.000 y 3 kg a $1.100 salen $1.060, y
+ * `cantidad × promedio` coincide con lo realmente pagado, así que `gastado` no se desvía.
+ * Las compras sin precio suman cantidad pero no entran al promedio.
+ */
+export function resumenCompras(
+  compras: { cantidad: number; precioUnitario: number | null }[],
+): { cantidadComprada: number; precioPromedio: number | null } {
+  let total = 0
+  let conPrecio = 0
+  let importe = 0
+  for (const c of compras) {
+    total += c.cantidad
+    if (c.precioUnitario != null) {
+      conPrecio += c.cantidad
+      importe += c.cantidad * c.precioUnitario
+    }
+  }
+  return {
+    cantidadComprada: Math.round(total * 1e6) / 1e6,
+    precioPromedio: conPrecio > 0 ? importe / conPrecio : null,
+  }
+}
+
 export interface ItemPatch {
   cantidad?: number
   precioUnitario?: number | null
@@ -136,6 +202,78 @@ export function aPrecioBase(precioUnitario: number, sub: SubunidadDe | null): nu
 /** Inversa de `aPrecioBase`: lo que se tipea (por kg/l) → lo que se guarda (por g/ml). */
 export function desdePrecioBase(precioBase: number, sub: SubunidadDe | null): number {
   return sub ? precioBase / FACTOR_SUBUNIDAD : precioBase
+}
+
+/** Cómo se tipea el precio de una compra: por unidad (por kg/litro si es g/ml) o como total pagado. */
+export type ModoPrecio = 'unitario' | 'total'
+
+/**
+ * Lo tipeado → precio por la unidad de la línea (lo que se guarda).
+ * - `unitario`: es por kg/litro si la unidad es g/ml (`desdePrecioBase`), si no ya es por unidad.
+ * - `total`: lo que costó esa cantidad, así que es `total ÷ cantidad` (500 g por $2.000 → $4 por g).
+ *   Sin cantidad válida no se puede calcular y devuelve `null`.
+ */
+export function precioUnitarioDeEntrada(
+  modo: ModoPrecio,
+  valor: number,
+  cantidad: number | null,
+  sub: SubunidadDe | null,
+): number | null {
+  if (modo === 'unitario') return desdePrecioBase(valor, sub)
+  return cantidad != null && cantidad > 0 ? valor / cantidad : null
+}
+
+/**
+ * Inversa de `precioUnitarioDeEntrada`: cómo mostrar en el campo un precio ya guardado según el
+ * modo elegido (para no perder el número al cambiar entre "unitario" y "total pagado"). El total
+ * se redondea a centavos. `null` si en modo total no hay cantidad válida.
+ */
+export function entradaDePrecio(
+  modo: ModoPrecio,
+  precioUnitario: number,
+  cantidad: number | null,
+  sub: SubunidadDe | null,
+): number | null {
+  if (modo === 'unitario') return aPrecioBase(precioUnitario, sub)
+  return cantidad != null && cantidad > 0 ? Math.round(precioUnitario * cantidad * 100) / 100 : null
+}
+
+/** Minúsculas, sin acentos y con espacios colapsados, para comparar: "Café" encuentra "cafe". */
+export function normalizarBusqueda(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Si una línea coincide con lo escrito en el buscador: **todas** las palabras tienen que aparecer
+ * en el nombre del artículo o en su rubro (en cualquier orden y como parte de una palabra:
+ * "yer" encuentra "Yerba mate", "alm yer" encuentra "Yerba" del rubro Almacén). Texto vacío =
+ * coincide todo.
+ */
+export function coincideBusqueda(item: { nombre: string; rubro: string | null }, texto: string): boolean {
+  const palabras = normalizarBusqueda(texto).split(' ').filter(Boolean)
+  if (palabras.length === 0) return true
+  const pajar = normalizarBusqueda(`${item.nombre} ${item.rubro ?? ''}`)
+  return palabras.every((p) => pajar.includes(p))
+}
+
+/**
+ * Rubros plegados, tal como se guardan en el navegador (JSON de un array de nombres). Tolera lo que
+ * no sea eso —vacío, JSON roto, otro tipo, elementos que no son texto— devolviendo `[]`: es una
+ * comodidad por usuario y nunca debe romper la pantalla.
+ */
+export function parseColapsados(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
 }
 
 /** Cambios aceptados al editar una unidad: nombre y/o equivalencia. `null` si no hay nada o es inválido. */
@@ -257,6 +395,8 @@ export interface ItemResponse {
   total: number | null
   /** `cantidad_comprada × precio_unitario`: lo que ya se gastó en la línea (`null` sin precio). */
   total_llevado: number | null
+  /** Compras registradas, por fecha. Si hay, lo llevado y el precio salen de ellas (no se editan a mano). */
+  compras: CompraResponse[]
   referencia: Referencia | null
 }
 
@@ -280,6 +420,7 @@ export function toItemResponse(row: any, referencia: Referencia | null): ItemRes
     comprado: esCompleto(row.cantidad, row.cantidadComprada),
     total: precio == null ? null : row.cantidad * precio,
     total_llevado: precio == null ? null : row.cantidadComprada * precio,
+    compras: (row.compras ?? []).map(toCompraResponse),
     referencia,
   }
 }
