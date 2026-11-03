@@ -130,3 +130,23 @@ sola query** de histórico para todos los artículos de la lista.
   del precio es el de referencia) y total de la línea.
 - **Copiar del mes anterior**: trae artículos y cantidades del último mes con lista; **no copia
   precios** (quedan vacíos, la referencia los muestra) ni lo llevado (arrancan en 0), y no pisa lo ya cargado.
+
+## Mobile
+
+Debajo del breakpoint `md` (900px) la página pasa a un diseño **compacto** (`useMediaQuery`); arriba
+queda el de escritorio, sin cambios. La fila vive en `FilaLista.tsx` (`FilaEscritorio` /
+`FilaCompacta`, que comparten el hook `useCamposFila` con el estado local de los campos y sus
+guardados, así que no se pueden desincronizar).
+
+- **Fila compacta**: apilada a ancho completo, con áreas de toque de 40px (tilde, borrar, +/−) y
+  campos de 56px. **Lo llevado** tiene botones **−/+** (`ajustarLlevo`: paso 1, o 100 si la unidad
+  es g/ml; nunca baja de 0; guarda al toque) además del campo editable. **Necesito** y **precio**
+  van en dos columnas y el total abajo a la derecha. **Rubro y unidad** quedan plegados detrás de
+  "Rubro · unidad ✎" (casi nunca se tocan).
+- **Resumen**: un único cuadro de tres renglones en vez de tres tarjetas.
+- **Agregar artículo** arranca **plegado** en el celular (la lista es lo que más se usa); adentro,
+  campos a ancho completo con cantidad y unidad juntas en un renglón y botón grande.
+- **Quitar de este mes pide confirmación** (en todos los tamaños): un toque accidental con el
+  pulgar no debería borrar la línea. El artículo y su historial de precios se conservan.
+- **Administrar unidades y rubros** abre a **pantalla completa** y sus filas se parten en dos
+  renglones (el selector de equivalencia pasa abajo).

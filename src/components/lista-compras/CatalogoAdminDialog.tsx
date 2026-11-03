@@ -11,6 +11,8 @@ import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -63,7 +65,7 @@ function Seccion({
       {opciones.map((o) => {
         const uso = o.uso ?? 0
         return (
-          <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1, flexWrap: 'wrap', borderBottom: '1px solid', borderColor: 'divider' }}>
             {editando === o.id ? (
               <>
                 <TextField
@@ -82,7 +84,7 @@ function Seccion({
               </>
             ) : (
               <>
-                <Typography variant="body2" sx={{ flex: 1 }}>{o.nombre}</Typography>
+                <Typography variant="body2" sx={{ flex: '1 1 120px', wordBreak: 'break-word' }}>{o.nombre}</Typography>
                 {tipo === 'unidades' && (
                   <Tooltip title="Si es la milésima parte de kg o litro, el precio se carga y se compara por kg/litro">
                     <TextField
@@ -91,7 +93,7 @@ function Seccion({
                       label="Equivale a 1/1000 de"
                       value={o.subunidad_de ?? ''}
                       onChange={(e) => onFijarSubunidad(o.id, (e.target.value || null) as 'kg' | 'l' | null)}
-                      sx={{ width: 170 }}
+                      sx={{ width: { xs: '100%', sm: 170 }, order: { xs: 5, sm: 0 } }}
                     >
                       <MenuItem value="">— (nada)</MenuItem>
                       <MenuItem value="kg">kg (ej: gramos)</MenuItem>
@@ -127,10 +129,12 @@ function Seccion({
 /** Renombrar y borrar unidades y rubros. Sólo se borra lo que ningún artículo usa. */
 export default function CatalogoAdminDialog({ open, unidades, rubros, onClose, onRenombrar, onBorrar, onFijarSubunidad }: Props) {
   const [aBorrar, setABorrar] = useState<{ tipo: Tipo; fila: OpcionCatalogo } | null>(null)
+  // En el celular un diálogo chico queda apretado y con el teclado tapa todo: pantalla completa.
+  const pantallaCompleta = useMediaQuery(useTheme().breakpoints.down('sm'))
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={pantallaCompleta}>
         <DialogTitle fontWeight={700}>Unidades y rubros</DialogTitle>
         <DialogContent>
           <Seccion titulo="Unidades" tipo="unidades" opciones={unidades} onRenombrar={onRenombrar} onFijarSubunidad={onFijarSubunidad} onPedirBorrar={(tipo, fila) => setABorrar({ tipo, fila })} />
