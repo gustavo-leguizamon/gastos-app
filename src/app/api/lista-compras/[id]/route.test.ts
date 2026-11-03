@@ -4,6 +4,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     listaCompraItem: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
     articulo: { update: vi.fn() },
+    listaCompraCompra: { count: vi.fn() },
     unidad: { findUnique: vi.fn() },
     rubro: { findUnique: vi.fn() },
   },
@@ -27,6 +28,7 @@ beforeEach(() => {
   mp.listaCompraItem.update.mockResolvedValue(fila)
   mp.listaCompraItem.findMany.mockResolvedValue([])
   mp.unidad.findUnique.mockResolvedValue({ id: 3 })
+  mp.listaCompraCompra.count.mockResolvedValue(0)
   mp.rubro.findUnique.mockResolvedValue({ id: 5 })
 })
 
@@ -62,6 +64,30 @@ describe('PUT /api/lista-compras/[id]', () => {
   it('el atajo comprado:false deja la cantidad llevada en 0', async () => {
     await PUT(req({ comprado: false }), ctx('1'))
     expect(mp.listaCompraItem.update.mock.calls[0][0].data).toEqual({ cantidadComprada: 0 })
+  })
+
+  describe('con compras registradas', () => {
+    beforeEach(() => mp.listaCompraCompra.count.mockResolvedValue(2))
+
+    it.each([
+      [{ cantidad_comprada: 3 }],
+      [{ comprado: true }],
+      [{ precio_unitario: 500 }],
+    ])('409 si se edita a mano lo que sale de las compras: %j', async (body) => {
+      const res = await PUT(req(body), ctx('1'))
+      expect(res.status).toBe(409)
+      expect(mp.listaCompraItem.update).not.toHaveBeenCalled()
+    })
+
+    it('lo que no sale de las compras (cantidad pedida, rubro) se sigue pudiendo editar', async () => {
+      expect((await PUT(req({ cantidad: 6 }), ctx('1'))).status).toBe(200)
+      expect(mp.listaCompraItem.update.mock.calls[0][0].data).toEqual({ cantidad: 6 })
+    })
+  })
+
+  it('sin compras no consulta el conteo si el cambio no toca lo llevado ni el precio', async () => {
+    await PUT(req({ cantidad: 6 }), ctx('1'))
+    expect(mp.listaCompraCompra.count).not.toHaveBeenCalled()
   })
 
   it('400 con una cantidad_comprada negativa', async () => {

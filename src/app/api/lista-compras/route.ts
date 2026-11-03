@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { antesDe, INCLUDE_ARTICULO, resolveArticulo } from '@/lib/lista-compras-db'
+import { antesDe, INCLUDE_ITEM, resolveArticulo } from '@/lib/lista-compras-db'
 import { parseItemBody, referenciaDe, toItemResponse, totalesLista } from '@/lib/lista-compras-compute'
 
 /** Lista del mes con, por línea, el último precio al que se compró el artículo antes de este mes. */
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const filas = await prisma.listaCompraItem.findMany({
     where: { mes, anio },
-    include: INCLUDE_ARTICULO,
+    include: INCLUDE_ITEM,
     orderBy: { articulo: { nombre: 'asc' } },
   })
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       cantidad: data.cantidad,
       precioUnitario: data.precioUnitario,
     },
-    include: INCLUDE_ARTICULO,
+    include: INCLUDE_ITEM,
   })
   return NextResponse.json(toItemResponse(fila, null), { status: 201 })
 }

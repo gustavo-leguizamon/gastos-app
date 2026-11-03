@@ -115,11 +115,33 @@ sola query** de histórico para todos los artículos de la lista.
   prefillea unidad/rubro. Unidad (default `un`) y rubro se eligen con `CatalogoSelect`: lista
   de las existentes y, si lo tipeado no existe, la opción **"Agregar «…»"** que lo crea y lo
   selecciona (no admite texto libre). El rubro es opcional. 409 si el artículo ya está en el mes.
+  **El alta no pide precio**: el precio del artículo sale de las compras registradas (es su promedio
+  ponderado) y el diálogo de compra ya ofrece como punto de partida el último precio conocido
+  (promedio actual o la referencia del mes anterior). La API de alta (`POST /api/lista-compras`)
+  sigue aceptando `precio_unitario` opcional, pero la pantalla no lo envía.
 - **Administrar unidades y rubros** (botón junto a "Agregar artículo", `CatalogoAdminDialog`):
   lista cada unidad/rubro con cuántos artículos la usan; **renombrar** inline (Enter guarda,
   Esc cancela; si el nombre está repetido avisa y queda en edición) y **borrar** con
   confirmación — el botón está deshabilitado mientras esté en uso. Al abrirlo se recargan los
   conteos. Si lo borrado estaba elegido en el formulario de alta, se limpia.
+- **Buscador** arriba de la lista ("Buscar artículo o rubro"; Esc o la X lo limpian). Filtra mientras se
+  escribe con `coincideBusqueda`: ignora mayúsculas y acentos (`normalizarBusqueda`) y **todas las
+  palabras** tienen que aparecer, en cualquier orden y aunque sean parte de una palabra, en el nombre
+  **o en el rubro** ("yer" → Yerba mate; "alm yer" → Yerba del rubro Almacén). Se ocultan los rubros
+  sin coincidencias, los que tienen alguna se muestran **desplegados aunque estén plegados** (con
+  el encabezado sin interacción mientras se busca, y "N de M" además del resumen), y se oculta
+  "Colapsar todos". Debajo se ve "N de M artículos" o "Ningún artículo coincide con «x»". Los
+  totales de arriba (estimado, gastado, comprados) **no se filtran**: son los del mes. Lo escrito no se
+  recuerda al recargar.
+- **Rubros plegables**: el encabezado de cada rubro se toca para plegarlo/desplegarlo. Plegado sigue
+  mostrando "x/y comprados · $estimado del rubro" (`totalesLista` sobre las líneas del grupo), así no
+  hace falta abrirlo para saber cómo viene. Si hay más de un rubro aparece **Colapsar todos / Expandir
+  todos**. Qué rubros están plegados se **recuerda en el navegador** (`localStorage`,
+  `lista-compras:rubros-colapsados`, por nombre de rubro; `parseColapsados` tolera cualquier valor roto):
+  es una comodidad por usuario, no un dato de la lista. Se lee en un efecto al montar (no en el estado
+  inicial, que desajustaría el HTML del server), y no se escribe hasta haber leído para no pisar lo
+  guardado con el estado vacío del primer render. Agregar un artículo a un rubro plegado lo
+  **despliega**, para que no parezca que no se agregó.
 - **Lista agrupada por rubro** ("Sin rubro" al final). Cada fila: checkbox *comprado* (tildar = llevo todo lo pedido, destildar = nada; queda en estado
   indeterminado si hay compra parcial), barra de progreso con "Faltan X u" cuando está en curso,
   campo de **precio por kg/litro** cuando la unidad es g/ml (con "= $X por g" y la referencia también por kg/l),
@@ -130,3 +152,77 @@ sola query** de histórico para todos los artículos de la lista.
   del precio es el de referencia) y total de la línea.
 - **Copiar del mes anterior**: trae artículos y cantidades del último mes con lista; **no copia
   precios** (quedan vacíos, la referencia los muestra) ni lo llevado (arrancan en 0), y no pisa lo ya cargado.
+
+## Compras registradas y precio promedio
+
+Cuando un artículo se compra en varias veces y a precios distintos, en vez de pisar un único
+precio se **registra cada compra** (cantidad, precio y fecha) y el precio de la línea pasa a ser
+el **promedio ponderado por cantidad**.
+
+- **Modelo** `ListaCompraCompra` (`itemId`, `cantidad > 0`, `precioUnitario?`, `fecha` `YYYY-MM-DD`;
+  cascade desde la línea). Migración `20261103180000_lista_compras_compras/` (tabla nueva y vacía:
+  no migra datos). `precioUnitario` null = no se anotó el precio de esa compra.
+- **Promedio ponderado, no simple** (`resumenCompras`): 2 kg a $1.000 + 3 kg a $1.100 → $1.060 (el
+  simple daría $1.050). Es lo correcto porque `cantidad × promedio` **coincide con lo realmente
+  pagado**, así que `gastado` no se desvía; con promedio simple pesaría igual una compra de 1 u
+  que una de 9. Las compras sin precio suman cantidad pero no entran al promedio.
+- **Se guarda denormalizado en la línea**: tras cada alta/edición/baja el server recalcula
+  (`recalcularLinea`) `cantidadComprada` = suma y `precioUnitario` = promedio. Así los totales, la
+  referencia del mes siguiente, `copiar` y el catálogo siguen leyendo los mismos campos de
+  siempre y la referencia del mes siguiente **es el promedio del mes**. Si ninguna compra tiene
+  precio, el precio de la línea **no se toca** (no se borra lo cargado a mano); al borrar la última
+  compra, lo llevado vuelve a 0 y el precio **se conserva**.
+- **Líneas sin compras siguen igual**: lo llevado y el precio se cargan a mano (campo "Llevo",
+  +/−, tilde). Con **compras registradas esos campos se bloquean** (el tilde, "Llevo", los +/− y el
+  precio, que pasa a rotularse "Precio promedio") y `PUT /api/lista-compras/[id]` responde **409**
+  si se intenta editar `cantidad_comprada`, `comprado` o `precio_unitario`: se pisarían en la
+  próxima compra. "Necesito" (la cantidad pedida), rubro y unidad se siguen editando.
+- **Primera compra sobre una línea con "Llevo" cargado a mano**: ese valor (con el precio de la
+  línea) se convierte antes en una **compra inicial**; si no, registrar la primera compra pisaría
+  lo que ya se llevaba. (No es atómico: son varias escrituras seguidas; si fallara a la mitad, la
+  siguiente operación recalcula desde las compras que haya.)
+- **Fecha**: la manda el cliente (fecha local, `hoyLocal()`), nunca la UTC del server. `fechaValida`
+  rechaza fechas inexistentes (2026-02-30) y se parsea a mano, sin `Date`.
+- **Pantalla**: botón **Registrar compra** (carrito con "+" en escritorio; botón ancho en móvil) abre
+  `CompraDialog`, que ofrece lo que **falta** como cantidad y el último precio conocido (promedio
+  o, si no hay, la referencia); con unidad g/ml el precio se tipea por kg/litro. Un toggle
+  "N compras ▾" despliega el detalle (fecha, cantidad × precio, editar/borrar) y el promedio
+  ponderado. Borrar una compra pide confirmación.
+
+## Cargar el precio como total pagado
+
+En **Registrar compra** el precio se puede tipear de dos maneras
+(`CampoPrecio`, un toggle "Por kg | Total pagado"; "Unitario | Total pagado" si la unidad no es g/ml):
+
+- **Unitario**: el precio por unidad (por kg/litro si la unidad es g/ml, como en el resto).
+- **Total pagado**: lo que costó esa cantidad. El precio unitario se calcula como
+  `total ÷ cantidad` (`precioUnitarioDeEntrada`): **500 g por $2.000 → $4 por g = $4.000 por kg**;
+  250 ml por $1.500 → $6.000 por litro. Debajo del campo se ve el resultado en vivo
+  ("= $4.000 por kg · $4 por g").
+
+Se guarda **siempre el precio por la unidad de la línea** (el total se descarta: es derivable de
+`cantidad × precio`), así que nada del resto —promedio, gastado, referencia— cambia. Con unidad
+g/ml el modo arranca en **total pagado** (es lo que dice el ticket); con las demás, en unitario.
+Al cambiar de modo con un número ya tipeado, el campo se **convierte** (`entradaDePrecio`, total a
+centavos) en vez de reinterpretarlo. En modo total hace falta la cantidad: sin ella no se calcula
+(`null`, nunca `Infinity`) y se avisa. Un total de 0 es válido (precio 0).
+
+## Mobile
+
+Debajo del breakpoint `md` (900px) la página pasa a un diseño **compacto** (`useMediaQuery`); arriba
+queda el de escritorio, sin cambios. La fila vive en `FilaLista.tsx` (`FilaEscritorio` /
+`FilaCompacta`, que comparten el hook `useCamposFila` con el estado local de los campos y sus
+guardados, así que no se pueden desincronizar).
+
+- **Fila compacta** (con compras registradas se ocultan los −/+ y "Llevo" queda de sólo lectura): apilada a ancho completo, con áreas de toque de 40px (tilde, borrar, +/−) y
+  campos de 56px. **Lo llevado** tiene botones **−/+** (`ajustarLlevo`: paso 1, o 100 si la unidad
+  es g/ml; nunca baja de 0; guarda al toque) además del campo editable. **Necesito** y **precio**
+  van en dos columnas y el total abajo a la derecha. **Rubro y unidad** quedan plegados detrás de
+  "Rubro · unidad ✎" (casi nunca se tocan).
+- **Resumen**: un único cuadro de tres renglones en vez de tres tarjetas.
+- **Agregar artículo** arranca **plegado** en el celular (la lista es lo que más se usa); adentro,
+  campos a ancho completo con cantidad y unidad juntas en un renglón y botón grande.
+- **Quitar de este mes pide confirmación** (en todos los tamaños): un toque accidental con el
+  pulgar no debería borrar la línea. El artículo y su historial de precios se conservan.
+- **Administrar unidades y rubros** abre a **pantalla completa** y sus filas se parten en dos
+  renglones (el selector de equivalencia pasa abajo).

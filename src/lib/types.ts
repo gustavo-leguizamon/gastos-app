@@ -615,6 +615,7 @@ export interface PlataformaDivisa {
 // ── Lista de compras ──────────────────────────────────────────────────────────
 export type {
   ItemResponse as ListaCompraItem,
+  CompraResponse as ListaCompraCompra,
   Referencia as ListaCompraReferencia,
   TotalesLista as ListaCompraTotales,
 } from './lista-compras-compute'

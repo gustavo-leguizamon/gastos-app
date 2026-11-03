@@ -585,7 +585,27 @@ model ListaCompraItem {
   updatedAt      DateTime @updatedAt
 
   articulo Articulo @relation(fields: [articuloId], references: [id], onDelete: Cascade)
+  compras  ListaCompraCompra[]
 
   @@unique([articuloId, mes, anio])
   @@index([anio, mes])
+}
+
+/// Una compra puntual de una línea de la lista (cantidad, precio y fecha). Si la línea tiene
+/// compras, su `cantidadComprada` es la suma y su `precioUnitario` el promedio ponderado por
+/// cantidad de las que tienen precio; ambos se recalculan al tocar una compra. Una línea sin
+/// compras sigue usando los valores cargados a mano.
+/// `precioUnitario` null = no se anotó el precio de esa compra (no entra al promedio).
+model ListaCompraCompra {
+  id             Int      @id @default(autoincrement())
+  itemId         Int
+  cantidad       Float
+  precioUnitario Float?
+  /// YYYY-MM-DD, fecha local del usuario (el server corre en UTC y no puede deducirla).
+  fecha          String
+  createdAt      DateTime @default(now())
+
+  item ListaCompraItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
 }
