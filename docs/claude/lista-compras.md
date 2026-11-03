@@ -230,6 +230,54 @@ Al cambiar de modo con un número ya tipeado, el campo se **convierte** (`entrad
 centavos) en vez de reinterpretarlo. En modo total hace falta la cantidad: sin ella no se calcula
 (`null`, nunca `Infinity`) y se avisa. Un total de 0 es válido (precio 0).
 
+## Cargar artículos desde una imagen (OCR)
+
+Botón **"Desde imagen"** (escritorio) / icono de cámara (celular) junto a "Unidades y rubros": abre
+`ImagenDialog` para cargar varios artículos de una vez desde la foto de una **lista escrita** o de un
+**ticket**.
+
+- **El OCR corre en el navegador** con `tesseract.js` (idioma `spa`, import dinámico: sólo se baja al usar la
+  función). La imagen **no sale del dispositivo**, no hay API key ni costo. La primera vez descarga el motor y
+  los datos del idioma desde CDN (unos MB; después quedan en el navegador). `public/sw.js` no intercepta esos
+  hosts (`cdn.jsdelivr.net`, `tessdata.projectnaptha.com`) para no duplicarlos en su caché.
+- Antes de reconocer, la imagen se reduce (lado mayor ≤ 2000 px, nunca se agranda) y pasa a escala de grises
+  con más contraste. Funciona bien con texto impreso y mal con letra a mano: por eso **siempre hay revisión**.
+- **`src/lib/lista-compras-ocr.ts`** (puro, test `lista-compras-ocr.test.ts`): `parseLineasOcr(texto, unidades)`
+  → `{ nombre, cantidad, unidad, total }[]`. Entiende `2 kg manzanas`, `2kg manzanas`, `1,5 l de aceite`,
+  `manzanas 2 kg`, `leche x2`, `1/2 kg pan`, viñetas y numeración (`- pan`, `1) yerba`) y renglones de ticket:
+  el **importe final** (`1.234,50`) es el `total` de la línea y, en un ticket, un `1L` del final es parte del
+  nombre (tamaño del producto), no la cantidad; sólo una cantidad explícita (`2 x CAFE`) o al comienzo cuenta.
+  Descarta ruido (TOTAL, SUBTOTAL, CUIT, EFECTIVO, VUELTO, fecha…), saca códigos de barras del comienzo, pasa
+  el MAYÚSCULAS del ticket a "Primera mayúscula" y **suma los repetidos** (sin distinguir mayúsculas ni
+  acentos). La unidad leída (`Kgs.`, `litros`, `gr`…) se resuelve a una unidad que **exista en la tabla**
+  (`resolverUnidad`); si no existe queda sin unidad. `precioDeTicket(total, cantidad)` = importe ÷ cantidad
+  (precio por la unidad de la línea, el que se guarda en una compra).
+- **Se mapea a tus artículos** (`src/lib/lista-compras-match.ts`, test `lista-compras-match.test.ts`):
+  `mejorCoincidencia(textoLeído, catálogo)` elige el artículo propio que mejor describe la línea leída
+  (`Afeitadora Gillette Prestoarba3 2 Unidades La` → "Afeitadora"; `MEX Anicar Blanco Ledesma… kg E` →
+  "Azúcar"). Mide qué porción de las **palabras del artículo** aparece en lo leído (el artículo propio es
+  corto y la línea trae marca, tamaño y ruido), sin acentos/mayúsculas, con prefijos (leche ~ leches) y
+  tolerancia a letras que el OCR confunde (sólo palabras de ≥ 5 letras). Mínimo 0,6; desempata por más palabras
+  coincidentes y luego nombre más corto. El texto leído se **conserva** y se muestra debajo ("Leído: …").
+- **Revisión editable:** una fila por línea con casilla, artículo (autocompletar sobre el catálogo; se puede
+  corregir o escribir uno nuevo), cantidad, unidad y rubro. Al mapear/elegir un artículo propio se **precargan
+  su unidad, rubro y la última cantidad usada** (`ArticuloCatalogo.ultima_cantidad`: cantidad de su línea más
+  reciente, `ultimosDeArticulo`; el catálogo lo expone junto a `ultimo_precio`); unidad y rubro quedan fijos
+  mientras sea un artículo propio. Lo que no coincide con nada llega **destildado** ("Sin coincidencia") y, si se
+  confirma, se crea como artículo nuevo. Dos renglones del mismo artículo se funden en una fila.
+- **Precio por fila**, igual que al registrar una compra (`CampoPrecio`): se carga como **precio unitario**
+  (por kg/litro si la unidad es g/ml) o como **total pagado** (`precioUnitarioDeEntrada`: total ÷ cantidad), con el
+  resultado en vivo debajo y conversión al cambiar de modo. Si el ticket trae el importe de la línea llega
+  precargado como "total pagado"; si no, queda vacío y se tipea a mano (opcional: sin precio la compra suma
+  cantidad pero no entra al promedio). La fecha es una sola para toda la imagen.
+- **Qué hace cada fila** (chip de estado): si el artículo **ya está en la lista del mes** se registra una
+  **compra** (cantidad, precio y fecha de arriba); si no, se da de **alta** con la última cantidad y, **si tiene
+  precio, se registra además la compra** (misma cantidad). `fechaDeTicket(texto, hoy)` toma la primera fecha real
+  y no futura del ticket (`dd/mm/aaaa`, `dd-mm-aa`, `dd.mm.aaaa`), con hoy como fallback; es editable en el diálogo.
+- El diálogo entrega « altas » y « compras » (`ImportItem`) a `importarDeImagen` de la página: `agregar(input, false)` y
+  `guardarCompra(..., false)` no recargan en cada uno; se recarga una sola vez al final. `agregar` ahora devuelve la línea creada (o
+  `null`), no un boolean. No hay endpoint nuevo ni migración.
+
 ## Mobile
 
 Debajo del breakpoint `md` (900px) la página pasa a un diseño **compacto** (`useMediaQuery`); arriba

@@ -238,6 +238,19 @@ export function entradaDePrecio(
   return cantidad != null && cantidad > 0 ? Math.round(precioUnitario * cantidad * 100) / 100 : null
 }
 
+/**
+ * Lo último que se usó de un artículo, para precargar el alta: la cantidad de su línea más reciente y
+ * el último precio que tuvo (que puede ser de una línea anterior). `lineas` de la más nueva a la más vieja.
+ */
+export function ultimosDeArticulo(
+  lineas: Array<{ cantidad: number; precioUnitario: number | null }>,
+): { cantidad: number | null; precio: number | null } {
+  return {
+    cantidad: lineas[0]?.cantidad ?? null,
+    precio: lineas.find((l) => l.precioUnitario != null)?.precioUnitario ?? null,
+  }
+}
+
 /** Minúsculas, sin acentos y con espacios colapsados, para comparar: "Café" encuentra "cafe". */
 export function normalizarBusqueda(s: string): string {
   return s
