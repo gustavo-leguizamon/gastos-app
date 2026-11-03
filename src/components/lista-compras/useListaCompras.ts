@@ -40,7 +40,7 @@ export interface CambioItem {
   rubro_id?: number | null
 }
 
-const TOTALES_VACIOS: ListaCompraTotales = { items: 0, comprados: 0, parciales: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 }
+const TOTALES_VACIOS: ListaCompraTotales = { items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 }
 
 /** Estado + ABM de la lista de compras de un mes y del catálogo para autocompletar. */
 export function useListaCompras(mes: number, anio: number) {

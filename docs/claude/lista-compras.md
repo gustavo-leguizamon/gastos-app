@@ -189,6 +189,29 @@ el **promedio ponderado por cantidad**.
   "N compras ▾" despliega el detalle (fecha, cantidad × precio, editar/borrar) y el promedio
   ponderado. Borrar una compra pide confirmación.
 
+## Alertas de cantidad (lo llevado vs. lo pedido)
+
+Cada línea se compara con su **cantidad pedida** ("Necesito", el límite previsto) y se resalta
+**cualquier diferencia** (`estadoCantidad`, con tolerancia sólo para el error de float):
+
+| Estado (`estado_cantidad`) | Cuándo | Cómo se ve |
+|---|---|---|
+| `sin_compras` | no se llevó nada | sin resalte: está **pendiente**, no es una alerta |
+| `por_debajo` | algo llevado, menos de lo pedido | borde y fondo **naranjas**, barra naranja y "Faltan X u" |
+| `completo` | justo lo pedido | barra verde "Completo" y la fila atenuada y tachada |
+| `por_encima` | se llevó **más** de lo pedido | borde y fondo **rojos**, barra roja y "⚠ Pasaste por X u" |
+
+- La API agrega a cada línea `estado_cantidad` y `exceso` (cuánto se pasó; `faltante` ya existía).
+  `comprado` sigue siendo "llevado ≥ pedido", así que incluye a los pasados.
+- **Sólo lo justo se atenúa/tacha**: lo que se pasó o falta tiene que seguir llamando la atención.
+- Con **compras parciales**, "por debajo" es el estado normal mientras se va comprando; se resalta igual
+  porque se pidió ver cualquier diferencia, y al llegar a la cantidad pedida pasa a "completo".
+- Las alertas **no se esconden al plegar un rubro**: el encabezado muestra "⚠ N de más" (rojo) y
+  "N por debajo" (naranja). El resumen de arriba suma "⚠ N de más" en *Comprados* (`totalesLista` devuelve
+  `excedidos`, líneas con más de lo pedido, además de `parciales`).
+- No se compara el **precio** con la referencia como alerta (eso sigue siendo el ▲/▼ chico de "Última vez");
+  la alerta es sólo por cantidades.
+
 ## Cargar el precio como total pagado
 
 En **Registrar compra** el precio se puede tipear de dos maneras
@@ -220,8 +243,15 @@ guardados, así que no se pueden desincronizar).
   van en dos columnas y el total abajo a la derecha. **Rubro y unidad** quedan plegados detrás de
   "Rubro · unidad ✎" (casi nunca se tocan).
 - **Resumen**: un único cuadro de tres renglones en vez de tres tarjetas.
-- **Agregar artículo** arranca **plegado** en el celular (la lista es lo que más se usa); adentro,
-  campos a ancho completo con cantidad y unidad juntas en un renglón y botón grande.
+- **Agregar artículo** en el celular **no es un formulario en la página sino un diálogo a pantalla
+  completa**, que se abre con el botón de la tarjeta de arriba o con un **botón flotante "+" fijo** abajo a la
+  derecha (`Fab`, respeta el área segura del teléfono). El flotante resuelve el caso de estar al final de
+  una lista larga: se agrega sin subir hasta el principio y sin perder el lugar en la lista. Adentro, campos a
+  ancho completo con cantidad y unidad juntas en un renglón y botón grande. **El diálogo queda abierto** al agregar
+  (avisa "Agregado: X", limpia el nombre y devuelve el foco para cargar el siguiente); "Listo" o la X lo
+  cierran. Al abrirlo el foco va al nombre. La página deja margen abajo para que el flotante no tape los
+  botones de la última fila. En escritorio el formulario sigue inline en la tarjeta (es el mismo
+  `formularioAlta`, montado en un lugar u otro según el tamaño, con el estado en la página).
 - **Quitar de este mes pide confirmación** (en todos los tamaños): un toque accidental con el
   pulgar no debería borrar la línea. El artículo y su historial de precios se conservan.
 - **Administrar unidades y rubros** abre a **pantalla completa** y sus filas se parten en dos
