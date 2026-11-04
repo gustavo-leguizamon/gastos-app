@@ -540,6 +540,11 @@ export interface Promocion {
   lugar: string
   concepto_ids: number[]
   concepto_nombres: string[]
+  /** Categorías y etiquetas vinculadas: igual que los conceptos, sólo sugieren (OR entre todos). */
+  categoria_ids: number[]
+  categoria_nombres: string[]
+  etiqueta_ids: number[]
+  etiqueta_nombres: string[]
   porcentaje: number
   tope_mensual: number
   /** 0 = lunes … 6 = domingo. */

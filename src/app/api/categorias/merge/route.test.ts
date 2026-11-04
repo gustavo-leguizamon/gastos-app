@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({
     categoria: { findUnique: vi.fn(), delete: vi.fn() },
     gasto: { updateMany: vi.fn() },
     gastoItem: { updateMany: vi.fn() },
+    promocion: { findMany: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -19,6 +20,7 @@ const req = (body: any) => ({ json: async () => body }) as any
 beforeEach(() => {
   vi.clearAllMocks()
   mp.$transaction.mockResolvedValue([{ count: 4 }, { count: 2 }, {}])
+  mp.promocion.findMany.mockResolvedValue([])
 })
 
 describe('POST /api/categorias/merge', () => {
@@ -41,6 +43,16 @@ describe('POST /api/categorias/merge', () => {
     await POST(req({ source_id: 1, target_id: 2 }))
     expect(mp.$transaction).toHaveBeenCalledTimes(1)
     expect(mp.$transaction.mock.calls[0][0]).toHaveLength(3)
+  })
+
+  it('conecta el destino a las promos que tenían vinculado el origen, en la misma transacción', async () => {
+    mp.categoria.findUnique.mockResolvedValue({ id: 1 })
+    mp.promocion.findMany.mockResolvedValue([{ id: 30 }, { id: 31 }])
+    await POST(req({ source_id: 1, target_id: 2 }))
+    expect(mp.promocion.findMany).toHaveBeenCalledWith({ where: { categorias: { some: { id: 1 } } }, select: { id: true } })
+    expect(mp.promocion.update).toHaveBeenCalledWith({ where: { id: 30 }, data: { categorias: { connect: { id: 2 } } } })
+    expect(mp.promocion.update).toHaveBeenCalledWith({ where: { id: 31 }, data: { categorias: { connect: { id: 2 } } } })
+    expect(mp.$transaction.mock.calls[0][0]).toHaveLength(5)
   })
 
   it('devuelve 400 con body inválido, sin tocar la DB', async () => {

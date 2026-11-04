@@ -65,6 +65,8 @@ export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, 
   const [verUsos, setVerUsos] = useState(false)
   const p = promo.progreso
   const completa = p.estado === 'tope_alcanzado'
+  // Con algún criterio vinculado la promo se sugiere al cargar gastos y lista candidatos.
+  const vinculada = promo.concepto_ids.length + promo.categoria_ids.length + promo.etiqueta_ids.length > 0
 
   return (
     <Card variant="outlined" sx={{ opacity: promo.activa && promo.vigente ? 1 : 0.55 }}>
@@ -157,15 +159,16 @@ export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, 
             : <>Te faltan gastar <b>{fmtARS(p.gasto_restante)}</b> para el reintegro máximo.</>}
         </Typography>
 
-        {promo.concepto_ids.length === 0 && (
+        {!vinculada && (
           <Typography variant="caption" color="text.secondary">
-            Sin conceptos vinculados: no se sugiere al cargar gastos. Sólo suma lo que registres a mano.
+            Sin conceptos, categorías ni etiquetas vinculados: no se sugiere al cargar gastos. Sólo suma lo que
+            registres a mano.
           </Typography>
         )}
         {promo.notas && <Typography variant="caption" color="text.secondary">{promo.notas}</Typography>}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {promo.concepto_ids.length > 0 && (
+          {vinculada && (
             <Button size="small" startIcon={<LinkIcon />} onClick={onAsociar}>Gastos que cuentan</Button>
           )}
           <Button size="small" startIcon={<AddIcon />} onClick={onUso}>Registrar uso</Button>

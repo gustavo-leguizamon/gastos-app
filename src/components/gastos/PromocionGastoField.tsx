@@ -15,6 +15,9 @@ interface Sugerida {
 
 interface Props {
   descripcion: string
+  /** Categoría y etiquetas del gasto: también disparan la sugerencia si la promo las tiene vinculadas. */
+  categoriaId: number | null
+  etiquetaIds: number[]
   tipoPago: 'C' | 'D'
   tarjetaId: number | null
   mes: number
@@ -24,7 +27,7 @@ interface Props {
   value: number | null
   onChange: (v: number | null) => void
   /**
-   * Alta: si hay una promo que coincide (concepto + medio de pago + vigente en el mes) y le
+   * Alta: si hay una promo que coincide (concepto/categoría/etiqueta + medio de pago + vigente en el mes) y le
    * queda tope, queda **elegida de entrada**. Editando no se toca nada solo.
    */
   autoSeleccionar: boolean
@@ -35,15 +38,18 @@ const fmtARS = (n: number) =>
 
 /**
  * Selector de la promoción a la que cuenta el gasto. El gasto no guarda fecha de compra, así
- * que la asociación es **explícita**: la promo se sugiere según concepto y medio de pago (y
+ * que la asociación es **explícita**: la promo se sugiere según concepto, categoría o etiquetas y medio de pago (y
  * que esté vigente en el mes) y viene elegida en el alta, pero quien carga la puede quitar —
  * por ejemplo si la compra fue antes de que la promo empezara a mitad de mes.
  *
  * No renderiza nada si no hay promo para ofrecer, así que no ensucia el form en el caso común.
  */
 export default function PromocionGastoField({
-  descripcion, tipoPago, tarjetaId, mes, anio, esTarjeta, value, onChange, autoSeleccionar,
+  descripcion, categoriaId, etiquetaIds, tipoPago, tarjetaId, mes, anio, esTarjeta, value, onChange, autoSeleccionar,
 }: Props) {
+  // Clave estable para el efecto: el array de etiquetas cambia de identidad en cada render del form.
+  const etiquetasKey = [...etiquetaIds].sort((a, b) => a - b).join(',')
+  const hayCriterio = !!descripcion.trim() || categoriaId != null || etiquetasKey !== ''
   const [opciones, setOpciones] = useState<Sugerida[]>([])
   // Si el usuario ya decidió (aunque sea "sin promoción"), la sugerencia no le pisa la elección.
   const tocada = useRef(false)
@@ -54,8 +60,8 @@ export default function PromocionGastoField({
   onChangeRef.current = onChange
 
   useEffect(() => {
-    if (!descripcion.trim()) tocada.current = false
-  }, [descripcion])
+    if (!hayCriterio) tocada.current = false
+  }, [hayCriterio])
 
   useEffect(() => {
     if (esTarjeta) {
@@ -63,7 +69,7 @@ export default function PromocionGastoField({
       if (valueRef.current != null) onChangeRef.current(null)
       return
     }
-    if (!descripcion.trim() && valueRef.current == null) {
+    if (!hayCriterio && valueRef.current == null) {
       setOpciones([])
       return
     }
@@ -75,6 +81,8 @@ export default function PromocionGastoField({
       const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const qs = new URLSearchParams({ descripcion, tipo_pago: tipoPago, mes: String(mes), anio: String(anio), fecha })
       if (tarjetaId) qs.set('tarjeta_id', String(tarjetaId))
+      if (categoriaId != null) qs.set('categoria_id', String(categoriaId))
+      if (etiquetasKey) qs.set('etiqueta_ids', etiquetasKey)
       if (valueRef.current != null) qs.set('promocion_id', String(valueRef.current))
       try {
         const r = await fetch(`/api/promociones/sugeridas?${qs}`, { cache: 'no-store' })
@@ -95,7 +103,7 @@ export default function PromocionGastoField({
       cancelado = true
       clearTimeout(t)
     }
-  }, [descripcion, tipoPago, tarjetaId, mes, anio, esTarjeta, autoSeleccionar])
+  }, [descripcion, categoriaId, etiquetasKey, hayCriterio, tipoPago, tarjetaId, mes, anio, esTarjeta, autoSeleccionar])
 
   const options = useMemo(
     () =>

@@ -708,6 +708,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
 
         <PromocionGastoField
           descripcion={descripcion ?? ''}
+          categoriaId={categoriaId ?? null}
+          etiquetaIds={etiquetaIds ?? []}
           tipoPago={tipoPago}
           tarjetaId={tarjetaId ?? null}
           mes={mesGasto}
