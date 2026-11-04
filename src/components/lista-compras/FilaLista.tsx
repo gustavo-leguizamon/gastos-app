@@ -21,7 +21,7 @@ import TextField from '@/components/shared/AppTextField'
 import { ajustarLlevo, aPrecioBase, desdePrecioBase, variacionPrecio } from '@/lib/lista-compras-compute'
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 import CatalogoSelect from './CatalogoSelect'
-import { fmtARS, parseNum } from './formato'
+import { fmtARS, parseNum, precioCampo } from './formato'
 import type { CambioItem, OpcionCatalogo } from './useListaCompras'
 
 interface Props {
@@ -44,7 +44,7 @@ interface Props {
 function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
   // Con unidad g/ml el precio se carga y se ve por kg/litro; se guarda siempre por la unidad de la línea.
   const base = item.subunidad_de
-  const verPrecio = (p: number | null) => (p == null ? '' : String(aPrecioBase(p, base)))
+  const verPrecio = (p: number | null) => (p == null ? '' : precioCampo(aPrecioBase(p, base)))
   const [cantidad, setCantidad] = useState(String(item.cantidad))
   const [precio, setPrecio] = useState(verPrecio(item.precio_unitario))
   const [llevo, setLlevo] = useState(String(item.cantidad_comprada))
@@ -84,6 +84,8 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
   }
 
   const guardarPrecio = () => {
+    // Lo que se ve está redondeado a centavos: salir del campo sin tocarlo no pisa el guardado.
+    if (precio === verPrecio(item.precio_unitario)) return
     const n = parseNum(precio)
     if (n !== null && (!Number.isFinite(n) || n < 0)) {
       toast.error('El precio no es válido')
@@ -106,13 +108,63 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
     progreso: Math.min(100, (item.cantidad_comprada / item.cantidad) * 100),
     ref,
     variacion: variacionPrecio(item.precio_unitario, ref?.precio_unitario ?? null),
-    placeholderPrecio: ref ? String(aPrecioBase(ref.precio_unitario, base)) : '',
+    placeholderPrecio: ref ? precioCampo(aPrecioBase(ref.precio_unitario, base)) : '',
     labelPrecio: tiene ? (base ? `Precio promedio por ${base}` : 'Precio promedio') : base ? `Precio por ${base}` : 'Precio unitario',
   }
 }
 
 const alEnter = (e: React.KeyboardEvent) => {
   if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+}
+
+/**
+ * Nombre del artículo con edición en línea: el lápiz lo convierte en campo; Enter o salir del
+ * campo guarda, Esc cancela. Renombra el artículo, así que el cambio se ve en todos los meses.
+ */
+function NombreArticulo({ item, onCambiar, variant }: { item: ListaCompraItem; onCambiar: Props['onCambiar']; variant: 'body1' | 'body2' }) {
+  const [editando, setEditando] = useState(false)
+  const [nombre, setNombre] = useState(item.nombre)
+  const tachado = item.estado_cantidad === 'completo' ? 'line-through' : 'none'
+
+  const abrir = () => { setNombre(item.nombre); setEditando(true) }
+  const guardar = () => {
+    setEditando(false)
+    const n = nombre.trim().replace(/\s+/g, ' ')
+    if (!n) { toast.error('El nombre no puede quedar vacío'); return }
+    if (n !== item.nombre) onCambiar(item.id, { nombre: n })
+  }
+
+  if (editando) {
+    return (
+      <TextField
+        size="small"
+        autoFocus
+        fullWidth
+        label="Nombre del artículo"
+        helperText="Se cambia en todos los meses"
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        onBlur={guardar}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          if (e.key === 'Escape') { setNombre(item.nombre); setEditando(false) }
+        }}
+        sx={{ my: 0.5 }}
+      />
+    )
+  }
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+      <Typography variant={variant} fontWeight={600} sx={{ textDecoration: tachado, wordBreak: 'break-word' }}>
+        {item.nombre}
+      </Typography>
+      <Tooltip title="Renombrar artículo">
+        <IconButton size="small" onClick={abrir} aria-label={`Renombrar ${item.nombre}`} sx={{ p: 0.5 }}>
+          <EditIcon sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  )
 }
 
 /** Barra de progreso + "Faltan X u" cuando la compra está en curso o completa. */
@@ -247,9 +299,7 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         inputProps={{ 'aria-label': `Comprado: ${item.nombre}` }}
       />
       <Box sx={{ flex: '1 1 160px', minWidth: 140 }}>
-        <Typography variant="body2" fontWeight={600} sx={{ textDecoration: item.estado_cantidad === 'completo' ? 'line-through' : 'none' }}>
-          {item.nombre}
-        </Typography>
+        <NombreArticulo item={item} onCambiar={onCambiar} variant="body2" />
         <Progreso item={item} progreso={c.progreso} />
         <Referencia item={item} c={c} />
         <ToggleCompras n={item.compras.length} abierto={verCompras} onClick={() => setVerCompras((v) => !v)} />
@@ -358,9 +408,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           sx={{ mt: -0.5, ml: -1 }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body1" fontWeight={600} sx={{ textDecoration: item.estado_cantidad === 'completo' ? 'line-through' : 'none', wordBreak: 'break-word' }}>
-            {item.nombre}
-          </Typography>
+          <NombreArticulo item={item} onCambiar={onCambiar} variant="body1" />
           <ButtonBase
             onClick={() => setEditandoArticulo((v) => !v)}
             aria-label="Cambiar rubro y unidad"

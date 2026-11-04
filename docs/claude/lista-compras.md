@@ -124,6 +124,14 @@ sola query** de histórico para todos los artículos de la lista.
   Esc cancela; si el nombre está repetido avisa y queda en edición) y **borrar** con
   confirmación — el botón está deshabilitado mientras esté en uso. Al abrirlo se recargan los
   conteos. Si lo borrado estaba elegido en el formulario de alta, se limpia.
+- **Renombrar un artículo**: el lápiz junto al nombre de cada fila (escritorio y celular,
+  componente `NombreArticulo` de `FilaLista`) lo vuelve un campo; Enter o salir del campo guarda,
+  Esc cancela. Manda `{ nombre }` al `PUT /api/lista-compras/[id]`, que renombra el **artículo**
+  (se ve en todos los meses y en el catálogo del alta) y conserva su historial de precios. El
+  nombre se normaliza (`parseItemPatch`: trim + colapso de espacios; vacío = 400) y responde
+  **409** si **otro** artículo ya tiene ese nombre sin distinguir mayúsculas (no se fusionan: se
+  mezclarían los históricos); el propio se excluye, así que corregir mayúsculas vale. Se permite
+  aunque la línea tenga compras registradas. El error del server se muestra en un toast.
 - **Buscador** arriba de la lista ("Buscar artículo o rubro"; Esc o la X lo limpian). Filtra mientras se
   escribe con `coincideBusqueda`: ignora mayúsculas y acentos (`normalizarBusqueda`) y **todas las
   palabras** tienen que aparecer, en cualquier orden y aunque sean parte de una palabra, en el nombre
@@ -165,7 +173,11 @@ el **promedio ponderado por cantidad**.
 - **Promedio ponderado, no simple** (`resumenCompras`): 2 kg a $1.000 + 3 kg a $1.100 → $1.060 (el
   simple daría $1.050). Es lo correcto porque `cantidad × promedio` **coincide con lo realmente
   pagado**, así que `gastado` no se desvía; con promedio simple pesaría igual una compra de 1 u
-  que una de 9. Las compras sin precio suman cantidad pero no entran al promedio.
+  que una de 9. Las compras sin precio **o con precio 0** suman cantidad pero no entran al promedio (un 0 hundiría la referencia del mes siguiente); si todas están en 0 o sin precio, la línea conserva el suyo.
+  El promedio se guarda **sin redondear** (para que los totales cierren), pero en los campos de
+  precio de la fila y en el precargado del diálogo de compra se muestra **a centavos**
+  (`precioCampo` en `formato.ts`: 5190.178571 → 5190.18). Salir del campo de precio sin tocarlo
+  no guarda el valor redondeado.
 - **Se guarda denormalizado en la línea**: tras cada alta/edición/baja el server recalcula
   (`recalcularLinea`) `cantidadComprada` = suma y `precioUnitario` = promedio. Así los totales, la
   referencia del mes siguiente, `copiar` y el catálogo siguen leyendo los mismos campos de

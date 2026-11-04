@@ -14,7 +14,7 @@ import AppDateField from '@/components/shared/AppDateField'
 import { entradaDePrecio, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 import CampoPrecio from './CampoPrecio'
-import { fmtARS, hoyLocal, parseNum } from './formato'
+import { fmtARS, hoyLocal, parseNum, precioCampo } from './formato'
 import type { CompraInput } from './useListaCompras'
 
 interface Props {
@@ -50,7 +50,7 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
     const entrada = precioInicial == null ? null : entradaDePrecio(modoInicial, precioInicial, cant, base)
     setModo(modoInicial)
     setCantidad(String(cant))
-    setPrecio(entrada == null ? '' : String(entrada))
+    setPrecio(entrada == null ? '' : precioCampo(entrada))
     setFecha(compra ? compra.fecha : hoyLocal())
     // Sólo al abrir o cambiar de línea/compra: si la lista se recarga con el diálogo abierto, no pisa lo tipeado.
   }, [open, item?.id, compra?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +64,7 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
     if (p != null && Number.isFinite(p) && p >= 0) {
       const unitario = precioUnitarioDeEntrada(modo, p, c != null && Number.isFinite(c) ? c : null, base)
       const entrada = unitario == null ? null : entradaDePrecio(nuevo, unitario, c != null && Number.isFinite(c) ? c : null, base)
-      if (entrada != null) setPrecio(String(entrada))
+      if (entrada != null) setPrecio(precioCampo(entrada))
     }
     setModo(nuevo)
   }

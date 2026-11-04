@@ -85,6 +85,12 @@ describe('parseItemPatch', () => {
     expect(parseItemPatch({ rubro_id: null })).toEqual({ rubroId: null })
   })
 
+  it('nombre se normaliza; vacío o no-string es inválido', () => {
+    expect(parseItemPatch({ nombre: '  Leche   descremada ' })).toEqual({ nombre: 'Leche descremada' })
+    expect(parseItemPatch({ nombre: '   ' })).toBeNull()
+    expect(parseItemPatch({ nombre: 3 })).toBeNull()
+  })
+
   it.each([[{}], [{ cantidad: 0 }], [{ comprado: 'si' }], [{ unidad_id: null }], [{ unidad_id: 'kg' }], [{ rubro_id: 'x' }], [{ rubro_id: 0 }], [{ precio_unitario: -1 }], [null]])(
     'rechaza %j',
     (body) => expect(parseItemPatch(body)).toBeNull(),
@@ -258,8 +264,14 @@ describe('resumenCompras (promedio ponderado)', () => {
     expect(resumenCompras([])).toEqual({ cantidadComprada: 0, precioPromedio: null })
   })
 
-  it('un precio en 0 cuenta (regalo/promo): baja el promedio', () => {
-    expect(resumenCompras([{ cantidad: 1, precioUnitario: 0 }, { cantidad: 1, precioUnitario: 100 }]).precioPromedio).toBe(50)
+  it('una compra con precio 0 suma cantidad pero no entra al promedio', () => {
+    const r = resumenCompras([{ cantidad: 1, precioUnitario: 0 }, { cantidad: 3, precioUnitario: 100 }])
+    expect(r.cantidadComprada).toBe(4)
+    expect(r.precioPromedio).toBe(100)
+  })
+
+  it('si todas las compras están en 0, no hay promedio (la línea conserva su precio)', () => {
+    expect(resumenCompras([{ cantidad: 2, precioUnitario: 0 }]).precioPromedio).toBeNull()
   })
 
   it('no arrastra ruido de float en lo llevado', () => {

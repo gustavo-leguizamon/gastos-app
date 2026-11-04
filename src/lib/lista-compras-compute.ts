@@ -90,7 +90,8 @@ export function toCompraResponse(row: any): CompraResponse {
  * `precioPromedio` = promedio **ponderado por cantidad** de las que tienen precio (null si
  * ninguna). Es ponderado, no simple: 2 kg a $1.000 y 3 kg a $1.100 salen $1.060, y
  * `cantidad × promedio` coincide con lo realmente pagado, así que `gastado` no se desvía.
- * Las compras sin precio suman cantidad pero no entran al promedio.
+ * Las compras sin precio **o con precio 0** suman cantidad pero no entran al promedio: un 0
+ * (regalo, promo, precio no anotado) hundiría el precio de referencia del mes siguiente.
  */
 export function resumenCompras(
   compras: { cantidad: number; precioUnitario: number | null }[],
@@ -100,7 +101,7 @@ export function resumenCompras(
   let importe = 0
   for (const c of compras) {
     total += c.cantidad
-    if (c.precioUnitario != null) {
+    if (c.precioUnitario != null && c.precioUnitario > 0) {
       conPrecio += c.cantidad
       importe += c.cantidad * c.precioUnitario
     }
@@ -121,6 +122,8 @@ export interface ItemPatch {
   unidadId?: number
   /** null = quitar el rubro. */
   rubroId?: number | null
+  /** Nuevo nombre del artículo (normalizado; vale para todos los meses). */
+  nombre?: string
 }
 
 /**
@@ -159,6 +162,12 @@ export function parseItemPatch(body: any): ItemPatch | null {
     const r = body.rubro_id === null ? null : parseId(body.rubro_id)
     if (r === undefined) return null
     patch.rubroId = r
+  }
+  if ('nombre' in body) {
+    if (typeof body.nombre !== 'string') return null
+    const n = normalizeNombre(body.nombre)
+    if (!n) return null
+    patch.nombre = n
   }
   return Object.keys(patch).length ? patch : null
 }

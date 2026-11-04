@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db', () => ({
   prisma: {
     listaCompraItem: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
-    articulo: { update: vi.fn() },
+    articulo: { update: vi.fn(), findFirst: vi.fn() },
     listaCompraCompra: { count: vi.fn() },
     unidad: { findUnique: vi.fn() },
     rubro: { findUnique: vi.fn() },
@@ -30,9 +30,32 @@ beforeEach(() => {
   mp.unidad.findUnique.mockResolvedValue({ id: 3 })
   mp.listaCompraCompra.count.mockResolvedValue(0)
   mp.rubro.findUnique.mockResolvedValue({ id: 5 })
+  mp.articulo.findFirst.mockResolvedValue(null)
 })
 
 describe('PUT /api/lista-compras/[id]', () => {
+  it('renombra el artículo (normalizado), no la línea', async () => {
+    expect((await PUT(req({ nombre: '  Leche  entera ' }), ctx('1'))).status).toBe(200)
+    expect(mp.articulo.findFirst.mock.calls[0][0].where).toEqual({
+      nombre: { equals: 'Leche entera', mode: 'insensitive' }, NOT: { id: 7 },
+    })
+    expect(mp.articulo.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { nombre: 'Leche entera' } })
+    expect(mp.listaCompraItem.update.mock.calls[0][0].data).toEqual({})
+  })
+
+  it('renombrar se permite aunque la línea tenga compras', async () => {
+    mp.listaCompraCompra.count.mockResolvedValue(3)
+    expect((await PUT(req({ nombre: 'Leche entera' }), ctx('1'))).status).toBe(200)
+    expect(mp.articulo.update).toHaveBeenCalled()
+  })
+
+  it('409 si otro artículo ya tiene ese nombre, sin tocar nada', async () => {
+    mp.articulo.findFirst.mockResolvedValue({ id: 9, nombre: 'Leche' })
+    expect((await PUT(req({ nombre: 'leche' }), ctx('1'))).status).toBe(409)
+    expect(mp.articulo.update).not.toHaveBeenCalled()
+    expect(mp.listaCompraItem.update).not.toHaveBeenCalled()
+  })
+
   it('400 con id o body inválido', async () => {
     expect((await PUT(req({ comprado: true }), ctx('x'))).status).toBe(400)
     expect((await PUT(req({}), ctx('1'))).status).toBe(400)

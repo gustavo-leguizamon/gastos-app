@@ -38,6 +38,8 @@ export interface CambioItem {
   unidad_id?: number
   /** null = quitar el rubro. */
   rubro_id?: number | null
+  /** Renombra el artículo (en todos los meses). */
+  nombre?: string
 }
 
 const TOTALES_VACIOS: ListaCompraTotales = { items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 }
@@ -210,7 +212,12 @@ export function useListaCompras(mes: number, anio: number) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cambio),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        // 409 trae el motivo (nombre repetido, línea con compras): se muestra tal cual.
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Error al guardar el cambio')
+        return false
+      }
       await Promise.all([load(), loadCatalogo()])
       return true
     } catch {

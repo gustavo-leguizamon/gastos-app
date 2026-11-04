@@ -45,7 +45,7 @@ export const INCLUDE_ITEM = {
 /**
  * Recalcula lo llevado y el precio de una línea a partir de sus compras: `cantidadComprada` =
  * suma y `precioUnitario` = promedio ponderado (ver `resumenCompras`). Si ninguna compra tiene
- * precio **no toca** el precio de la línea (no borra lo cargado a mano). Se llama después de cada
+ * precio mayor a 0 **no toca** el precio de la línea (no borra lo cargado a mano). Se llama después de cada
  * alta, edición o baja de una compra.
  */
 export async function recalcularLinea(db: any, itemId: number): Promise<void> {
