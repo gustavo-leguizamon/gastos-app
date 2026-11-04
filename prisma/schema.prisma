@@ -73,6 +73,7 @@ model Categoria {
   items           GastoItem[]
   presupuestos    Presupuesto[]
   reglasEtiquetas CategoriaEtiquetaRegla[]
+  promociones     Promocion[]              @relation("PromocionCategorias")
 }
 
 /// Tope de gasto mensual de una categoría. La app mostraba montos absolutos pero nada contra
@@ -134,7 +135,8 @@ model Etiqueta {
   nombre String                   @unique
   gastos Gasto[]                  @relation("GastoEtiquetas")
   items  GastoItem[]              @relation("GastoItemEtiquetas")
-  reglas CategoriaEtiquetaRegla[]
+  reglas      CategoriaEtiquetaRegla[]
+  promociones Promocion[]              @relation("PromocionEtiquetas")
 }
 
 /// Corrección manual de qué etiquetas ofrece el form para una categoría.
@@ -463,8 +465,9 @@ model PushSubscription {
 ///
 /// `dias`: 0 = lunes … 6 = domingo. `efectivo`: aplica a gastos de débito sin tarjeta.
 /// El consumo del mes sale de los gastos **asociados explícitamente** (`Gasto.promocionId`) más
-/// los `usos` manuales. `conceptoId` (opcional) sólo sirve para **sugerir** la promo al cargar
-/// un gasto de ese concepto y para listar candidatos a asociar.
+/// los `usos` manuales. Los criterios vinculados (`conceptos`, `categorias`, `etiquetas`, todos
+/// opcionales) sólo sirven para **sugerir** la promo al cargar un gasto que coincida con
+/// **cualquiera** de ellos y para listar candidatos a asociar.
 model Promocion {
   id           Int      @id @default(autoincrement())
   lugar        String
@@ -486,6 +489,8 @@ model Promocion {
   updatedAt    DateTime @updatedAt
 
   conceptos  Concepto[]           @relation("PromocionConceptos")
+  categorias Categoria[]          @relation("PromocionCategorias")
+  etiquetas  Etiqueta[]           @relation("PromocionEtiquetas")
   tarjetas   Tarjeta[]            @relation("PromocionTarjetas")
   usos       PromocionUso[]
   gastos     Gasto[]

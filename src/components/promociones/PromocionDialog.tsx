@@ -21,7 +21,8 @@ import { DIAS_CORTOS, DIAS_SEMANA } from '@/lib/promociones-compute'
 import { tarjetasVisiblesEn } from '@/lib/tarjetas-baja'
 import type { Promocion, Tarjeta } from '@/lib/types'
 
-interface Concepto { id: number; nombre: string }
+/** Concepto, categoría o etiqueta: lo único que el dialog necesita de cada uno. */
+interface Opcion { id: number; nombre: string }
 
 interface Props {
   open: boolean
@@ -52,9 +53,13 @@ const fmtARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 export default function PromocionDialog({ open, onClose, onSaved, editando, tarjetas, mes, anio }: Props) {
-  const [conceptos, setConceptos] = useState<Concepto[]>([])
+  const [conceptos, setConceptos] = useState<Opcion[]>([])
+  const [categorias, setCategorias] = useState<Opcion[]>([])
+  const [etiquetas, setEtiquetas] = useState<Opcion[]>([])
   const [lugar, setLugar] = useState('')
   const [conceptoIds, setConceptoIds] = useState<number[]>([])
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([])
+  const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
   const [porcentaje, setPorcentaje] = useState('')
   const [tope, setTope] = useState('')
   const [dias, setDias] = useState<number[]>([])
@@ -69,8 +74,12 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
   useEffect(() => {
     if (!open) return
     fetch('/api/conceptos').then(r => r.json()).then(setConceptos).catch(() => {})
+    fetch('/api/categorias').then(r => r.json()).then(setCategorias).catch(() => {})
+    fetch('/api/etiquetas').then(r => r.json()).then(setEtiquetas).catch(() => {})
     setLugar(editando?.lugar ?? '')
     setConceptoIds(editando?.concepto_ids ?? [])
+    setCategoriaIds(editando?.categoria_ids ?? [])
+    setEtiquetaIds(editando?.etiqueta_ids ?? [])
     setPorcentaje(editando ? String(editando.porcentaje) : '')
     setTope(editando ? String(editando.tope_mensual) : '')
     setDias(editando?.dias ?? [])
@@ -117,6 +126,8 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
         body: JSON.stringify({
           lugar,
           concepto_ids: conceptoIds,
+          categoria_ids: categoriaIds,
+          etiqueta_ids: etiquetaIds,
           porcentaje: pct,
           tope_mensual: topeNum,
           dias,
@@ -206,10 +217,26 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
               if (ids.length && !lugar.trim()) setLugar(conceptos.find(c => c.id === ids[0])?.nombre ?? '')
             }}
           />
+          <AppMultiSelect
+            label="Categorías vinculadas (opcional)"
+            size="small"
+            fullWidth
+            options={categorias.map(c => ({ value: c.id, label: c.nombre }))}
+            value={categoriaIds}
+            onChange={v => setCategoriaIds(v.map(Number))}
+          />
+          <AppMultiSelect
+            label="Etiquetas vinculadas (opcional)"
+            size="small"
+            fullWidth
+            options={etiquetas.map(e => ({ value: e.id, label: e.nombre }))}
+            value={etiquetaIds}
+            onChange={v => setEtiquetaIds(v.map(Number))}
+          />
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
-            Al cargar un gasto de cualquiera de esos conceptos con uno de estos medios de pago, la promo se te
-            sugiere y queda asociada. Sin vincular no se sugiere: sólo suman los gastos que asocies a mano y los
-            usos manuales.
+            Al cargar un gasto de cualquiera de esos conceptos, categorías o etiquetas con uno de estos medios de
+            pago, la promo se te sugiere y queda asociada (alcanza con que coincida uno). Sin vincular nada no se
+            sugiere: sólo suman los gastos que asocies a mano y los usos manuales.
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 2 }}>

@@ -4,7 +4,7 @@ import { validarReferenciasPromocion } from '@/lib/promociones-refs'
 import { promocionesConProgreso } from '@/lib/promociones-db'
 import { parsePromocionBody, toPromocionResponse, totalesPromociones } from '@/lib/promociones-compute'
 
-const INCLUDE = { conceptos: true, tarjetas: true } as const
+const INCLUDE = { conceptos: true, categorias: true, etiquetas: true, tarjetas: true } as const
 
 /**
  * `GET /api/promociones?mes=&anio=` — las promociones con su **progreso en el período**.
@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
       vigenteHasta: data.vigenteHasta,
       tarjetas: { connect: data.tarjetaIds.map(id => ({ id })) },
       conceptos: { connect: data.conceptoIds.map(id => ({ id })) },
+      categorias: { connect: data.categoriaIds.map(id => ({ id })) },
+      etiquetas: { connect: data.etiquetaIds.map(id => ({ id })) },
     },
     include: INCLUDE,
   })

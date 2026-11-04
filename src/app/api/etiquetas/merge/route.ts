@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
       include: {
         gastos: { select: { id: true } },
         items: { select: { id: true } },
+        // Al borrar el origen la tabla puente de la promo lo suelta y dejaría de sugerirse.
+        promociones: { select: { id: true } },
       },
     }),
     prisma.etiqueta.findUnique({ where: { id: targetId } }),
@@ -37,6 +39,9 @@ export async function POST(req: NextRequest) {
     ),
     ...source.items.map(i =>
       prisma.gastoItem.update({ where: { id: i.id }, data: { etiquetas: { connect: { id: targetId } } } }),
+    ),
+    ...source.promociones.map(p =>
+      prisma.promocion.update({ where: { id: p.id }, data: { etiquetas: { connect: { id: targetId } } } }),
     ),
     prisma.etiqueta.delete({ where: { id: sourceId } }),
   ])
