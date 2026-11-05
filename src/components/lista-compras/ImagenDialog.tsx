@@ -155,8 +155,8 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
     const unidadDefault = (unidades.find((u) => u.nombre.toLowerCase() === 'un') ?? unidades[0])?.id
     const porArticulo = new Map<number, Fila>()
     const out: Fila[] = []
-    // kg y l no son unidades de artículo, pero se leen para cargar la cantidad en kg/l.
-    parseLineasOcr(texto, [...unidades.map((u) => u.nombre), 'kg', 'l']).forEach((c, i) => {
+    // kg, l y m no son unidades de artículo, pero se leen para cargar la cantidad en kg/l/m.
+    parseLineasOcr(texto, [...unidades.map((u) => u.nombre), 'kg', 'l', 'm']).forEach((c, i) => {
       const multLeido = c.unidad ? esUnidadMultiplo(c.unidad) : null
       // Se mapea al artículo propio más parecido a lo leído; si ninguno se parece, queda como se leyó.
       const m = mejorCoincidencia(c.nombre, catalogo)

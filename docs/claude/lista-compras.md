@@ -50,8 +50,11 @@ Decisiones:
   se deriva** (`esCompleto`: `cantidadComprada >= cantidad`, con tolerancia de float). Así no hay
   dos datos que se contradigan al cambiar la cantidad (si subís lo que necesitás de 2 a 3 con 2
   llevados, pasa a "en curso"). Se puede llevar de más: queda completo y `faltante` nunca es negativo.
-- **Precio por kg / litro (unidades g y ml)**: `Unidad.subunidadDe` (`'kg'` | `'l'` | null) marca
-  que la unidad es **la milésima parte** de kg o litro (g → kg, ml → l; `FACTOR_SUBUNIDAD = 1000`).
+- **Precio por kg / litro / metro (unidades g, ml y mm)**: `Unidad.subunidadDe` (`'kg'` | `'l'` |
+  `'m'` | null) marca que la unidad es **la milésima parte** de kg, litro o metro (g → kg, ml → l,
+  mm → m; `FACTOR_SUBUNIDAD = 1000`; `SUBUNIDAD` da la chica de cada base). **Todo lo que sigue
+  sobre g/ml y kg/l vale igual para mm y m** (precio por metro, selector mm | m, preferencia de
+  visualización, rechazo de "m" como unidad de artículo).
   Cuando el artículo usa una unidad así, el precio **se carga y se ve por kg/litro** (campo
   "Precio por kg") pero **se persiste siempre por la unidad de la línea** (`precioUnitario` por
   gramo): así el total (`cantidad × precio`), `gastado`, `estimado`, la referencia y la
@@ -61,12 +64,14 @@ Decisiones:
   para no mostrar `3999.9900000000002`), usadas por el cliente; la API sigue hablando en precio
   por unidad de la línea y sólo agrega `subunidad_de` a cada ítem.
   - Al **crear** una unidad la equivalencia se **infiere del nombre** (`inferirSubunidad`: g, gr,
-    grs, gramo(s) → kg; ml, cc, mililitro(s) → l; sin acentos ni mayúsculas ni puntos). Cualquier
+    grs, gramo(s) → kg; ml, cc, mililitro(s) → l; mm, milímetro(s) → m; sin acentos ni mayúsculas ni
+    puntos; la "mm" que ya existía se completó con la migración de datos
+    `20261105150000_unidad_mm_subunidad_m/`). Cualquier
     otro nombre queda sin equivalencia y se puede fijar a mano en "Administrar unidades y rubros"
     (select "Equivale a 1/1000 de").
   - Cambiar la equivalencia (o la unidad de un artículo) **no reconvierte** precios ya guardados:
     cambia cómo se interpretan/muestran, así que conviene hacerlo antes de cargar precios.
-- **Cantidades siempre en la unidad chica (g / ml / un)**: ningún artículo usa kg ni l. Las
+- **Cantidades siempre en la unidad chica (g / ml / mm / un)**: ningún artículo usa kg, l ni m. Las
   cantidades (`cantidad`, `cantidadComprada`, la `cantidad` de cada compra) se **registran en
   g/ml**; en pantalla, en los artículos en g/ml, cada campo de cantidad tiene a la derecha un
   selector **g | kg** (ml | l) para elegir en qué se está cargando (`CampoCantidad`): "1" con kg
@@ -93,14 +98,16 @@ Decisiones:
     campo a su propio selector no guarda (el número tipeado todavía puede cambiar de significado).
     Si el artículo deja de estar en g/ml, el kg elegido se ignora.
   - Los +/− del celular suman/restan el paso en g/ml (100) aunque se vea en kg.
-  - **kg y l no son unidades de artículo**: `POST /api/lista-compras/unidades` y el renombre
+  - **kg, l y m no son unidades de artículo**: `POST /api/lista-compras/unidades` y el renombre
     (`PUT .../unidades/[id]`) responden **400** con un nombre múltiplo (`esUnidadMultiplo`: kg,
-    kilo(s), kilogramo(s), l, lt(s), litro(s); sin acentos, mayúsculas ni puntos) con el mensaje
-    `errorMultiplo` ("usá g y elegí kg al cargar la cantidad").
-  - Los artículos que estaban en kg/l se pasan a g/ml con
+    kilo(s), kilogramo(s), l, lt(s), litro(s), m, mt(s), metro(s); sin acentos, mayúsculas ni puntos)
+    con el mensaje `errorMultiplo` ("usá g y elegí kg al cargar la cantidad"; mm/m para metros).
+    El OCR también reconoce metros y milímetros ("30 metros papel").
+  - Los artículos que estaban en kg/l/m se pasan a g/ml/mm con
     `node scripts/migrar-lista-compras-a-unidades.js [--apply]` (dry-run por defecto): cambia la
-    unidad del artículo, multiplica por 1000 las cantidades de sus líneas y compras y divide por
-    1000 sus precios (lo pagado no cambia), y borra las unidades kg/l. La DB es una sola para
+    unidad del artículo y le deja `mostrarEnMultiplo` en true (se sigue viendo en kg/l/m),
+    multiplica por 1000 las cantidades de sus líneas y compras y divide por 1000 sus precios (lo
+    pagado no cambia), y borra las unidades kg/l/m. Necesita la migración de datos de "mm" aplicada. La DB es una sola para
     todos los ambientes: correrlo **después** de desplegar este cambio.
 - **Un solo precio unitario por línea**: si las compras parciales salieron a precios distintos,
   se carga el último/promedio; no hay precio por compra.
