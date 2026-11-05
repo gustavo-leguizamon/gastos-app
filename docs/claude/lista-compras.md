@@ -174,9 +174,13 @@ sola query** de histórico para todos los artículos de la lista.
   Esc cancela; si el nombre está repetido avisa y queda en edición) y **borrar** con
   confirmación — el botón está deshabilitado mientras esté en uso. Al abrirlo se recargan los
   conteos. Si lo borrado estaba elegido en el formulario de alta, se limpia.
-- **Renombrar un artículo**: el lápiz junto al nombre de cada fila (escritorio y celular,
-  componente `NombreArticulo` de `FilaLista`) lo vuelve un campo; Enter o salir del campo guarda,
-  Esc cancela. Manda `{ nombre }` al `PUT /api/lista-compras/[id]`, que renombra el **artículo**
+- **Editar un artículo (nombre, rubro y unidad)**: casi nunca cambian, así que **no están siempre en
+  pantalla**. Bajo el nombre de cada fila se ve "Rubro · unidad" de sólo lectura (`NombreArticulo`), y el
+  lápiz junto al nombre despliega el editor del artículo (`EditorArticulo` de `FilaLista`, igual en
+  escritorio y celular): nombre, rubro y unidad (`CatalogoSelect`) y "Listo" para cerrarlo; el lápiz
+  queda resaltado mientras está abierto. El nombre se guarda con Enter o al salir del campo (Esc lo
+  deshace y cierra); rubro y unidad, al elegirlos.
+- **Renombrar** (desde ese editor): manda `{ nombre }` al `PUT /api/lista-compras/[id]`, que renombra el **artículo**
   (se ve en todos los meses y en el catálogo del alta) y conserva su historial de precios. El
   nombre se normaliza (`parseItemPatch`: trim + colapso de espacios; vacío = 400) y responde
   **409** si **otro** artículo ya tiene ese nombre sin distinguir mayúsculas (no se fusionan: se
@@ -202,11 +206,16 @@ sola query** de histórico para todos los artículos de la lista.
   **despliega**, para que no parezca que no se agregó.
 - **Lista agrupada por rubro** ("Sin rubro" al final). Cada fila: checkbox *comprado* (tildar = llevo todo lo pedido, destildar = nada; queda en estado
   indeterminado si hay compra parcial), barra de progreso con "Faltan X u" cuando está en curso,
-  campo de **precio por kg/litro** cuando la unidad es g/ml (con "= $X por g" y la referencia también por kg/l),
+  campo de **precio por kg/litro** cuando la unidad es g/ml/mm (la referencia también por kg/l/m),
+  **precio por unidad de sólo lectura** en las dos unidades (`PreciosPorUnidad`, sólo artículos con
+  equivalencia y con precio): "por **g**" (unidad individual, como se guarda; `fmtPrecioUnitario` muestra
+  hasta 4 decimales por debajo de $100, porque un g o un mm cuesta centavos) y "por **kg**" (unidad
+  mayor), cada uno en su propio recuadro con la unidad en negrita y un tooltip — en escritorio apilados
+  en una columna, en el celular lado a lado con el rótulo "Unidad individual" / "Unidad mayor",
   campo **Llevo** (acumulado, se actualiza en cada compra) junto a **Necesito**, "llevo $X" bajo
   el total cuando es parcial,
   referencia ("Última vez: $X × cant (mm/aaaa) ▲/▼ %" — el % sólo si hay precio este mes),
-  **rubro y unidad** (mismos `CatalogoSelect`; son del artículo, así que el cambio vale para todos los meses y, al cambiar el rubro, la fila se mueve de grupo; el rubro se puede quitar), cantidad y precio editables inline (se guardan al salir del campo / Enter; el placeholder
+  **rubro y unidad** (en el editor del artículo, detrás del lápiz; son del artículo, así que el cambio vale para todos los meses y, al cambiar el rubro, la fila se mueve de grupo; el rubro se puede quitar), cantidad y precio editables inline (se guardan al salir del campo / Enter; el placeholder
   del precio es el de referencia) y total de la línea.
 - **Copiar del mes anterior**: trae artículos y cantidades del último mes con lista; **no copia
   precios** (quedan vacíos, la referencia los muestra) ni lo llevado (arrancan en 0), y no pisa lo ya cargado.
@@ -354,8 +363,9 @@ guardados, así que no se pueden desincronizar).
 - **Fila compacta** (con compras registradas se ocultan los −/+ y "Llevo" queda de sólo lectura): apilada a ancho completo, con áreas de toque de 40px (tilde, borrar, +/−) y
   campos de 56px. **Lo llevado** tiene botones **−/+** (`ajustarLlevo`: paso 1, o 100 si la unidad
   es g/ml; nunca baja de 0; guarda al toque) además del campo editable. **Necesito** y **precio**
-  van en dos columnas y el total abajo a la derecha. **Rubro y unidad** quedan plegados detrás de
-  "Rubro · unidad ✎" (casi nunca se tocan).
+  van en dos columnas, debajo los dos **precios por unidad** (individual y mayor) lado a lado, y el
+  total abajo a la derecha. **Nombre, rubro y unidad** quedan plegados detrás del lápiz del nombre
+  (casi nunca se tocan), con el nombre a ancho completo y rubro/unidad en dos columnas.
 - **Resumen**: un único cuadro de tres renglones en vez de tres tarjetas.
 - **Agregar artículo** en el celular **no es un formulario en la página sino un diálogo a pantalla
   completa**, que se abre con el botón de la tarjeta de arriba o con un **botón flotante "+" fijo** abajo a la

@@ -22,7 +22,7 @@ import { aCantidadBase, ajustarLlevo, aPrecioBase, desdeCantidadBase, desdePreci
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 import CampoCantidad from './CampoCantidad'
 import CatalogoSelect from './CatalogoSelect'
-import { fmtARS, fmtCantidad, parseNum, precioCampo } from './formato'
+import { fmtARS, fmtCantidad, fmtPrecioUnitario, parseNum, precioCampo } from './formato'
 import type { CambioItem, OpcionCatalogo } from './useListaCompras'
 
 interface Props {
@@ -145,51 +145,145 @@ const alEnter = (e: React.KeyboardEvent) => {
 }
 
 /**
- * Nombre del artículo con edición en línea: el lápiz lo convierte en campo; Enter o salir del
- * campo guarda, Esc cancela. Renombra el artículo, así que el cambio se ve en todos los meses.
+ * Nombre del artículo con su rubro y unidad debajo, de sólo lectura: casi nunca cambian, así que
+ * los campos para editarlos (`EditorArticulo`) aparecen sólo al tocar el lápiz.
  */
-function NombreArticulo({ item, onCambiar, variant }: { item: ListaCompraItem; onCambiar: Props['onCambiar']; variant: 'body1' | 'body2' }) {
-  const [editando, setEditando] = useState(false)
-  const [nombre, setNombre] = useState(item.nombre)
+function NombreArticulo({ item, editando, onEditar, variant }: { item: ListaCompraItem; editando: boolean; onEditar: () => void; variant: 'body1' | 'body2' }) {
   const tachado = item.estado_cantidad === 'completo' ? 'line-through' : 'none'
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+        <Typography variant={variant} fontWeight={600} sx={{ textDecoration: tachado, wordBreak: 'break-word' }}>
+          {item.nombre}
+        </Typography>
+        <Tooltip title={editando ? 'Cerrar edición del artículo' : 'Editar artículo (nombre, rubro y unidad)'}>
+          <IconButton
+            size="small"
+            onClick={onEditar}
+            color={editando ? 'primary' : 'default'}
+            aria-label={`Editar ${item.nombre}`}
+            aria-expanded={editando}
+            sx={{ p: 0.5 }}
+          >
+            <EditIcon sx={{ fontSize: 15 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+        {item.rubro ?? 'Sin rubro'} · {item.unidad}
+      </Typography>
+    </Box>
+  )
+}
 
-  const abrir = () => { setNombre(item.nombre); setEditando(true) }
-  const guardar = () => {
-    setEditando(false)
+/**
+ * Edición del artículo (nombre, rubro y unidad), plegada detrás del lápiz del nombre. Son datos
+ * del artículo: el cambio se ve en todos los meses. El nombre se guarda al salir del campo o con
+ * Enter (Esc lo deshace y cierra); rubro y unidad, al elegirlos.
+ */
+function EditorArticulo({
+  item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onCerrar, compacta,
+}: Pick<Props, 'item' | 'unidades' | 'rubros' | 'onCrearUnidad' | 'onCrearRubro' | 'onCambiar'> & { onCerrar: () => void; compacta?: boolean }) {
+  const [nombre, setNombre] = useState(item.nombre)
+  useEffect(() => { setNombre(item.nombre) }, [item.nombre])
+
+  const guardarNombre = () => {
     const n = nombre.trim().replace(/\s+/g, ' ')
-    if (!n) { toast.error('El nombre no puede quedar vacío'); return }
+    if (!n) { toast.error('El nombre no puede quedar vacío'); setNombre(item.nombre); return }
     if (n !== item.nombre) onCambiar(item.id, { nombre: n })
   }
 
-  if (editando) {
-    return (
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: compacta ? '1fr 1fr' : 'minmax(200px, 2fr) minmax(150px, 1fr) minmax(110px, 140px) auto',
+        alignItems: 'center',
+        gap: 1,
+        p: 1,
+        mt: 0.5,
+        border: '1px dashed',
+        borderColor: 'primary.main',
+        borderRadius: 1,
+      }}
+    >
       <TextField
         size="small"
         autoFocus
-        fullWidth
         label="Nombre del artículo"
-        helperText="Se cambia en todos los meses"
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
-        onBlur={guardar}
+        onBlur={guardarNombre}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          if (e.key === 'Escape') { setNombre(item.nombre); setEditando(false) }
+          if (e.key === 'Escape') { setNombre(item.nombre); onCerrar() }
         }}
-        sx={{ my: 0.5 }}
+        sx={compacta ? { gridColumn: '1 / -1' } : undefined}
       />
-    )
-  }
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-      <Typography variant={variant} fontWeight={600} sx={{ textDecoration: tachado, wordBreak: 'break-word' }}>
-        {item.nombre}
+      <CatalogoSelect
+        label="Rubro"
+        options={rubros}
+        value={item.rubro_id}
+        onChange={(id) => { if (id !== item.rubro_id) onCambiar(item.id, { rubro_id: id }) }}
+        onCrear={onCrearRubro}
+        clearable
+        width="100%"
+      />
+      <CatalogoSelect
+        label="Unidad"
+        options={unidades}
+        value={item.unidad_id}
+        onChange={(id) => { if (id != null && id !== item.unidad_id) onCambiar(item.id, { unidad_id: id }) }}
+        onCrear={onCrearUnidad}
+        width="100%"
+      />
+      <Button size="small" onClick={onCerrar} sx={compacta ? { gridColumn: '1 / -1' } : undefined}>
+        Listo
+      </Button>
+      <Typography variant="caption" color="text.secondary" sx={{ gridColumn: '1 / -1' }}>
+        Se cambia en todos los meses: es del artículo.
       </Typography>
-      <Tooltip title="Renombrar artículo">
-        <IconButton size="small" onClick={abrir} aria-label={`Renombrar ${item.nombre}`} sx={{ p: 0.5 }}>
-          <EditIcon sx={{ fontSize: 15 }} />
-        </IconButton>
-      </Tooltip>
+    </Box>
+  )
+}
+
+/**
+ * Precio de sólo lectura en las dos unidades de un artículo en g/ml/mm: por la unidad individual
+ * (como se guarda) y por la mayor (kg/l/m, como se carga). Cada valor lleva su unidad en negrita
+ * y su nombre ("individual" / "mayor") para no confundirlos. Sin equivalencia o sin precio no
+ * muestra nada.
+ */
+function PreciosPorUnidad({ item, horizontal }: { item: ListaCompraItem; horizontal?: boolean }) {
+  const base = item.subunidad_de
+  if (!base || item.precio_unitario == null) return null
+  const filas = [
+    { tipo: 'individual', unidad: item.unidad, valor: fmtPrecioUnitario(item.precio_unitario) },
+    { tipo: 'mayor', unidad: base, valor: fmtARS(aPrecioBase(item.precio_unitario, base)) },
+  ]
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: horizontal ? '1fr 1fr' : '1fr', gap: horizontal ? 1 : 0.25 }}>
+      {filas.map((f) => (
+        <Tooltip key={f.tipo} title={`Precio por unidad ${f.tipo} (${f.unidad}), de sólo lectura`}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: horizontal ? 'column' : 'row',
+              alignItems: horizontal ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              columnGap: 0.75,
+              px: 0.75,
+              py: horizontal ? 0.5 : 0.25,
+              bgcolor: 'action.hover',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+              {horizontal ? `Unidad ${f.tipo} · ` : ''}por <Box component="b" sx={{ color: 'text.primary' }}>{f.unidad}</Box>
+            </Typography>
+            <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>{f.valor}</Typography>
+          </Box>
+        </Tooltip>
+      ))}
     </Box>
   )
 }
@@ -222,7 +316,7 @@ function estiloEstado(item: ListaCompraItem) {
     : { borderLeftColor: 'transparent' }
 }
 
-/** Referencia de la última compra (por kg/l si la unidad es g/ml) y precio por unidad de la línea. */
+/** Referencia de la última compra (por kg/l si la unidad es g/ml). */
 function Referencia({ item, c }: { item: ListaCompraItem; c: ReturnType<typeof useCamposFila> }) {
   const { ref, base, variacion } = c
   return (
@@ -238,11 +332,6 @@ function Referencia({ item, c }: { item: ListaCompraItem; c: ReturnType<typeof u
         </Typography>
       ) : (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Sin compras anteriores</Typography>
-      )}
-      {base && item.precio_unitario != null && (
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          = {fmtARS(item.precio_unitario)} por {item.unidad}
-        </Typography>
       )}
     </>
   )
@@ -299,6 +388,7 @@ function ComprasDetalle({
 function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar, onRegistrarCompra, onEditarCompra, onBorrarCompra }: Props) {
   const c = useCamposFila(item, onCambiar)
   const [verCompras, setVerCompras] = useState(false)
+  const [editandoArticulo, setEditandoArticulo] = useState(false)
   return (
     <Box
       sx={{
@@ -325,32 +415,11 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         inputProps={{ 'aria-label': `Comprado: ${item.nombre}` }}
       />
       <Box sx={{ flex: '1 1 160px', minWidth: 140 }}>
-        <NombreArticulo item={item} onCambiar={onCambiar} variant="body2" />
+        <NombreArticulo item={item} editando={editandoArticulo} onEditar={() => setEditandoArticulo((v) => !v)} variant="body2" />
         <Progreso item={item} progreso={c.progreso} />
         <Referencia item={item} c={c} />
         <ToggleCompras n={item.compras.length} abierto={verCompras} onClick={() => setVerCompras((v) => !v)} />
       </Box>
-      <Tooltip title="Se cambia en todos los meses: es del artículo">
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <CatalogoSelect
-            label="Rubro"
-            options={rubros}
-            value={item.rubro_id}
-            onChange={(id) => { if (id !== item.rubro_id) onCambiar(item.id, { rubro_id: id }) }}
-            onCrear={onCrearRubro}
-            clearable
-            width={150}
-          />
-          <CatalogoSelect
-            label="Unidad"
-            options={unidades}
-            value={item.unidad_id}
-            onChange={(id) => { if (id != null && id !== item.unidad_id) onCambiar(item.id, { unidad_id: id }) }}
-            onCrear={onCrearUnidad}
-            width={110}
-          />
-        </Box>
-      </Tooltip>
       <CampoCantidad
         label="Llevo"
         value={c.llevo}
@@ -390,6 +459,9 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
         disabled={c.tiene}
         sx={{ width: 140 }}
       />
+      <Box sx={{ width: 150 }}>
+        <PreciosPorUnidad item={item} />
+      </Box>
       <Typography variant="body2" fontWeight={700} sx={{ width: 110, textAlign: 'right' }}>
         {item.total == null ? '—' : fmtARS(item.total)}
         {c.parcial && item.total_llevado != null && (
@@ -408,6 +480,17 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
           <DeleteIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      <Collapse in={editandoArticulo} unmountOnExit sx={{ flexBasis: '100%' }}>
+        <EditorArticulo
+          item={item}
+          unidades={unidades}
+          rubros={rubros}
+          onCrearUnidad={onCrearUnidad}
+          onCrearRubro={onCrearRubro}
+          onCambiar={onCambiar}
+          onCerrar={() => setEditandoArticulo(false)}
+        />
+      </Collapse>
       {item.compras.length > 0 && (
         <Collapse in={verCompras} unmountOnExit sx={{ flexBasis: '100%' }}>
           <ComprasDetalle item={item} onEditar={(co) => onEditarCompra(item, co)} onBorrar={(co) => onBorrarCompra(item, co)} />
@@ -419,8 +502,8 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
 
 /**
  * Fila para pantallas chicas: todo apilado a ancho completo, con áreas de toque de 40px, lo llevado
- * con botones +/− (en el súper se toca, no se tipea) y el rubro/unidad del artículo —que casi no
- * se toca— plegados detrás del texto "Rubro · unidad".
+ * con botones +/− (en el súper se toca, no se tipea) y el nombre/rubro/unidad del artículo —que casi
+ * no se tocan— plegados detrás del lápiz del nombre.
  */
 function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onCambiar, onEliminar, onRegistrarCompra, onEditarCompra, onBorrarCompra }: Props) {
   const c = useCamposFila(item, onCambiar)
@@ -440,14 +523,7 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           sx={{ mt: -0.5, ml: -1 }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <NombreArticulo item={item} onCambiar={onCambiar} variant="body1" />
-          <ButtonBase
-            onClick={() => setEditandoArticulo((v) => !v)}
-            aria-label="Cambiar rubro y unidad"
-            sx={{ typography: 'caption', color: 'text.secondary', gap: 0.5, py: 0.5 }}
-          >
-            {item.rubro ?? 'Sin rubro'} · {item.unidad} <EditIcon sx={{ fontSize: 13 }} />
-          </ButtonBase>
+          <NombreArticulo item={item} editando={editandoArticulo} onEditar={() => setEditandoArticulo((v) => !v)} variant="body1" />
         </Box>
         <IconButton onClick={() => onEliminar(item)} aria-label="Quitar de este mes" sx={{ mt: -0.5, mr: -1 }}>
           <DeleteIcon />
@@ -455,27 +531,17 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
       </Box>
 
       <Collapse in={editandoArticulo} unmountOnExit>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, pb: 1 }}>
-          <CatalogoSelect
-            label="Rubro"
-            options={rubros}
-            value={item.rubro_id}
-            onChange={(id) => { if (id !== item.rubro_id) onCambiar(item.id, { rubro_id: id }) }}
-            onCrear={onCrearRubro}
-            clearable
-            width="100%"
+        <Box sx={{ pb: 1 }}>
+          <EditorArticulo
+            item={item}
+            unidades={unidades}
+            rubros={rubros}
+            onCrearUnidad={onCrearUnidad}
+            onCrearRubro={onCrearRubro}
+            onCambiar={onCambiar}
+            onCerrar={() => setEditandoArticulo(false)}
+            compacta
           />
-          <CatalogoSelect
-            label="Unidad"
-            options={unidades}
-            value={item.unidad_id}
-            onChange={(id) => { if (id != null && id !== item.unidad_id) onCambiar(item.id, { unidad_id: id }) }}
-            onCrear={onCrearUnidad}
-            width="100%"
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ gridColumn: '1 / -1' }}>
-            Se cambia en todos los meses: es del artículo.
-          </Typography>
         </Box>
       </Collapse>
 
@@ -535,6 +601,10 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
           inputProps={{ inputMode: 'decimal' }}
           disabled={c.tiene}
         />
+      </Box>
+
+      <Box sx={{ mt: 1 }}>
+        <PreciosPorUnidad item={item} horizontal />
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mt: 1 }}>

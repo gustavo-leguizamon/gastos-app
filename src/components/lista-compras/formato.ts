@@ -5,6 +5,19 @@ export function fmtARS(n: number) {
 }
 
 /**
+ * Precio por la unidad individual (g/ml/mm): suele ser de centavos o menos ($6,698 el g, $0,019 el
+ * mm), así que por debajo de $100 muestra hasta 4 decimales en vez de redondear a $6,70 / $0,02.
+ */
+export function fmtPrecioUnitario(n: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Math.abs(n) >= 100 ? 2 : 4,
+  }).format(n)
+}
+
+/**
  * Precio para un campo editable, redondeado a centavos: el promedio ponderado guardado suele
  * tener muchos decimales (5190.178571 → "5190.18"). Sólo es de pantalla; lo guardado no cambia.
  */
