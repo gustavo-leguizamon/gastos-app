@@ -1,4 +1,4 @@
-import { desdeCantidadBase } from '@/lib/lista-compras-compute'
+import { desdeCantidadBase, type SubunidadDe } from '@/lib/lista-compras-compute'
 
 export function fmtARS(n: number) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
@@ -18,7 +18,7 @@ export function precioCampo(n: number): string {
  */
 export function fmtCantidad(
   n: number,
-  item: { unidad: string; subunidad_de: 'kg' | 'l' | null; mostrar_en_multiplo: boolean },
+  item: { unidad: string; subunidad_de: SubunidadDe | null; mostrar_en_multiplo: boolean },
 ): string {
   const kg = item.mostrar_en_multiplo && item.subunidad_de != null
   const v = desdeCantidadBase(n, kg)

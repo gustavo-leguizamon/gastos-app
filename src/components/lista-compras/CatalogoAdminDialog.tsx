@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { SubunidadDe } from '@/lib/lista-compras-compute'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
@@ -30,7 +31,7 @@ interface Props {
   onClose: () => void
   onRenombrar: (tipo: Tipo, id: number, nombre: string) => Promise<boolean>
   onBorrar: (tipo: Tipo, id: number) => Promise<boolean>
-  onFijarSubunidad: (id: number, subunidad: 'kg' | 'l' | null) => Promise<boolean>
+  onFijarSubunidad: (id: number, subunidad: SubunidadDe | null) => Promise<boolean>
 }
 
 function Seccion({
@@ -86,18 +87,19 @@ function Seccion({
               <>
                 <Typography variant="body2" sx={{ flex: '1 1 120px', wordBreak: 'break-word' }}>{o.nombre}</Typography>
                 {tipo === 'unidades' && (
-                  <Tooltip title="Si es la milésima parte de kg o litro, el precio se carga y se compara por kg/litro">
+                  <Tooltip title="Si es la milésima parte de kg, litro o metro, el precio se carga y se compara por kg/litro/metro">
                     <TextField
                       select
                       size="small"
                       label="Equivale a 1/1000 de"
                       value={o.subunidad_de ?? ''}
-                      onChange={(e) => onFijarSubunidad(o.id, (e.target.value || null) as 'kg' | 'l' | null)}
+                      onChange={(e) => onFijarSubunidad(o.id, (e.target.value || null) as SubunidadDe | null)}
                       sx={{ width: { xs: '100%', sm: 170 }, order: { xs: 5, sm: 0 } }}
                     >
                       <MenuItem value="">— (nada)</MenuItem>
                       <MenuItem value="kg">kg (ej: gramos)</MenuItem>
                       <MenuItem value="l">litro (ej: ml)</MenuItem>
+                      <MenuItem value="m">metro (ej: mm)</MenuItem>
                     </TextField>
                   </Tooltip>
                 )}

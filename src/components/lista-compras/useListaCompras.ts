@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import type { ArticuloCatalogo, ListaCompraItem, ListaCompraTotales } from '@/lib/types'
+import type { SubunidadDe } from '@/lib/lista-compras-compute'
 
 /** Fila de una tabla de catálogo (unidades, rubros). */
 export interface OpcionCatalogo {
@@ -11,7 +12,7 @@ export interface OpcionCatalogo {
   /** Cantidad de artículos que la usan (sólo la trae el listado). */
   uso?: number
   /** Sólo en unidades: "kg"/"l" si es la milésima parte de esa base (g, ml). */
-  subunidad_de?: 'kg' | 'l' | null
+  subunidad_de?: SubunidadDe | null
 }
 
 /** Una compra puntual: cantidad, precio (por la unidad de la línea; null = sin anotar) y fecha local. */
@@ -127,7 +128,7 @@ export function useListaCompras(mes: number, anio: number) {
   }, [loadOpciones, loadCatalogo])
 
   /** Fija o quita la equivalencia de una unidad (g → kg, ml → l). */
-  const fijarSubunidad = useCallback(async (id: number, subunidad_de: 'kg' | 'l' | null) => {
+  const fijarSubunidad = useCallback(async (id: number, subunidad_de: SubunidadDe | null) => {
     try {
       const res = await fetch(`/api/lista-compras/unidades/${id}`, {
         method: 'PUT',

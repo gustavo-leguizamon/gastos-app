@@ -28,7 +28,7 @@ describe('/api/lista-compras/unidades', () => {
   })
 
   it('POST 400 con kg/l: se registra en g/ml y el múltiplo se elige al cargar', async () => {
-    for (const nombre of ['kg', 'Kilos', 'litro']) expect((await POST(post({ nombre }))).status).toBe(400)
+    for (const nombre of ['kg', 'Kilos', 'litro', 'm', 'metros']) expect((await POST(post({ nombre }))).status).toBe(400)
     expect(mp.unidad.findFirst).not.toHaveBeenCalled()
     expect(mp.unidad.create).not.toHaveBeenCalled()
   })
