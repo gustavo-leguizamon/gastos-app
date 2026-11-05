@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { inferirSubunidad, parseNombreCatalogo } from '@/lib/lista-compras-compute'
+import { errorMultiplo, esUnidadMultiplo, inferirSubunidad, parseNombreCatalogo } from '@/lib/lista-compras-compute'
 import { resolveCatalogo } from '@/lib/lista-compras-db'
 
 // Sin `req` Next lo prerenderiza en el build y congela el catálogo (ver prerender-guard.test.ts).
@@ -25,6 +25,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const nombre = parseNombreCatalogo(await req.json())
   if (!nombre) return NextResponse.json({ error: 'El nombre no puede estar vacío' }, { status: 400 })
+  const multiplo = esUnidadMultiplo(nombre)
+  if (multiplo) return NextResponse.json({ error: errorMultiplo(multiplo) }, { status: 400 })
   const subunidadDe = inferirSubunidad(nombre)
   const { fila, creada } = await resolveCatalogo(prisma.unidad, nombre, subunidadDe ? { subunidadDe } : {})
   return NextResponse.json(

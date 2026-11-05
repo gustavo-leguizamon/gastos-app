@@ -542,6 +542,9 @@ model Articulo {
   unidadId  Int
   /// null = sin rubro.
   rubroId   Int?
+  /// Sólo en artículos en g/ml: true = las cantidades se muestran (y se cargan por defecto) en
+  /// kg/l. Es de presentación: las cantidades se guardan siempre en g/ml.
+  mostrarEnMultiplo Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

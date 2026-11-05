@@ -635,4 +635,6 @@ export interface ArticuloCatalogo {
   ultimo_precio: number | null
   /** Cantidad de la línea más reciente (para precargar el alta). */
   ultima_cantidad: number | null
+  /** Ver/cargar las cantidades en kg/l (artículos en g/ml). */
+  mostrar_en_multiplo: boolean
 }

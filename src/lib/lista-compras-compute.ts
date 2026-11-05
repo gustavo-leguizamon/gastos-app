@@ -10,6 +10,8 @@ export interface ItemBody {
   precioUnitario: number | null
   mes: number
   anio: number
+  /** Sólo si el artículo se crea: verlo en kg/l. Uno existente conserva su preferencia. */
+  mostrarEnMultiplo: boolean
 }
 
 const esMes = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 12
@@ -42,7 +44,8 @@ export function parseItemBody(body: any): ItemBody | null {
   if (unidadId === undefined) return null
   const rubroId = body.rubro_id == null ? null : parseId(body.rubro_id)
   if (rubroId === undefined) return null
-  return { nombre, unidadId, rubroId, cantidad, precioUnitario, mes, anio }
+  if (body.mostrar_en_multiplo !== undefined && typeof body.mostrar_en_multiplo !== 'boolean') return null
+  return { nombre, unidadId, rubroId, cantidad, precioUnitario, mes, anio, mostrarEnMultiplo: body.mostrar_en_multiplo === true }
 }
 
 /** `YYYY-MM-DD` real (rechaza 2026-02-30). Se parsea a mano: `new Date(str)` correría el día en UTC. */
@@ -90,7 +93,8 @@ export function toCompraResponse(row: any): CompraResponse {
  * `precioPromedio` = promedio **ponderado por cantidad** de las que tienen precio (null si
  * ninguna). Es ponderado, no simple: 2 kg a $1.000 y 3 kg a $1.100 salen $1.060, y
  * `cantidad × promedio` coincide con lo realmente pagado, así que `gastado` no se desvía.
- * Las compras sin precio suman cantidad pero no entran al promedio.
+ * Las compras sin precio **o con precio 0** suman cantidad pero no entran al promedio: un 0
+ * (regalo, promo, precio no anotado) hundiría el precio de referencia del mes siguiente.
  */
 export function resumenCompras(
   compras: { cantidad: number; precioUnitario: number | null }[],
@@ -100,7 +104,7 @@ export function resumenCompras(
   let importe = 0
   for (const c of compras) {
     total += c.cantidad
-    if (c.precioUnitario != null) {
+    if (c.precioUnitario != null && c.precioUnitario > 0) {
       conPrecio += c.cantidad
       importe += c.cantidad * c.precioUnitario
     }
@@ -119,8 +123,12 @@ export interface ItemPatch {
   /** Atajo: `true` = llevo todo, `false` = nada. Lo traduce `resolverPatchComprado`. */
   comprado?: boolean
   unidadId?: number
+  /** Preferencia de visualización del artículo en g/ml: true = ver y cargar en kg/l. */
+  mostrarEnMultiplo?: boolean
   /** null = quitar el rubro. */
   rubroId?: number | null
+  /** Nuevo nombre del artículo (normalizado; vale para todos los meses). */
+  nombre?: string
 }
 
 /**
@@ -150,6 +158,10 @@ export function parseItemPatch(body: any): ItemPatch | null {
     if (typeof body.comprado !== 'boolean') return null
     patch.comprado = body.comprado
   }
+  if ('mostrar_en_multiplo' in body) {
+    if (typeof body.mostrar_en_multiplo !== 'boolean') return null
+    patch.mostrarEnMultiplo = body.mostrar_en_multiplo
+  }
   if ('unidad_id' in body) {
     const u = parseId(body.unidad_id)
     if (u === undefined) return null
@@ -159,6 +171,12 @@ export function parseItemPatch(body: any): ItemPatch | null {
     const r = body.rubro_id === null ? null : parseId(body.rubro_id)
     if (r === undefined) return null
     patch.rubroId = r
+  }
+  if ('nombre' in body) {
+    if (typeof body.nombre !== 'string') return null
+    const n = normalizeNombre(body.nombre)
+    if (!n) return null
+    patch.nombre = n
   }
   return Object.keys(patch).length ? patch : null
 }
@@ -174,6 +192,55 @@ export const FACTOR_SUBUNIDAD = 1000
 export function parseSubunidadDe(v: unknown): SubunidadDe | null | undefined {
   if (v === null || v === undefined || v === '') return null
   return v === 'kg' || v === 'l' ? v : undefined
+}
+
+/**
+ * Cantidades: se **registran siempre en la unidad del artículo** (g, ml, un…), nunca en kg/l. En
+ * pantalla, en los artículos en g/ml, se puede elegir cargar en el múltiplo (kg/l): `multiplo`
+ * = true significa que lo tipeado está en kg/l y se multiplica por 1000 al guardar.
+ * Redondeo a 6 decimales para que 1,1 kg no quede en 1100.0000000000002 g.
+ */
+export function aCantidadBase(valor: number, multiplo: boolean): number {
+  return Math.round((multiplo ? valor * FACTOR_SUBUNIDAD : valor) * 1e6) / 1e6
+}
+
+/** Inversa de `aCantidadBase`: la cantidad guardada (g/ml) expresada en lo que se eligió ver. */
+export function desdeCantidadBase(valor: number, multiplo: boolean): number {
+  return Math.round((multiplo ? valor / FACTOR_SUBUNIDAD : valor) * 1e6) / 1e6
+}
+
+/**
+ * Texto del campo de cantidad al cambiar la unidad en que se carga (g ↔ kg). Si el campo muestra
+ * todavía la cantidad de referencia (lo guardado o lo precargado), se **convierte** — 2500 g pasa
+ * a 2,5 kg, sigue siendo la misma cantidad y no se guarda nada distinto —. Si ya se tipeó otro
+ * número, se **conserva**: quien tipea "1" y elige kg quiere decir 1 kg.
+ */
+export function textoAlCambiarUnidad(texto: string, multiploActual: boolean, multiploNuevo: boolean, referencia: number | null): string {
+  if (multiploActual === multiploNuevo || referencia == null) return texto
+  const v = Number(texto.trim().replace(',', '.'))
+  if (texto.trim() === '' || !Number.isFinite(v)) return texto
+  if (aCantidadBase(v, multiploActual) !== referencia) return texto
+  return String(desdeCantidadBase(referencia, multiploNuevo))
+}
+
+const MULTIPLOS: Record<string, SubunidadDe> = {
+  kg: 'kg', kgs: 'kg', kilo: 'kg', kilos: 'kg', kilogramo: 'kg', kilogramos: 'kg',
+  l: 'l', lt: 'l', lts: 'l', litro: 'l', litros: 'l',
+}
+
+/**
+ * Si un nombre de unidad es un **múltiplo** (kg, kilo, l, litro…): esas no se usan como unidad de
+ * un artículo — se registra en g/ml y el kg/l se elige al cargar la cantidad.
+ */
+export function esUnidadMultiplo(nombre: string): SubunidadDe | null {
+  const n = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\./g, '').trim().toLowerCase()
+  return MULTIPLOS[n] ?? null
+}
+
+/** Por qué no se acepta una unidad kg/l (alta o renombre). */
+export function errorMultiplo(multiplo: SubunidadDe): string {
+  const sub = multiplo === 'kg' ? 'g' : 'ml'
+  return `Los artículos se registran en ${sub}: usá "${sub}" y elegí "${multiplo}" al cargar la cantidad`
 }
 
 const SUBUNIDADES_A_KG = ['g', 'gr', 'grs', 'gramo', 'gramos']
@@ -408,6 +475,8 @@ export interface ItemResponse {
   unidad: string
   /** "kg"/"l" si la unidad es g/ml: el precio se carga y se compara por kg/litro. */
   subunidad_de: SubunidadDe | null
+  /** Ver las cantidades en kg/l (sólo con `subunidad_de`); se guardan igual en g/ml. */
+  mostrar_en_multiplo: boolean
   rubro_id: number | null
   rubro: string | null
   mes: number
@@ -424,17 +493,56 @@ export interface ItemResponse {
   estado_cantidad: EstadoCantidad
   /** Derivado: `cantidad_comprada >= cantidad`. */
   comprado: boolean
-  /** `cantidad × precio_unitario`, o `null` sin precio. Derivado, no se persiste. */
+  /** Lo gastado + lo que falta al precio de la línea (ver `importesLinea`), o `null` sin precio. Derivado. */
   total: number | null
-  /** `cantidad_comprada × precio_unitario`: lo que ya se gastó en la línea (`null` sin precio). */
+  /** Lo que ya se gastó en la línea (ver `importesLinea`); `null` si no se puede saber. */
   total_llevado: number | null
   /** Compras registradas, por fecha. Si hay, lo llevado y el precio salen de ellas (no se editan a mano). */
   compras: CompraResponse[]
   referencia: Referencia | null
 }
 
+/**
+ * Cuánto se gastó en una línea y cuánto va a salir en total.
+ *
+ * - **Sin compras registradas** (llevo cargado a mano): `llevado × precio` y `cantidad × precio`.
+ * - **Con compras**: lo gastado es lo **realmente pagado** — la suma de `cantidad × precio` de
+ *   cada compra, así una compra a $0 (regalo, promo) cuesta 0 aunque el promedio no la cuente
+ *   (ver `resumenCompras`). Las compras **sin precio** no se sabe cuánto costaron: se valorizan al
+ *   precio de la línea, y sin él lo gastado es `null`. El total es lo gastado más lo que falta
+ *   comprar al precio de la línea (comprar de más no lo baja: lo pagado, pagado está).
+ *
+ * `null` = no se puede calcular (≠ 0, que es un importe real).
+ */
+export function importesLinea(linea: {
+  cantidad: number
+  cantidadComprada: number
+  precioUnitario: number | null
+  compras?: { cantidad: number; precioUnitario: number | null }[]
+}): { total: number | null; totalLlevado: number | null } {
+  const precio = linea.precioUnitario
+  const compras = linea.compras ?? []
+  if (compras.length === 0) {
+    return {
+      total: precio == null ? null : linea.cantidad * precio,
+      totalLlevado: precio == null ? null : linea.cantidadComprada * precio,
+    }
+  }
+  let pagado = 0
+  let sinPrecio = 0
+  for (const c of compras) {
+    if (c.precioUnitario == null) sinPrecio += c.cantidad
+    else pagado += c.cantidad * c.precioUnitario
+  }
+  const totalLlevado = sinPrecio === 0 ? pagado : precio == null ? null : pagado + sinPrecio * precio
+  const faltante = Math.max(0, linea.cantidad - linea.cantidadComprada)
+  const total = totalLlevado == null ? null : faltante === 0 ? totalLlevado : precio == null ? null : totalLlevado + faltante * precio
+  return { total, totalLlevado }
+}
+
 export function toItemResponse(row: any, referencia: Referencia | null): ItemResponse {
   const precio: number | null = row.precioUnitario ?? null
+  const importes = importesLinea(row)
   return {
     id: row.id,
     articulo_id: row.articuloId,
@@ -442,6 +550,7 @@ export function toItemResponse(row: any, referencia: Referencia | null): ItemRes
     unidad_id: row.articulo.unidadId,
     unidad: row.articulo.unidad.nombre,
     subunidad_de: row.articulo.unidad.subunidadDe ?? null,
+    mostrar_en_multiplo: !!row.articulo.mostrarEnMultiplo,
     rubro_id: row.articulo.rubroId ?? null,
     rubro: row.articulo.rubro?.nombre ?? null,
     mes: row.mes,
@@ -453,8 +562,8 @@ export function toItemResponse(row: any, referencia: Referencia | null): ItemRes
     exceso: Math.round(Math.max(0, row.cantidadComprada - row.cantidad) * 1e6) / 1e6,
     estado_cantidad: estadoCantidad(row.cantidad, row.cantidadComprada),
     comprado: esCompleto(row.cantidad, row.cantidadComprada),
-    total: precio == null ? null : row.cantidad * precio,
-    total_llevado: precio == null ? null : row.cantidadComprada * precio,
+    total: importes.total,
+    total_llevado: importes.totalLlevado,
     compras: (row.compras ?? []).map(toCompraResponse),
     referencia,
   }
@@ -470,16 +579,17 @@ export interface TotalesLista {
   excedidos: number
   /** Líneas todavía no completas (incluye las parciales). */
   pendientes: number
-  /** Lo que ya se gastó: cantidad llevada × precio, sólo en líneas con precio cargado. */
+  /** Lo que ya se gastó: el `total_llevado` de cada línea (lo pagado en sus compras), o llevado × precio. */
   gastado: number
-  /** Lo que se estima gastar en total: precio del mes o, sin él, el de referencia. */
+  /** Lo que se estima gastar en total: el `total` de la línea o, sin precio, cantidad × referencia. */
   estimado: number
   /** Líneas sin precio propio ni referencia: el estimado no las cuenta. */
   sin_precio: number
 }
 
 export function totalesLista(
-  items: Pick<ItemResponse, 'cantidad' | 'cantidad_comprada' | 'precio_unitario' | 'referencia'>[],
+  items: (Pick<ItemResponse, 'cantidad' | 'cantidad_comprada' | 'precio_unitario' | 'referencia'> &
+    Partial<Pick<ItemResponse, 'total' | 'total_llevado'>>)[],
 ): TotalesLista {
   let gastado = 0
   let estimado = 0
@@ -491,10 +601,15 @@ export function totalesLista(
     if (esCompleto(i.cantidad, i.cantidad_comprada)) comprados++
     else if (i.cantidad_comprada > 0) parciales++
     if (estadoCantidad(i.cantidad, i.cantidad_comprada) === 'por_encima') excedidos++
-    if (i.precio_unitario != null) gastado += i.cantidad_comprada * i.precio_unitario
-    const base = i.precio_unitario ?? i.referencia?.precio_unitario ?? null
-    if (base == null) sinPrecio++
-    else estimado += i.cantidad * base
+    // Los importes de la línea (`importesLinea`) mandan: con compras, lo pagado de verdad.
+    if (i.total_llevado !== undefined) gastado += i.total_llevado ?? 0
+    else if (i.precio_unitario != null) gastado += i.cantidad_comprada * i.precio_unitario
+    if (i.total != null) estimado += i.total
+    else {
+      const base = i.precio_unitario ?? i.referencia?.precio_unitario ?? null
+      if (base == null) sinPrecio++
+      else estimado += i.cantidad * base
+    }
   }
   return { items: items.length, comprados, parciales, excedidos, pendientes: items.length - comprados, gastado, estimado, sin_precio: sinPrecio }
 }

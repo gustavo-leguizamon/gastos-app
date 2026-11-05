@@ -27,6 +27,12 @@ describe('/api/lista-compras/unidades', () => {
     expect(mp.unidad.findFirst).not.toHaveBeenCalled()
   })
 
+  it('POST 400 con kg/l: se registra en g/ml y el múltiplo se elige al cargar', async () => {
+    for (const nombre of ['kg', 'Kilos', 'litro']) expect((await POST(post({ nombre }))).status).toBe(400)
+    expect(mp.unidad.findFirst).not.toHaveBeenCalled()
+    expect(mp.unidad.create).not.toHaveBeenCalled()
+  })
+
   it('POST crea una unidad nueva (201)', async () => {
     mp.unidad.findFirst.mockResolvedValue(null)
     mp.unidad.create.mockResolvedValue({ id: 8, nombre: 'docena' })
@@ -52,12 +58,12 @@ describe('/api/lista-compras/unidades', () => {
   })
 
   it('POST con un nombre existente (sin distinguir mayúsculas) devuelve la existente con 200', async () => {
-    mp.unidad.findFirst.mockResolvedValue({ id: 1, nombre: 'kg' })
-    const res = await POST(post({ nombre: 'KG' }))
-    expect(mp.unidad.findFirst.mock.calls[0][0].where).toEqual({ nombre: { equals: 'KG', mode: 'insensitive' } })
+    mp.unidad.findFirst.mockResolvedValue({ id: 1, nombre: 'pack' })
+    const res = await POST(post({ nombre: 'PACK' }))
+    expect(mp.unidad.findFirst.mock.calls[0][0].where).toEqual({ nombre: { equals: 'PACK', mode: 'insensitive' } })
     expect(mp.unidad.create).not.toHaveBeenCalled()
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ id: 1, nombre: 'kg', subunidad_de: null })
+    expect(await res.json()).toEqual({ id: 1, nombre: 'pack', subunidad_de: null })
   })
 
   it('POST ante una carrera (P2002) devuelve la que creó el otro request', async () => {

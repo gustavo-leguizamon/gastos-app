@@ -28,6 +28,7 @@ export async function GET() {
       unidad: a.unidad.nombre,
       rubro_id: a.rubroId,
       rubro: a.rubro?.nombre ?? null,
+      mostrar_en_multiplo: a.mostrarEnMultiplo,
       ultimo_precio: ultimos.precio,
       ultima_cantidad: ultimos.cantidad,
     }}),
