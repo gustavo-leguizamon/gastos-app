@@ -75,6 +75,33 @@ describe('GET /api/promociones/sugeridas', () => {
     expect(await (await GET(url(`${base}&promocion_id=1`))).json()).toMatchObject([{ id: 1, coincide: false }])
   })
 
+  it('busca también por la categoría y las etiquetas del gasto', async () => {
+    mp.concepto.findFirst.mockResolvedValue(null)
+    await GET(url('descripcion=otra&categoria_id=2&etiqueta_ids=8,7,8,x&tipo_pago=C&tarjeta_id=10&mes=10&anio=2026'))
+    expect(mp.promocion.findMany.mock.calls[0][0].where).toEqual({
+      OR: [
+        { activa: true, categorias: { some: { id: 2 } } },
+        { activa: true, etiquetas: { some: { id: { in: [8, 7] } } } },
+      ],
+    })
+  })
+
+  it('sugiere una promo vinculada por categoría o por etiqueta aunque el concepto no esté entre los suyos', async () => {
+    mp.concepto.findFirst.mockResolvedValue({ id: 99, nombre: 'Otro' })
+    mp.promocion.findMany.mockResolvedValue([rawPromo({ conceptos: [], categorias: [{ id: 2 }], etiquetas: [{ id: 7 }] })])
+    const q = 'descripcion=otro&tipo_pago=C&tarjeta_id=10&mes=10&anio=2026'
+    expect(await (await GET(url(`${q}&categoria_id=2`))).json()).toMatchObject([{ id: 1, coincide: true }])
+    expect(await (await GET(url(`${q}&etiqueta_ids=3,7`))).json()).toMatchObject([{ id: 1, coincide: true }])
+    // Ni concepto, ni categoría, ni etiqueta en común: no se sugiere.
+    expect(await (await GET(url(`${q}&categoria_id=3&etiqueta_ids=8`))).json()).toEqual([])
+  })
+
+  it('sin concepto, categoría ni etiquetas no consulta promos', async () => {
+    mp.concepto.findFirst.mockResolvedValue(null)
+    expect(await (await GET(url('tipo_pago=C&mes=10&anio=2026'))).json()).toEqual([])
+    expect(mp.promocion.findMany).not.toHaveBeenCalled()
+  })
+
   it('sugiere la promo con lo que queda por reintegrar', async () => {
     mp.gasto.findMany.mockResolvedValue([{ promocionId: 1, totalMoneda: 50000, tipoCambio: 1 }]) // 15.000 reintegrados
     const [s] = await (await GET(url(base))).json()

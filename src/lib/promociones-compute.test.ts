@@ -18,6 +18,10 @@ import {
   diasHasta,
   estadoVencimiento,
   reintegrosPendientes,
+  criteriosDe,
+  tieneCriterios,
+  criterioCoincide,
+  whereGastoCriterios,
 } from './promociones-compute'
 
 const bodyOk = (over: Record<string, any> = {}) => ({
@@ -53,6 +57,8 @@ describe('parsePromocionBody', () => {
     expect(parsePromocionBody(bodyOk({ tarjeta_ids: [2, 1, 2] }))).toEqual({
       lugar: 'Carrefour',
       conceptoIds: [],
+      categoriaIds: [],
+      etiquetaIds: [],
       porcentaje: 20,
       topeMensual: 10000,
       dias: [2, 4],
@@ -70,6 +76,11 @@ describe('parsePromocionBody', () => {
     expect(r).toMatchObject({ tarjetaIds: [], efectivo: true, conceptoIds: [7, 3] })
   })
 
+  it('acepta categorías y etiquetas vinculadas (sin repetir, ids numéricos)', () => {
+    const r = parsePromocionBody(bodyOk({ categoria_ids: [4, '4', 2], etiqueta_ids: [9, 9] }))
+    expect(r).toMatchObject({ categoriaIds: [4, 2], etiquetaIds: [9] })
+  })
+
   it.each([
     ['sin lugar', { lugar: '  ' }],
     ['porcentaje 0', { porcentaje: 0 }],
@@ -82,6 +93,8 @@ describe('parsePromocionBody', () => {
     ['sin tarjetas ni efectivo', { tarjeta_ids: [], efectivo: false }],
     ['tarjeta inválida', { tarjeta_ids: [0] }],
     ['concepto inválido', { concepto_ids: [5, -1] }],
+    ['categoría inválida', { categoria_ids: [0] }],
+    ['etiqueta inválida', { etiqueta_ids: ['x'] }],
     ['vigente_desde inválida', { vigente_desde: '15/10/2026' }],
     ['vigente_hasta inválida', { vigente_hasta: 'mañana' }],
     ['vigencia invertida', { vigente_desde: '2026-10-20', vigente_hasta: '2026-10-10' }],
@@ -130,6 +143,53 @@ describe('toPromocionResponse', () => {
       concepto_ids: [3, 4], concepto_nombres: ['Coto', 'Coto Digital'], tope_mensual: 8000, dias: [1, 4], tarjeta_ids: [9], efectivo: true,
     })
     expect(r.tarjetas[0]).toEqual({ id: 9, nombre: 'Visa', banco: 'Galicia', marca: 'visa', banco_logo: 'galicia', banco_icono: null })
+  })
+
+  it('mapea categorías y etiquetas vinculadas; sin incluirlas quedan vacías', () => {
+    const base = { id: 1, lugar: 'X', porcentaje: 10, topeMensual: 1, dias: [0], efectivo: true }
+    expect(toPromocionResponse({
+      ...base, categorias: [{ id: 2, nombre: 'Comida' }], etiquetas: [{ id: 7, nombre: 'Delivery' }],
+    })).toMatchObject({ categoria_ids: [2], categoria_nombres: ['Comida'], etiqueta_ids: [7], etiqueta_nombres: ['Delivery'] })
+    expect(toPromocionResponse(base)).toMatchObject({ categoria_ids: [], etiqueta_ids: [] })
+  })
+})
+
+describe('criterios vinculados', () => {
+  const promo = { conceptoIds: [5], categoriaIds: [2], etiquetaIds: [7, 8] }
+  const gasto = (over: Record<string, any> = {}) => ({ conceptoId: 99, categoriaId: null, etiquetaIds: [] as number[], ...over })
+
+  it('criteriosDe saca los ids de la fila de Prisma', () => {
+    expect(criteriosDe({ conceptos: [{ id: 5 }], categorias: [{ id: 2 }] })).toEqual({
+      conceptoIds: [5], categoriaIds: [2], etiquetaIds: [],
+    })
+  })
+
+  it('tieneCriterios con cualquiera de los tres ejes', () => {
+    const vacio = { conceptoIds: [], categoriaIds: [], etiquetaIds: [] }
+    expect(tieneCriterios(vacio)).toBe(false)
+    expect(tieneCriterios({ ...vacio, categoriaIds: [1] })).toBe(true)
+    expect(tieneCriterios({ ...vacio, etiquetaIds: [1] })).toBe(true)
+  })
+
+  it('coincide por concepto, por categoría o por alguna etiqueta (OR entre ejes)', () => {
+    expect(criterioCoincide(promo, gasto({ conceptoId: 5 }))).toBe(true)
+    expect(criterioCoincide(promo, gasto({ categoriaId: 2 }))).toBe(true)
+    expect(criterioCoincide(promo, gasto({ etiquetaIds: [3, 8] }))).toBe(true)
+    expect(criterioCoincide(promo, gasto({ categoriaId: 3, etiquetaIds: [3] }))).toBe(false)
+  })
+
+  it('una promo sin criterios no coincide con nada', () => {
+    const vacio = { conceptoIds: [], categoriaIds: [], etiquetaIds: [] }
+    expect(criterioCoincide(vacio, gasto({ conceptoId: 5, categoriaId: 2, etiquetaIds: [7] }))).toBe(false)
+  })
+
+  it('whereGastoCriterios arma sólo las condiciones de los ejes vinculados', () => {
+    expect(whereGastoCriterios(promo)).toEqual([
+      { conceptoId: { in: [5] } },
+      { categoriaId: { in: [2] } },
+      { etiquetas: { some: { id: { in: [7, 8] } } } },
+    ])
+    expect(whereGastoCriterios({ conceptoIds: [], categoriaIds: [4], etiquetaIds: [] })).toEqual([{ categoriaId: { in: [4] } }])
   })
 })
 

@@ -13,7 +13,7 @@ export function antesDe(mes: number, anio: number) {
  */
 export async function resolveArticulo(
   db: any,
-  data: { nombre: string; unidadId: number; rubroId: number | null },
+  data: { nombre: string; unidadId: number; rubroId: number | null; mostrarEnMultiplo?: boolean },
 ): Promise<number> {
   const nombre = normalizeNombre(data.nombre)
   const buscar = () =>
@@ -23,7 +23,7 @@ export async function resolveArticulo(
   if (existente) return existente.id
   try {
     const creado = await db.articulo.create({
-      data: { nombre, unidadId: data.unidadId, rubroId: data.rubroId },
+      data: { nombre, unidadId: data.unidadId, rubroId: data.rubroId, mostrarEnMultiplo: data.mostrarEnMultiplo ?? false },
       select: { id: true },
     })
     return creado.id
@@ -45,7 +45,7 @@ export const INCLUDE_ITEM = {
 /**
  * Recalcula lo llevado y el precio de una línea a partir de sus compras: `cantidadComprada` =
  * suma y `precioUnitario` = promedio ponderado (ver `resumenCompras`). Si ninguna compra tiene
- * precio **no toca** el precio de la línea (no borra lo cargado a mano). Se llama después de cada
+ * precio mayor a 0 **no toca** el precio de la línea (no borra lo cargado a mano). Se llama después de cada
  * alta, edición o baja de una compra.
  */
 export async function recalcularLinea(db: any, itemId: number): Promise<void> {

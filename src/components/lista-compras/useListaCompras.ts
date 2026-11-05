@@ -26,6 +26,8 @@ export interface AltaItem {
   unidad_id: number
   rubro_id: number | null
   cantidad: number
+  /** Si el artículo es nuevo: verlo en kg/l (se cargó en kg/l). */
+  mostrar_en_multiplo?: boolean
 }
 
 export interface CambioItem {
@@ -38,6 +40,10 @@ export interface CambioItem {
   unidad_id?: number
   /** null = quitar el rubro. */
   rubro_id?: number | null
+  /** Renombra el artículo (en todos los meses). */
+  nombre?: string
+  /** Preferencia del artículo en g/ml: ver y cargar las cantidades en kg/l. */
+  mostrar_en_multiplo?: boolean
 }
 
 const TOTALES_VACIOS: ListaCompraTotales = { items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 }
@@ -210,7 +216,12 @@ export function useListaCompras(mes: number, anio: number) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cambio),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        // 409 trae el motivo (nombre repetido, línea con compras): se muestra tal cual.
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? 'Error al guardar el cambio')
+        return false
+      }
       await Promise.all([load(), loadCatalogo()])
       return true
     } catch {

@@ -5,6 +5,8 @@ vi.mock('@/lib/db', () => ({
     promocion: { findMany: vi.fn(), create: vi.fn() },
     gasto: { findMany: vi.fn() },
     concepto: { count: vi.fn() },
+    categoria: { count: vi.fn() },
+    etiqueta: { count: vi.fn() },
     tarjeta: { count: vi.fn() },
   },
 }))
@@ -131,6 +133,31 @@ describe('POST /api/promociones', () => {
       lugar: 'Coto', porcentaje: 15, topeMensual: 8000, dias: [1, 3], efectivo: true, vigenteDesde: '2026-10-15', vigenteHasta: null,
       tarjetas: { connect: [{ id: 10 }] },
       conceptos: { connect: [{ id: 5 }, { id: 6 }] },
+      categorias: { connect: [] },
+      etiquetas: { connect: [] },
     })
+  })
+
+  it('conecta categorías y etiquetas vinculadas; 400 si alguna no existe', async () => {
+    const conEjes = { ...ok, concepto_ids: [], categoria_ids: [2, 3], etiqueta_ids: [7] }
+    mp.tarjeta.count.mockResolvedValue(1)
+    mp.categoria.count.mockResolvedValue(1) // pidió 2, existe 1
+    expect((await POST(body(conEjes))).status).toBe(400)
+
+    mp.categoria.count.mockResolvedValue(2)
+    mp.etiqueta.count.mockResolvedValue(0)
+    expect((await POST(body(conEjes))).status).toBe(400)
+    expect(mp.promocion.create).not.toHaveBeenCalled()
+
+    mp.etiqueta.count.mockResolvedValue(1)
+    mp.promocion.create.mockResolvedValue(rawPromo({ categorias: [{ id: 2, nombre: 'Comida' }], etiquetas: [{ id: 7, nombre: 'Delivery' }] }))
+    const res = await POST(body(conEjes))
+    expect(res.status).toBe(201)
+    expect(mp.promocion.create.mock.calls[0][0].data).toMatchObject({
+      categorias: { connect: [{ id: 2 }, { id: 3 }] },
+      etiquetas: { connect: [{ id: 7 }] },
+    })
+    expect(mp.promocion.create.mock.calls[0][0].include).toEqual({ conceptos: true, categorias: true, etiquetas: true, tarjetas: true })
+    expect(await res.json()).toMatchObject({ categoria_nombres: ['Comida'], etiqueta_nombres: ['Delivery'] })
   })
 })

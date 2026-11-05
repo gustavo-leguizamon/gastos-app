@@ -23,9 +23,19 @@ export async function POST(req: NextRequest) {
   if (!source) return NextResponse.json({ error: 'Categoría origen no encontrada' }, { status: 404 })
   if (!target) return NextResponse.json({ error: 'Categoría destino no encontrada' }, { status: 404 })
 
+  // Las promos vinculadas al origen: al borrarlo la tabla puente lo suelta (cascade) y la promo
+  // dejaría de sugerirse sin avisar. Se les conecta el destino (idempotente si ya lo tenían).
+  const promos = await prisma.promocion.findMany({
+    where: { categorias: { some: { id: sourceId } } },
+    select: { id: true },
+  })
+
   const [gastos, items] = await prisma.$transaction([
     prisma.gasto.updateMany({ where: { categoriaId: sourceId }, data: { categoriaId: targetId } }),
     prisma.gastoItem.updateMany({ where: { categoriaId: sourceId }, data: { categoriaId: targetId } }),
+    ...promos.map(p =>
+      prisma.promocion.update({ where: { id: p.id }, data: { categorias: { connect: { id: targetId } } } }),
+    ),
     prisma.categoria.delete({ where: { id: sourceId } }),
   ])
 

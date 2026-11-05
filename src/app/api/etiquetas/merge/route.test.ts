@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({
     etiqueta: { findUnique: vi.fn(), delete: vi.fn() },
     gasto: { update: vi.fn() },
     gastoItem: { update: vi.fn() },
+    promocion: { update: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -24,7 +25,7 @@ beforeEach(() => {
 describe('POST /api/etiquetas/merge', () => {
   it('conecta el destino en cada gasto y sub-item del origen, y borra el origen', async () => {
     mp.etiqueta.findUnique
-      .mockResolvedValueOnce({ id: 1, gastos: [{ id: 10 }, { id: 11 }], items: [{ id: 20 }] })
+      .mockResolvedValueOnce({ id: 1, gastos: [{ id: 10 }, { id: 11 }], items: [{ id: 20 }], promociones: [] })
       .mockResolvedValueOnce({ id: 2, nombre: 'Viaje' })
 
     const res = await POST(req({ source_id: 1, target_id: 2 }))
@@ -39,7 +40,7 @@ describe('POST /api/etiquetas/merge', () => {
 
   it('todo va en una sola transacción: N gastos + M items + el delete', async () => {
     mp.etiqueta.findUnique
-      .mockResolvedValueOnce({ id: 1, gastos: [{ id: 10 }, { id: 11 }], items: [{ id: 20 }] })
+      .mockResolvedValueOnce({ id: 1, gastos: [{ id: 10 }, { id: 11 }], items: [{ id: 20 }], promociones: [] })
       .mockResolvedValueOnce({ id: 2 })
     await POST(req({ source_id: 1, target_id: 2 }))
     expect(mp.$transaction.mock.calls[0][0]).toHaveLength(4)
@@ -47,11 +48,20 @@ describe('POST /api/etiquetas/merge', () => {
 
   it('una etiqueta sin uso sólo se borra', async () => {
     mp.etiqueta.findUnique
-      .mockResolvedValueOnce({ id: 1, gastos: [], items: [] })
+      .mockResolvedValueOnce({ id: 1, gastos: [], items: [], promociones: [] })
       .mockResolvedValueOnce({ id: 2 })
     const res = await POST(req({ source_id: 1, target_id: 2 }))
     expect(await res.json()).toMatchObject({ moved_gastos: 0, moved_items: 0 })
     expect(mp.$transaction.mock.calls[0][0]).toHaveLength(1)
+  })
+
+  it('conecta el destino a las promos que tenían vinculado el origen', async () => {
+    mp.etiqueta.findUnique
+      .mockResolvedValueOnce({ id: 1, gastos: [], items: [], promociones: [{ id: 30 }] })
+      .mockResolvedValueOnce({ id: 2 })
+    await POST(req({ source_id: 1, target_id: 2 }))
+    expect(mp.promocion.update).toHaveBeenCalledWith({ where: { id: 30 }, data: { etiquetas: { connect: { id: 2 } } } })
+    expect(mp.$transaction.mock.calls[0][0]).toHaveLength(2)
   })
 
   it('devuelve 400 con body inválido, sin tocar la DB', async () => {

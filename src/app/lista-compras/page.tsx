@@ -36,13 +36,14 @@ import TextField from '@/components/shared/AppTextField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import CatalogoAdminDialog from '@/components/lista-compras/CatalogoAdminDialog'
+import CampoCantidad from '@/components/lista-compras/CampoCantidad'
 import CatalogoSelect from '@/components/lista-compras/CatalogoSelect'
 import CompraDialog from '@/components/lista-compras/CompraDialog'
 import FilaLista from '@/components/lista-compras/FilaLista'
 import ImagenDialog, { type ImportItem } from '@/components/lista-compras/ImagenDialog'
 import { fmtARS, parseNum } from '@/components/lista-compras/formato'
 import { useListaCompras, type AltaItem } from '@/components/lista-compras/useListaCompras'
-import { coincideBusqueda, parseColapsados, totalesLista } from '@/lib/lista-compras-compute'
+import { aCantidadBase, coincideBusqueda, parseColapsados, totalesLista } from '@/lib/lista-compras-compute'
 import type { ArticuloCatalogo, ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 
 const CLAVE_COLAPSADOS = 'lista-compras:rubros-colapsados'
@@ -64,6 +65,8 @@ export default function ListaComprasPage() {
   const [unidadId, setUnidadId] = useState<number | null>(null)
   const [rubroId, setRubroId] = useState<number | null>(null)
   const [cantidad, setCantidad] = useState('1')
+  // En unidades g/ml la cantidad se puede cargar en kg/l; se registra siempre en g/ml.
+  const [cantidadKg, setCantidadKg] = useState(false)
   const [adminAbierto, setAdminAbierto] = useState(false)
   const [imagenAbierta, setImagenAbierta] = useState(false)
   // Diálogo de alta del celular (y el botón flotante que lo abre).
@@ -145,8 +148,12 @@ export default function ListaComprasPage() {
       setNombre(a.nombre)
       setUnidadId(a.unidad_id)
       setRubroId(a.rubro_id)
+      setCantidadKg(a.mostrar_en_multiplo)
     }
   }
+
+  const unidadAlta = unidades.find((u) => u.id === unidadId) ?? null
+  const baseAlta = unidadAlta?.subunidad_de ?? null
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,9 +162,9 @@ export default function ListaComprasPage() {
     if (!n) return toast.error('Completá el nombre del artículo')
     if (c == null || !Number.isFinite(c) || c <= 0) return toast.error('La cantidad tiene que ser mayor a 0')
     if (unidadId == null) return toast.error('Elegí la unidad')
-    const alta: AltaItem = { nombre: n, unidad_id: unidadId, rubro_id: rubroId, cantidad: c }
+    const alta: AltaItem = { nombre: n, unidad_id: unidadId, rubro_id: rubroId, cantidad: aCantidadBase(c, cantidadKg && baseAlta != null), mostrar_en_multiplo: cantidadKg && baseAlta != null }
     if (await agregar(alta)) {
-      setNombre(''); setCantidad('1'); setSugerido(null)
+      setNombre(''); setCantidad('1'); setCantidadKg(false); setSugerido(null)
       toast.success(`Agregado: ${n}`)
       nombreRef.current?.focus() // el diálogo queda abierto para cargar el siguiente
       // Si el artículo cae en un rubro plegado, se despliega: si no, parecería que no se agregó.
@@ -237,13 +244,16 @@ export default function ListaComprasPage() {
               />
               {/* Cantidad y unidad van juntas en un renglón: son lo que se completa siempre. */}
               <Box sx={{ display: 'flex', gap: 2, width: { xs: '100%', md: 'auto' } }}>
-                <TextField
+                <CampoCantidad
                   size={compacta ? 'medium' : 'small'}
                   label="Cantidad"
                   value={cantidad}
-                  onChange={(e) => setCantidad(e.target.value)}
-                  inputProps={{ inputMode: 'decimal' }}
-                  sx={{ flex: { xs: 1, md: 'none' }, width: { md: 110 } }}
+                  onChange={setCantidad}
+                  multiplo={cantidadKg && baseAlta != null}
+                  onMultiplo={setCantidadKg}
+                  unidad={unidadAlta?.nombre ?? ''}
+                  base={baseAlta}
+                  sx={{ flex: { xs: 1, md: 'none' }, width: { md: 130 } }}
                 />
                 <CatalogoSelect
                   label="Unidad"

@@ -94,7 +94,16 @@ describe('POST /api/lista-compras', () => {
     mp.listaCompraItem.findUnique.mockResolvedValue(null)
     mp.listaCompraItem.create.mockResolvedValue(fila)
     await POST(post({ nombre: 'Yerba', unidad_id: 2, rubro_id: 5, mes: 11, anio: 2026 }))
-    expect(mp.articulo.create.mock.calls[0][0].data).toEqual({ nombre: 'Yerba', unidadId: 2, rubroId: 5 })
+    expect(mp.articulo.create.mock.calls[0][0].data).toEqual({ nombre: 'Yerba', unidadId: 2, rubroId: 5, mostrarEnMultiplo: false })
+  })
+
+  it('un artículo nuevo cargado en kg queda guardado para verse en kg', async () => {
+    mp.articulo.findFirst.mockResolvedValue(null)
+    mp.articulo.create.mockResolvedValue({ id: 9 })
+    mp.listaCompraItem.findUnique.mockResolvedValue(null)
+    mp.listaCompraItem.create.mockResolvedValue(fila)
+    await POST(post({ nombre: 'Yerba', unidad_id: 2, cantidad: 1000, mostrar_en_multiplo: true, mes: 11, anio: 2026 }))
+    expect(mp.articulo.create.mock.calls[0][0].data).toMatchObject({ mostrarEnMultiplo: true })
   })
 
   it('409 si el artículo ya está en el mes (no duplica)', async () => {

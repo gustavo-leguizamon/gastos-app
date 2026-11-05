@@ -28,6 +28,8 @@ export function diaSemanaDeFecha(fecha: unknown): number | null {
 export interface PromocionData {
   lugar: string
   conceptoIds: number[]
+  categoriaIds: number[]
+  etiquetaIds: number[]
   porcentaje: number
   topeMensual: number
   dias: number[]
@@ -37,6 +39,13 @@ export interface PromocionData {
   notas: string | null
   vigenteDesde: string | null
   vigenteHasta: string | null
+}
+
+/** Lista opcional de ids (dedup). `null` si algún id no es un entero positivo. */
+function parseIds(v: unknown): number[] | null {
+  const raw: unknown[] = Array.isArray(v) ? v : []
+  const ids = Array.from(new Set(raw.map(Number)))
+  return ids.some(id => !Number.isInteger(id) || id <= 0) ? null : ids
 }
 
 /** Fecha opcional `YYYY-MM-DD`: vacía → `null`, válida → la fecha, inválida → `false`. */
@@ -77,9 +86,10 @@ export function parsePromocionBody(body: any): PromocionData | null {
   const efectivo = body.efectivo === true
   if (tarjetaIds.length === 0 && !efectivo) return null
 
-  const conceptosRaw: unknown[] = Array.isArray(body.concepto_ids) ? body.concepto_ids : []
-  const conceptoIds = Array.from(new Set(conceptosRaw.map(Number)))
-  if (conceptoIds.some(id => !Number.isInteger(id) || id <= 0)) return null
+  const conceptoIds = parseIds(body.concepto_ids)
+  const categoriaIds = parseIds(body.categoria_ids)
+  const etiquetaIds = parseIds(body.etiqueta_ids)
+  if (!conceptoIds || !categoriaIds || !etiquetaIds) return null
 
   const notas = typeof body.notas === 'string' && body.notas.trim() ? body.notas.trim() : null
 
@@ -91,6 +101,8 @@ export function parsePromocionBody(body: any): PromocionData | null {
   return {
     lugar,
     conceptoIds,
+    categoriaIds,
+    etiquetaIds,
     porcentaje: r2(porcentaje),
     topeMensual: r2(topeMensual),
     dias,
@@ -125,15 +137,21 @@ export function parseUsoBody(body: any): PromocionUsoData | null {
   return { fecha: body.fecha, mes: periodo.mes, anio: periodo.anio, montoGasto: r2(montoGasto), notas }
 }
 
-/** Mapping camelCase→snake_case de una fila de Prisma (con `conceptos` y `tarjetas` incluidos). */
+/** Mapping camelCase→snake_case de una fila de Prisma (con `conceptos`, `categorias`, `etiquetas` y `tarjetas` incluidos). */
 export function toPromocionResponse(row: any) {
   const tarjetas: any[] = row.tarjetas ?? []
   const conceptos: any[] = row.conceptos ?? []
+  const categorias: any[] = row.categorias ?? []
+  const etiquetas: any[] = row.etiquetas ?? []
   return {
     id: row.id,
     lugar: row.lugar,
     concepto_ids: conceptos.map(c => c.id),
     concepto_nombres: conceptos.map(c => c.nombre),
+    categoria_ids: categorias.map(c => c.id),
+    categoria_nombres: categorias.map(c => c.nombre),
+    etiqueta_ids: etiquetas.map(e => e.id),
+    etiqueta_nombres: etiquetas.map(e => e.nombre),
     porcentaje: row.porcentaje,
     tope_mensual: row.topeMensual,
     dias: [...(row.dias ?? [])].sort((a: number, b: number) => a - b),
@@ -257,6 +275,58 @@ export function medioCoincide(
   return promo.efectivo && medio.tipoPago === 'D' && medio.tarjetaId == null
 }
 
+// ── Criterios vinculados (conceptos / categorías / etiquetas) ─────────────────────────
+
+export interface PromoCriterios {
+  conceptoIds: number[]
+  categoriaIds: number[]
+  etiquetaIds: number[]
+}
+
+/** Los ids de los criterios de una fila de Prisma (con `conceptos`/`categorias`/`etiquetas` incluidos). */
+export function criteriosDe(row: {
+  conceptos?: { id: number }[]
+  categorias?: { id: number }[]
+  etiquetas?: { id: number }[]
+}): PromoCriterios {
+  return {
+    conceptoIds: (row.conceptos ?? []).map(c => c.id),
+    categoriaIds: (row.categorias ?? []).map(c => c.id),
+    etiquetaIds: (row.etiquetas ?? []).map(e => e.id),
+  }
+}
+
+/** Si la promo tiene algún criterio vinculado. Sin ninguno no se sugiere ni lista candidatos. */
+export function tieneCriterios(c: PromoCriterios): boolean {
+  return c.conceptoIds.length > 0 || c.categoriaIds.length > 0 || c.etiquetaIds.length > 0
+}
+
+/**
+ * Si un gasto coincide con los criterios de la promo: su concepto, su categoría o **alguna** de
+ * sus etiquetas está entre los vinculados. Los ejes se combinan con **OR** (igual que varios
+ * conceptos entre sí): vincular una categoría amplía la promo, no la restringe.
+ */
+export function criterioCoincide(
+  promo: PromoCriterios,
+  gasto: { conceptoId: number | null; categoriaId: number | null; etiquetaIds: number[] },
+): boolean {
+  if (gasto.conceptoId != null && promo.conceptoIds.includes(gasto.conceptoId)) return true
+  if (gasto.categoriaId != null && promo.categoriaIds.includes(gasto.categoriaId)) return true
+  return gasto.etiquetaIds.some(id => promo.etiquetaIds.includes(id))
+}
+
+/**
+ * Condiciones (para un `OR` de Prisma sobre `Gasto`) que traen los gastos que coinciden con los
+ * criterios: el pre-filtro en la DB de `criterioCoincide`. `[]` si la promo no tiene criterios.
+ */
+export function whereGastoCriterios(c: PromoCriterios): Record<string, unknown>[] {
+  const or: Record<string, unknown>[] = []
+  if (c.conceptoIds.length) or.push({ conceptoId: { in: c.conceptoIds } })
+  if (c.categoriaIds.length) or.push({ categoriaId: { in: c.categoriaIds } })
+  if (c.etiquetaIds.length) or.push({ etiquetas: { some: { id: { in: c.etiquetaIds } } } })
+  return or
+}
+
 /**
  * Si la promo vale el día de la semana de `fecha` (`YYYY-MM-DD`). Sin fecha válida no hay
  * criterio y no se descarta nada.
@@ -295,7 +365,7 @@ export interface GastoConsumo {
  *
  * La asociación es explícita a propósito: el gasto no guarda fecha de compra, así que no hay
  * forma de saber cuáles caen después de que la promo arrancó. Quien carga el gasto decide si
- * cuenta (el form lo sugiere por concepto y medio de pago). Los gastos del período ya vienen
+ * cuenta (el form lo sugiere por concepto/categoría/etiqueta y medio de pago). Los gastos del período ya vienen
  * filtrados por la route.
  *
  * Suma el total en ARS (`totalMoneda × tipoCambio`, igual que `total_ars`); las devoluciones
