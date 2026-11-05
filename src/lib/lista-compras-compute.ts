@@ -182,16 +182,19 @@ export function parseItemPatch(body: any): ItemPatch | null {
 }
 
 /** Alta de una unidad o un rubro: `{ nombre }` normalizado, o `null` si queda vacío. */
-/** Base a la que equivale una unidad que es su milésima parte: g → "kg", ml → "l". */
-export type SubunidadDe = 'kg' | 'l'
+/** Base a la que equivale una unidad que es su milésima parte: g → "kg", ml → "l", mm → "m". */
+export type SubunidadDe = 'kg' | 'l' | 'm'
 
-/** Cuántas subunidades entran en una base (1000 g = 1 kg, 1000 ml = 1 l). */
+/** La unidad chica de cada base: en la que se registran las cantidades. */
+export const SUBUNIDAD: Record<SubunidadDe, string> = { kg: 'g', l: 'ml', m: 'mm' }
+
+/** Cuántas subunidades entran en una base (1000 g = 1 kg, 1000 ml = 1 l, 1000 mm = 1 m). */
 export const FACTOR_SUBUNIDAD = 1000
 
 /** `undefined` = inválido; vacío/null = sin equivalencia. */
 export function parseSubunidadDe(v: unknown): SubunidadDe | null | undefined {
   if (v === null || v === undefined || v === '') return null
-  return v === 'kg' || v === 'l' ? v : undefined
+  return v === 'kg' || v === 'l' || v === 'm' ? v : undefined
 }
 
 /**
@@ -226,6 +229,7 @@ export function textoAlCambiarUnidad(texto: string, multiploActual: boolean, mul
 const MULTIPLOS: Record<string, SubunidadDe> = {
   kg: 'kg', kgs: 'kg', kilo: 'kg', kilos: 'kg', kilogramo: 'kg', kilogramos: 'kg',
   l: 'l', lt: 'l', lts: 'l', litro: 'l', litros: 'l',
+  m: 'm', mt: 'm', mts: 'm', metro: 'm', metros: 'm',
 }
 
 /**
@@ -237,14 +241,15 @@ export function esUnidadMultiplo(nombre: string): SubunidadDe | null {
   return MULTIPLOS[n] ?? null
 }
 
-/** Por qué no se acepta una unidad kg/l (alta o renombre). */
+/** Por qué no se acepta una unidad kg/l/m (alta o renombre). */
 export function errorMultiplo(multiplo: SubunidadDe): string {
-  const sub = multiplo === 'kg' ? 'g' : 'ml'
+  const sub = SUBUNIDAD[multiplo]
   return `Los artículos se registran en ${sub}: usá "${sub}" y elegí "${multiplo}" al cargar la cantidad`
 }
 
 const SUBUNIDADES_A_KG = ['g', 'gr', 'grs', 'gramo', 'gramos']
 const SUBUNIDADES_A_L = ['ml', 'mls', 'cc', 'mililitro', 'mililitros']
+const SUBUNIDADES_A_M = ['mm', 'milimetro', 'milimetros']
 
 /**
  * Equivalencia que se le asigna a una unidad recién creada por su nombre (sin acentos ni
@@ -255,6 +260,7 @@ export function inferirSubunidad(nombre: string): SubunidadDe | null {
   const n = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').trim().toLowerCase()
   if (SUBUNIDADES_A_KG.includes(n)) return 'kg'
   if (SUBUNIDADES_A_L.includes(n)) return 'l'
+  if (SUBUNIDADES_A_M.includes(n)) return 'm'
   return null
 }
 

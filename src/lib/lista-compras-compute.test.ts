@@ -33,6 +33,7 @@ import {
   desdeCantidadBase,
   textoAlCambiarUnidad,
   esUnidadMultiplo,
+  errorMultiplo,
 } from './lista-compras-compute'
 
 describe('parseItemBody', () => {
@@ -717,6 +718,27 @@ describe('cantidades en la unidad del artículo (g/ml)', () => {
   it('esUnidadMultiplo reconoce kg y litros (sin acentos, mayúsculas ni puntos)', () => {
     for (const n of ['kg', 'Kg.', 'kilo', 'Kilogramos']) expect(esUnidadMultiplo(n)).toBe('kg')
     for (const n of ['l', 'L', 'lt', 'Litros']) expect(esUnidadMultiplo(n)).toBe('l')
-    for (const n of ['g', 'ml', 'un', 'pack', 'm']) expect(esUnidadMultiplo(n)).toBeNull()
+    for (const n of ['m', 'Mts.', 'metro', 'Metros']) expect(esUnidadMultiplo(n)).toBe('m')
+    for (const n of ['g', 'ml', 'mm', 'un', 'pack']) expect(esUnidadMultiplo(n)).toBeNull()
+  })
+})
+
+describe('metros / milímetros', () => {
+  it('mm se registra y m se elige al cargar: 1,5 m → 1500 mm', () => {
+    expect(inferirSubunidad('mm')).toBe('m')
+    expect(inferirSubunidad('Milímetros')).toBe('m')
+    expect(parseSubunidadDe('m')).toBe('m')
+    expect(aCantidadBase(1.5, true)).toBe(1500)
+  })
+
+  it('el precio se ve por metro: $19,05/m guardado como $0,01905/mm', () => {
+    expect(aPrecioBase(0.01905, 'm')).toBeCloseTo(19.05)
+    expect(desdePrecioBase(19.05, 'm')).toBeCloseTo(0.01905)
+  })
+
+  it('una unidad "m" se rechaza pidiendo mm', () => {
+    expect(errorMultiplo('m')).toContain('"mm"')
+    expect(errorMultiplo('kg')).toContain('"g"')
+    expect(errorMultiplo('l')).toContain('"ml"')
   })
 })

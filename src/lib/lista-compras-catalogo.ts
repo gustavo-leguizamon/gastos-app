@@ -1,4 +1,5 @@
 import { normalizeNombre } from './conceptos'
+import type { SubunidadDe } from './lista-compras-compute'
 
 /** Resultado listo para `NextResponse.json(body, { status })`. */
 export interface Resultado {
@@ -40,7 +41,7 @@ export async function renombrarCatalogo(model: any, id: number, raw: string): Pr
 export async function actualizarUnidad(
   model: any,
   id: number,
-  patch: { nombre?: string; subunidadDe?: 'kg' | 'l' | null },
+  patch: { nombre?: string; subunidadDe?: SubunidadDe | null },
 ): Promise<Resultado> {
   const existente = await model.findUnique({ where: { id } })
   if (!existente) return { status: 404, body: { error: 'No encontrado' } }

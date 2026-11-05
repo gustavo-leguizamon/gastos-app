@@ -18,6 +18,8 @@ const ALIAS_UNIDAD: Record<string, string> = {
   g: 'g', gr: 'g', grs: 'g', gramo: 'g', gramos: 'g',
   l: 'l', lt: 'l', lts: 'l', litro: 'l', litros: 'l',
   ml: 'ml', cc: 'ml',
+  m: 'm', mt: 'm', mts: 'm', metro: 'm', metros: 'm',
+  mm: 'mm', milimetro: 'mm', milimetros: 'mm',
   un: 'un', u: 'un', und: 'un', unid: 'un', unidad: 'un', unidades: 'un',
 }
 

@@ -20,6 +20,8 @@ describe('resolverUnidad', () => {
     expect(resolverUnidad('Kgs.', UNIDADES)).toBe('kg')
     expect(resolverUnidad('litros', UNIDADES)).toBe('l')
     expect(resolverUnidad('gr', UNIDADES)).toBe('g')
+    expect(resolverUnidad('metros', [...UNIDADES, 'm'])).toBe('m')
+    expect(resolverUnidad('milimetros', [...UNIDADES, 'mm'])).toBe('mm')
   })
   it('acepta unidades propias por nombre y devuelve null si no existe', () => {
     expect(resolverUnidad('paquete', UNIDADES)).toBe('Paquete')
