@@ -15,6 +15,7 @@ import {
   fechaValida,
   parseCompraBody,
   resumenCompras,
+  importesLinea,
   toCompraResponse,
   pasoLlevo,
   ajustarLlevo,
@@ -28,6 +29,10 @@ import {
   variacionPrecio,
   toItemResponse,
   totalesLista,
+  aCantidadBase,
+  desdeCantidadBase,
+  textoAlCambiarUnidad,
+  esUnidadMultiplo,
 } from './lista-compras-compute'
 
 describe('parseItemBody', () => {
@@ -35,8 +40,13 @@ describe('parseItemBody', () => {
 
   it('normaliza el nombre y aplica defaults (cantidad 1, sin rubro ni precio)', () => {
     expect(parseItemBody(ok)).toEqual({
-      nombre: 'Leche entera', unidadId: 1, rubroId: null, cantidad: 1, precioUnitario: null, mes: 11, anio: 2026,
+      nombre: 'Leche entera', unidadId: 1, rubroId: null, cantidad: 1, precioUnitario: null, mes: 11, anio: 2026, mostrarEnMultiplo: false,
     })
+  })
+
+  it('mostrar_en_multiplo: sólo boolean (para el artículo nuevo); sin él, false', () => {
+    expect(parseItemBody({ ...ok, mostrar_en_multiplo: true })?.mostrarEnMultiplo).toBe(true)
+    expect(parseItemBody({ ...ok, mostrar_en_multiplo: 'si' })).toBeNull()
   })
 
   it('acepta precio 0 (distinto de sin precio) y rubro', () => {
@@ -83,6 +93,12 @@ describe('parseItemPatch', () => {
     expect(parseItemPatch({ unidad_id: 2 })).toEqual({ unidadId: 2 })
     expect(parseItemPatch({ rubro_id: 4 })).toEqual({ rubroId: 4 })
     expect(parseItemPatch({ rubro_id: null })).toEqual({ rubroId: null })
+  })
+
+  it('mostrar_en_multiplo es la preferencia del artículo (sólo boolean)', () => {
+    expect(parseItemPatch({ mostrar_en_multiplo: true })).toEqual({ mostrarEnMultiplo: true })
+    expect(parseItemPatch({ mostrar_en_multiplo: false })).toEqual({ mostrarEnMultiplo: false })
+    expect(parseItemPatch({ mostrar_en_multiplo: 1 })).toBeNull()
   })
 
   it('nombre se normaliza; vacío o no-string es inválido', () => {
@@ -517,7 +533,7 @@ describe('toItemResponse', () => {
 
   it('mapea a snake_case y deriva el total', () => {
     expect(toItemResponse(row, null)).toEqual({
-      id: 1, articulo_id: 7, nombre: 'Yerba', unidad_id: 3, unidad: 'kg', subunidad_de: null, rubro_id: null, rubro: null, mes: 11, anio: 2026,
+      id: 1, articulo_id: 7, nombre: 'Yerba', unidad_id: 3, unidad: 'kg', subunidad_de: null, mostrar_en_multiplo: false, rubro_id: null, rubro: null, mes: 11, anio: 2026,
       cantidad: 3, precio_unitario: 150, cantidad_comprada: 3, faltante: 0, exceso: 0, estado_cantidad: 'completo', comprado: true,
       total: 450, total_llevado: 450, compras: [], referencia: null,
     })
@@ -560,6 +576,54 @@ describe('toItemResponse', () => {
     expect(r.total).toBeNull()
     expect(r.total_llevado).toBeNull()
   })
+
+  it('con compras, lo llevado es lo pagado en ellas y el total suma lo que falta al promedio', () => {
+    const compras = [
+      { id: 1, cantidad: 400, precioUnitario: 7.525, fecha: '2026-11-03' },
+      { id: 2, cantidad: 400, precioUnitario: 0, fecha: '2026-11-03' },
+      { id: 3, cantidad: 600, precioUnitario: 7.09375, fecha: '2026-11-03' },
+    ]
+    const r = toItemResponse({ ...row, cantidad: 2500, cantidadComprada: 1400, precioUnitario: 7.26625, compras }, null)
+    expect(r.total_llevado).toBeCloseTo(7266.25)
+    expect(r.total).toBeCloseTo(7266.25 + 1100 * 7.26625)
+  })
+})
+
+describe('importesLinea', () => {
+  const c = (cantidad: number, precioUnitario: number | null) => ({ cantidad, precioUnitario })
+
+  it('sin compras: llevado × precio y cantidad × precio', () => {
+    expect(importesLinea({ cantidad: 3, cantidadComprada: 1, precioUnitario: 100 })).toEqual({ total: 300, totalLlevado: 100 })
+    expect(importesLinea({ cantidad: 3, cantidadComprada: 1, precioUnitario: null })).toEqual({ total: null, totalLlevado: null })
+  })
+
+  it('una compra a $0 cuesta 0: lo gastado no se infla al promedio', () => {
+    // promedio sin el 0 = 100; llevado × promedio daría 200, pero se pagó 100
+    expect(importesLinea({ cantidad: 2, cantidadComprada: 2, precioUnitario: 100, compras: [c(1, 100), c(1, 0)] }))
+      .toEqual({ total: 100, totalLlevado: 100 })
+  })
+
+  it('lo que falta se estima al precio de la línea', () => {
+    expect(importesLinea({ cantidad: 5, cantidadComprada: 2, precioUnitario: 100, compras: [c(1, 100), c(1, 0)] }))
+      .toEqual({ total: 400, totalLlevado: 100 })
+  })
+
+  it('comprar de más no baja el total por debajo de lo pagado', () => {
+    expect(importesLinea({ cantidad: 1, cantidadComprada: 3, precioUnitario: 100, compras: [c(3, 100)] }))
+      .toEqual({ total: 300, totalLlevado: 300 })
+  })
+
+  it('compras sin precio se valorizan al precio de la línea; sin él, no se sabe', () => {
+    expect(importesLinea({ cantidad: 2, cantidadComprada: 2, precioUnitario: 100, compras: [c(1, 100), c(1, null)] }))
+      .toEqual({ total: 200, totalLlevado: 200 })
+    expect(importesLinea({ cantidad: 2, cantidadComprada: 2, precioUnitario: null, compras: [c(2, null)] }))
+      .toEqual({ total: null, totalLlevado: null })
+  })
+
+  it('todo a $0 sin precio en la línea: gastó 0 (dato real) y sin faltante el total es 0', () => {
+    expect(importesLinea({ cantidad: 1, cantidadComprada: 1, precioUnitario: null, compras: [c(1, 0)] }))
+      .toEqual({ total: 0, totalLlevado: 0 })
+  })
 })
 
 describe('totalesLista', () => {
@@ -597,6 +661,14 @@ describe('totalesLista', () => {
     expect(t).toMatchObject({ comprados: 2, parciales: 1, excedidos: 1, pendientes: 2 })
   })
 
+  it('si la línea trae sus importes, gastado y estimado salen de ellos (lo pagado de verdad)', () => {
+    const t = totalesLista([
+      { cantidad: 2, cantidad_comprada: 2, precio_unitario: 100, referencia: null, total: 100, total_llevado: 100 }, // una de las dos fue gratis
+      { cantidad: 3, cantidad_comprada: 0, precio_unitario: null, referencia: ref(50), total: null, total_llevado: null },
+    ])
+    expect(t).toMatchObject({ gastado: 100, estimado: 250, sin_precio: 0 })
+  })
+
   it('lista vacía', () => {
     expect(totalesLista([])).toEqual({ items: 0, comprados: 0, parciales: 0, excedidos: 0, pendientes: 0, gastado: 0, estimado: 0, sin_precio: 0 })
   })
@@ -613,5 +685,38 @@ describe('ultimosDeArticulo', () => {
   it('sin líneas, todo null; un precio en 0 cuenta', () => {
     expect(ultimosDeArticulo([])).toEqual({ cantidad: null, precio: null })
     expect(ultimosDeArticulo([{ cantidad: 1, precioUnitario: 0 }]).precio).toBe(0)
+  })
+})
+
+describe('cantidades en la unidad del artículo (g/ml)', () => {
+  it('aCantidadBase: kg/l se registran ×1000, sin ruido de float', () => {
+    expect(aCantidadBase(1, true)).toBe(1000)
+    expect(aCantidadBase(1.1, true)).toBe(1100)
+    expect(aCantidadBase(0.25, true)).toBe(250)
+    expect(aCantidadBase(250, false)).toBe(250)
+  })
+
+  it('desdeCantidadBase: lo guardado en g se ve en kg', () => {
+    expect(desdeCantidadBase(2500, true)).toBe(2.5)
+    expect(desdeCantidadBase(1100, true)).toBe(1.1)
+    expect(desdeCantidadBase(2500, false)).toBe(2500)
+  })
+
+  it('textoAlCambiarUnidad convierte lo que todavía es la referencia', () => {
+    expect(textoAlCambiarUnidad('2500', false, true, 2500)).toBe('2.5')
+    expect(textoAlCambiarUnidad('2,5', true, false, 2500)).toBe('2500')
+  })
+
+  it('textoAlCambiarUnidad conserva un número ya tipeado (pasa a significar kg)', () => {
+    expect(textoAlCambiarUnidad('1', false, true, 2500)).toBe('1')
+    expect(textoAlCambiarUnidad('1', false, true, null)).toBe('1')
+    expect(textoAlCambiarUnidad('', false, true, 2500)).toBe('')
+    expect(textoAlCambiarUnidad('abc', false, true, 2500)).toBe('abc')
+  })
+
+  it('esUnidadMultiplo reconoce kg y litros (sin acentos, mayúsculas ni puntos)', () => {
+    for (const n of ['kg', 'Kg.', 'kilo', 'Kilogramos']) expect(esUnidadMultiplo(n)).toBe('kg')
+    for (const n of ['l', 'L', 'lt', 'Litros']) expect(esUnidadMultiplo(n)).toBe('l')
+    for (const n of ['g', 'ml', 'un', 'pack', 'm']) expect(esUnidadMultiplo(n)).toBeNull()
   })
 })

@@ -18,10 +18,11 @@ import EditIcon from '@mui/icons-material/Edit'
 import RemoveIcon from '@mui/icons-material/Remove'
 import toast from 'react-hot-toast'
 import TextField from '@/components/shared/AppTextField'
-import { ajustarLlevo, aPrecioBase, desdePrecioBase, variacionPrecio } from '@/lib/lista-compras-compute'
+import { aCantidadBase, ajustarLlevo, aPrecioBase, desdeCantidadBase, desdePrecioBase, textoAlCambiarUnidad, variacionPrecio } from '@/lib/lista-compras-compute'
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
+import CampoCantidad from './CampoCantidad'
 import CatalogoSelect from './CatalogoSelect'
-import { fmtARS, parseNum, precioCampo } from './formato'
+import { fmtARS, fmtCantidad, parseNum, precioCampo } from './formato'
 import type { CambioItem, OpcionCatalogo } from './useListaCompras'
 
 interface Props {
@@ -45,42 +46,67 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
   // Con unidad g/ml el precio se carga y se ve por kg/litro; se guarda siempre por la unidad de la línea.
   const base = item.subunidad_de
   const verPrecio = (p: number | null) => (p == null ? '' : precioCampo(aPrecioBase(p, base)))
-  const [cantidad, setCantidad] = useState(String(item.cantidad))
+  // Las cantidades se registran en la unidad del artículo (g/ml). En g/ml se ven y se cargan en
+  // la unidad que el artículo tiene guardada como preferencia (`mostrar_en_multiplo`): elegir kg en
+  // cualquiera de los campos la cambia para el artículo (todos los meses, todos los dispositivos).
+  // `kgSel` es la copia local, para que el cambio se vea antes de que vuelva el server.
+  const [kgSel, setKgSel] = useState(item.mostrar_en_multiplo)
+  useEffect(() => { setKgSel(item.mostrar_en_multiplo) }, [item.mostrar_en_multiplo])
+  // Si el artículo deja de estar en g/ml (se le cambió la unidad), no hay kg/l que aplicar.
+  const kg = kgSel && base != null
+  const ver = (n: number, enKg: boolean) => String(desdeCantidadBase(n, enKg))
+  const [cantidad, setCantidad] = useState(ver(item.cantidad, kg))
   const [precio, setPrecio] = useState(verPrecio(item.precio_unitario))
-  const [llevo, setLlevo] = useState(String(item.cantidad_comprada))
+  const [llevo, setLlevo] = useState(ver(item.cantidad_comprada, kg))
 
   // Si el server devuelve otro valor (recarga, otro mes), el input lo sigue.
-  useEffect(() => { setCantidad(String(item.cantidad)) }, [item.cantidad])
-  useEffect(() => { setLlevo(String(item.cantidad_comprada)) }, [item.cantidad_comprada])
+  // También al cambiar la unidad o la preferencia: el texto en kg dejaría de significar lo mismo.
+  useEffect(() => { setCantidad(ver(item.cantidad, kg)) }, [item.cantidad, base, item.mostrar_en_multiplo]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setLlevo(ver(item.cantidad_comprada, kg)) }, [item.cantidad_comprada, base, item.mostrar_en_multiplo]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setPrecio(verPrecio(item.precio_unitario)) }, [item.precio_unitario, item.subunidad_de]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Cambio de unidad en un campo: vale para los dos (es del artículo); cada uno convierte su texto si no se tocó. */
+  const elegirUnidad = (nuevo: boolean) => {
+    setCantidad((t) => textoAlCambiarUnidad(t, kg, nuevo, item.cantidad))
+    setLlevo((t) => textoAlCambiarUnidad(t, kg, nuevo, item.cantidad_comprada))
+    setKgSel(nuevo)
+  }
+  /** La preferencia viaja en el mismo guardado que la cantidad, sólo si cambió. */
+  const preferencia = (enKg: boolean): CambioItem =>
+    base != null && enKg !== item.mostrar_en_multiplo ? { mostrar_en_multiplo: enKg } : {}
+
   /** Lo llevado es el acumulado (no el de una compra): se completa de a poco hasta llegar a la cantidad. */
-  const guardarLlevo = () => {
-    const n = parseNum(llevo)
+  const guardarLlevo = (texto: string, enKg: boolean) => {
+    const n = parseNum(texto)
     if (n == null || !Number.isFinite(n) || n < 0) {
       toast.error('La cantidad comprada no es válida')
-      setLlevo(String(item.cantidad_comprada))
+      setLlevo(ver(item.cantidad_comprada, enKg))
       return
     }
-    if (n !== item.cantidad_comprada) onCambiar(item.id, { cantidad_comprada: n })
+    const enBase = aCantidadBase(n, enKg)
+    const cambio = { ...(enBase !== item.cantidad_comprada ? { cantidad_comprada: enBase } : {}), ...preferencia(enKg) }
+    if (Object.keys(cambio).length) onCambiar(item.id, cambio)
   }
 
-  /** Botones +/−: suman o restan un paso a lo que se ve en el campo y guardan al toque. */
+  /** Botones +/−: suman o restan un paso (en la unidad del artículo) a lo que se ve y guardan al toque. */
   const ajustar = (direccion: 1 | -1) => {
     const actual = parseNum(llevo)
-    const nuevo = ajustarLlevo(actual != null && Number.isFinite(actual) ? actual : item.cantidad_comprada, direccion, base)
-    setLlevo(String(nuevo))
+    const desde = actual != null && Number.isFinite(actual) ? aCantidadBase(actual, kg) : item.cantidad_comprada
+    const nuevo = ajustarLlevo(desde, direccion, base)
+    setLlevo(ver(nuevo, kg))
     onCambiar(item.id, { cantidad_comprada: nuevo })
   }
 
-  const guardarCantidad = () => {
-    const n = parseNum(cantidad)
+  const guardarCantidad = (texto: string, enKg: boolean) => {
+    const n = parseNum(texto)
     if (n == null || !Number.isFinite(n) || n <= 0) {
       toast.error('La cantidad tiene que ser mayor a 0')
-      setCantidad(String(item.cantidad))
+      setCantidad(ver(item.cantidad, enKg))
       return
     }
-    if (n !== item.cantidad) onCambiar(item.id, { cantidad: n })
+    const enBase = aCantidadBase(n, enKg)
+    const cambio = { ...(enBase !== item.cantidad ? { cantidad: enBase } : {}), ...preferencia(enKg) }
+    if (Object.keys(cambio).length) onCambiar(item.id, cambio)
   }
 
   const guardarPrecio = () => {
@@ -103,6 +129,7 @@ function useCamposFila(item: ListaCompraItem, onCambiar: Props['onCambiar']) {
   return {
     tiene,
     base, cantidad, setCantidad, precio, setPrecio, llevo, setLlevo,
+    kg, elegirUnidad,
     guardarLlevo, guardarCantidad, guardarPrecio, ajustar,
     parcial,
     progreso: Math.min(100, (item.cantidad_comprada / item.cantidad) * 100),
@@ -172,13 +199,12 @@ function Progreso({ item, progreso }: { item: ListaCompraItem; progreso: number 
   const estado = item.estado_cantidad
   if (estado === 'sin_compras') return null
   const color = estado === 'por_encima' ? 'error' : estado === 'por_debajo' ? 'warning' : 'success'
-  const n = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 3 })
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.25 }}>
       <LinearProgress variant="determinate" value={progreso} color={color} sx={{ flex: 1, height: 6, borderRadius: 3 }} />
       <Typography variant="caption" color={`${color}.main`} fontWeight={estado === 'completo' ? 400 : 700} sx={{ whiteSpace: 'nowrap' }}>
-        {estado === 'por_encima' && `⚠ Pasaste por ${n(item.exceso)} ${item.unidad}`}
-        {estado === 'por_debajo' && `Faltan ${n(item.faltante)} ${item.unidad}`}
+        {estado === 'por_encima' && `⚠ Pasaste por ${fmtCantidad(item.exceso, item)}`}
+        {estado === 'por_debajo' && `Faltan ${fmtCantidad(item.faltante, item)}`}
         {estado === 'completo' && 'Completo'}
       </Typography>
     </Box>
@@ -203,7 +229,7 @@ function Referencia({ item, c }: { item: ListaCompraItem; c: ReturnType<typeof u
     <>
       {ref ? (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          Última vez: {fmtARS(aPrecioBase(ref.precio_unitario, base))}{base ? `/${base}` : ''} × {ref.cantidad.toLocaleString('es-AR')} ({String(ref.mes).padStart(2, '0')}/{ref.anio})
+          Última vez: {fmtARS(aPrecioBase(ref.precio_unitario, base))}{base ? `/${base}` : ''} × {fmtCantidad(ref.cantidad, item)} ({String(ref.mes).padStart(2, '0')}/{ref.anio})
           {variacion != null && (
             <Box component="span" sx={{ ml: 0.5, color: variacion > 0 ? 'error.main' : variacion < 0 ? 'success.main' : 'text.secondary' }}>
               {variacion > 0 ? '▲' : variacion < 0 ? '▼' : '='} {Math.abs(variacion).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%
@@ -254,7 +280,7 @@ function ComprasDetalle({
         <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
           <Typography variant="caption" color="text.secondary" sx={{ minWidth: 76 }}>{fechaCorta(c.fecha)}</Typography>
           <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
-            {c.cantidad.toLocaleString('es-AR', { maximumFractionDigits: 3 })} {item.unidad}
+            {fmtCantidad(c.cantidad, item)}
             {c.precio_unitario != null ? ` × ${fmtARS(aPrecioBase(c.precio_unitario, base))}${base ? `/${base}` : ''}` : ' · sin precio'}
           </Typography>
           <IconButton size="small" onClick={() => onEditar(c)} aria-label="Editar compra"><EditIcon fontSize="small" /></IconButton>
@@ -325,26 +351,32 @@ function FilaEscritorio({ item, unidades, rubros, onCrearUnidad, onCrearRubro, o
           />
         </Box>
       </Tooltip>
-      <TextField
-        size="small"
-        label={`Llevo (${item.unidad})`}
+      <CampoCantidad
+        label="Llevo"
         value={c.llevo}
-        onChange={(e) => c.setLlevo(e.target.value)}
-        onBlur={c.guardarLlevo}
+        onChange={c.setLlevo}
+        multiplo={c.kg}
+        onMultiplo={c.elegirUnidad}
+        unidad={item.unidad}
+        base={c.base}
+        referencia={item.cantidad_comprada}
+        onCommit={c.guardarLlevo}
         onKeyDown={alEnter}
-        inputProps={{ inputMode: 'decimal' }}
         disabled={c.tiene}
-        sx={{ width: 110 }}
+        sx={{ width: 130 }}
       />
-      <TextField
-        size="small"
-        label={`Necesito (${item.unidad})`}
+      <CampoCantidad
+        label="Necesito"
         value={c.cantidad}
-        onChange={(e) => c.setCantidad(e.target.value)}
-        onBlur={c.guardarCantidad}
+        onChange={c.setCantidad}
+        multiplo={c.kg}
+        onMultiplo={c.elegirUnidad}
+        unidad={item.unidad}
+        base={c.base}
+        referencia={item.cantidad}
+        onCommit={c.guardarCantidad}
         onKeyDown={alEnter}
-        inputProps={{ inputMode: 'decimal' }}
-        sx={{ width: 120 }}
+        sx={{ width: 140 }}
       />
       <TextField
         size="small"
@@ -456,14 +488,20 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
             <RemoveIcon />
           </IconButton>
         )}
-        <TextField
-          label={`Llevo (${item.unidad})`}
+        <CampoCantidad
+          label="Llevo"
           value={c.llevo}
-          onChange={(e) => c.setLlevo(e.target.value)}
-          onBlur={c.guardarLlevo}
+          onChange={c.setLlevo}
+          multiplo={c.kg}
+          onMultiplo={c.elegirUnidad}
+          unidad={item.unidad}
+          base={c.base}
+          referencia={item.cantidad_comprada}
+          onCommit={c.guardarLlevo}
           onKeyDown={alEnter}
-          inputProps={{ inputMode: 'decimal', style: { textAlign: 'center' } }}
           disabled={c.tiene}
+          size="medium"
+          inputStyle={{ textAlign: 'center' }}
           sx={{ flex: 1 }}
         />
         {!c.tiene && (
@@ -474,13 +512,18 @@ function FilaCompacta({ item, unidades, rubros, onCrearUnidad, onCrearRubro, onC
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mt: 1.5 }}>
-        <TextField
-          label={`Necesito (${item.unidad})`}
+        <CampoCantidad
+          label="Necesito"
           value={c.cantidad}
-          onChange={(e) => c.setCantidad(e.target.value)}
-          onBlur={c.guardarCantidad}
+          onChange={c.setCantidad}
+          multiplo={c.kg}
+          onMultiplo={c.elegirUnidad}
+          unidad={item.unidad}
+          base={c.base}
+          referencia={item.cantidad}
+          onCommit={c.guardarCantidad}
           onKeyDown={alEnter}
-          inputProps={{ inputMode: 'decimal' }}
+          size="medium"
         />
         <TextField
           label={c.labelPrecio}

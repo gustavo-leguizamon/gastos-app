@@ -9,12 +9,12 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
-import TextField from '@/components/shared/AppTextField'
 import AppDateField from '@/components/shared/AppDateField'
-import { entradaDePrecio, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
+import { aCantidadBase, desdeCantidadBase, entradaDePrecio, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
+import CampoCantidad from './CampoCantidad'
 import CampoPrecio from './CampoPrecio'
-import { fmtARS, hoyLocal, parseNum, precioCampo } from './formato'
+import { fmtARS, fmtCantidad, hoyLocal, parseNum, precioCampo } from './formato'
 import type { CompraInput } from './useListaCompras'
 
 interface Props {
@@ -34,8 +34,16 @@ interface Props {
  * o como **total pagado**, y se calcula el otro: 500 g por $2.000 → $4.000 por kg. Con unidad g/ml
  * arranca en "total pagado" (es lo que dice el ticket); con las demás, en unitario.
  */
+/** Lo tipeado en la unidad elegida → unidad del artículo; `null` vacío, NaN si no es un número. */
+function cantidadBase(texto: string, kg: boolean): number | null {
+  const n = parseNum(texto)
+  return n == null || !Number.isFinite(n) ? n : aCantidadBase(n, kg)
+}
+
 export default function CompraDialog({ open, item, compra, onClose, onGuardar }: Props) {
   const [cantidad, setCantidad] = useState('')
+  // En g/ml la cantidad se puede cargar en kg/l; se registra siempre en la unidad del artículo.
+  const [cantidadKg, setCantidadKg] = useState(false)
   const [precio, setPrecio] = useState('')
   const [modo, setModo] = useState<ModoPrecio>('unitario')
   const [fecha, setFecha] = useState(hoyLocal())
@@ -49,7 +57,10 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
     const precioInicial = compra ? compra.precio_unitario : item.precio_unitario ?? item.referencia?.precio_unitario ?? null
     const entrada = precioInicial == null ? null : entradaDePrecio(modoInicial, precioInicial, cant, base)
     setModo(modoInicial)
-    setCantidad(String(cant))
+    // Arranca en la unidad en que el artículo se muestra (kg/l si lo prefiere); se registra igual en g/ml.
+    const enKg = item.mostrar_en_multiplo && base != null
+    setCantidadKg(enKg)
+    setCantidad(String(desdeCantidadBase(cant, enKg)))
     setPrecio(entrada == null ? '' : precioCampo(entrada))
     setFecha(compra ? compra.fecha : hoyLocal())
     // Sólo al abrir o cambiar de línea/compra: si la lista se recarga con el diálogo abierto, no pisa lo tipeado.
@@ -59,7 +70,7 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
 
   /** Al cambiar entre unitario y total, el campo se convierte (no queda un número con otro significado). */
   const cambiarModo = (nuevo: ModoPrecio) => {
-    const c = parseNum(cantidad)
+    const c = cantidadBase(cantidad, cantidadKg)
     const p = parseNum(precio)
     if (p != null && Number.isFinite(p) && p >= 0) {
       const unitario = precioUnitarioDeEntrada(modo, p, c != null && Number.isFinite(c) ? c : null, base)
@@ -71,7 +82,7 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const c = parseNum(cantidad)
+    const c = cantidadBase(cantidad, cantidadKg)
     const p = parseNum(precio)
     if (c == null || !Number.isFinite(c) || c <= 0) return toast.error('La cantidad tiene que ser mayor a 0')
     if (p !== null && (!Number.isFinite(p) || p < 0)) return toast.error('El precio no es válido')
@@ -86,7 +97,7 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
     if (ok) onClose()
   }
 
-  const c = parseNum(cantidad)
+  const c = cantidadBase(cantidad, cantidadKg)
   const p = parseNum(precio)
   const cantidadValida = c != null && Number.isFinite(c) ? c : null
   const unitario = p != null && Number.isFinite(p) ? precioUnitarioDeEntrada(modo, p, cantidadValida, base) : null
@@ -99,13 +110,18 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
           {compra ? 'Editar compra' : 'Registrar compra'} · {item.nombre}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
-          <TextField
-            label={`Cantidad (${item.unidad})`}
+          <CampoCantidad
+            label="Cantidad"
             value={cantidad}
-            onChange={(e) => setCantidad(e.target.value)}
-            inputProps={{ inputMode: 'decimal' }}
+            onChange={setCantidad}
+            multiplo={cantidadKg}
+            onMultiplo={setCantidadKg}
+            unidad={item.unidad}
+            base={base}
+            referencia={compra ? compra.cantidad : item.faltante > 0 ? item.faltante : item.cantidad}
+            size="medium"
             autoFocus
-            helperText={!compra && item.faltante > 0 ? `Faltan ${item.faltante.toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${item.unidad}` : undefined}
+            helperText={!compra && item.faltante > 0 ? `Faltan ${fmtCantidad(item.faltante, item)}` : undefined}
           />
           <CampoPrecio
             modo={modo}

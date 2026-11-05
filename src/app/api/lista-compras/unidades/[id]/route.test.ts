@@ -25,12 +25,12 @@ describe('PUT /api/lista-compras/unidades/[id]', () => {
   })
 
   it('renombra y devuelve la fila', async () => {
-    mp.unidad.findUnique.mockResolvedValue({ id: 1, nombre: 'kilo' })
+    mp.unidad.findUnique.mockResolvedValue({ id: 1, nombre: 'paq' })
     mp.unidad.findFirst.mockResolvedValue(null)
-    mp.unidad.update.mockResolvedValue({ id: 1, nombre: 'kg' })
-    const res = await PUT(req({ nombre: 'kg' }), ctx('1'))
+    mp.unidad.update.mockResolvedValue({ id: 1, nombre: 'pack' })
+    const res = await PUT(req({ nombre: 'pack' }), ctx('1'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ id: 1, nombre: 'kg', subunidad_de: null })
+    expect(await res.json()).toEqual({ id: 1, nombre: 'pack', subunidad_de: null })
   })
 
   it('fija la equivalencia (g → kg)', async () => {
@@ -41,10 +41,15 @@ describe('PUT /api/lista-compras/unidades/[id]', () => {
     expect(await res.json()).toEqual({ id: 1, nombre: 'g', subunidad_de: 'kg' })
   })
 
+  it('400 al renombrar a kg/l, sin tocar la DB', async () => {
+    expect((await PUT(req({ nombre: 'Kg' }), ctx('1'))).status).toBe(400)
+    expect(mp.unidad.findUnique).not.toHaveBeenCalled()
+  })
+
   it('409 si el nombre ya lo tiene otra unidad', async () => {
-    mp.unidad.findUnique.mockResolvedValue({ id: 1, nombre: 'kilo' })
-    mp.unidad.findFirst.mockResolvedValue({ id: 2, nombre: 'kg' })
-    expect((await PUT(req({ nombre: 'kg' }), ctx('1'))).status).toBe(409)
+    mp.unidad.findUnique.mockResolvedValue({ id: 1, nombre: 'paq' })
+    mp.unidad.findFirst.mockResolvedValue({ id: 2, nombre: 'pack' })
+    expect((await PUT(req({ nombre: 'pack' }), ctx('1'))).status).toBe(409)
   })
 })
 

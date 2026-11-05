@@ -43,6 +43,13 @@ describe('PUT /api/lista-compras/[id]', () => {
     expect(mp.listaCompraItem.update.mock.calls[0][0].data).toEqual({})
   })
 
+  it('la preferencia de ver en kg/l va al artículo, aunque la línea tenga compras', async () => {
+    mp.listaCompraCompra.count.mockResolvedValue(2)
+    expect((await PUT(req({ mostrar_en_multiplo: true }), ctx('1'))).status).toBe(200)
+    expect(mp.articulo.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { mostrarEnMultiplo: true } })
+    expect(mp.listaCompraItem.update.mock.calls[0][0].data).toEqual({})
+  })
+
   it('renombrar se permite aunque la línea tenga compras', async () => {
     mp.listaCompraCompra.count.mockResolvedValue(3)
     expect((await PUT(req({ nombre: 'Leche entera' }), ctx('1'))).status).toBe(200)

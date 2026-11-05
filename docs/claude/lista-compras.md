@@ -18,6 +18,8 @@ de la app vía `useGastosStore().filtros`.
 - **`Articulo`** — catálogo de artículos: `nombre`, `unidadId` (obligatoria), `rubroId?`
   (null = sin rubro; `onDelete: SetNull`). El nombre es único **sin distinguir mayúsculas**,
   resuelto en `resolveArticulo()` (find-or-create, igual que `Concepto`), no con un índice.
+  `mostrarEnMultiplo` (default false; migración `20261105120000_articulo_mostrar_en_multiplo/`): en
+  artículos en g/ml, ver y cargar las cantidades en kg/l — sólo presentación, ver "Cantidades".
 - **`ListaCompraItem`** — una línea por `(articuloId, mes, anio)` (único): `cantidad`,
   `precioUnitario?`, `cantidadComprada` (default 0). `precioUnitario` **null = sin precio** (≠ 0,
   que es un precio válido). `onDelete: Cascade` desde el artículo.
@@ -64,6 +66,42 @@ Decisiones:
     (select "Equivale a 1/1000 de").
   - Cambiar la equivalencia (o la unidad de un artículo) **no reconvierte** precios ya guardados:
     cambia cómo se interpretan/muestran, así que conviene hacerlo antes de cargar precios.
+- **Cantidades siempre en la unidad chica (g / ml / un)**: ningún artículo usa kg ni l. Las
+  cantidades (`cantidad`, `cantidadComprada`, la `cantidad` de cada compra) se **registran en
+  g/ml**; en pantalla, en los artículos en g/ml, cada campo de cantidad tiene a la derecha un
+  selector **g | kg** (ml | l) para elegir en qué se está cargando (`CampoCantidad`): "1" con kg
+  se registra **1000**. Lo usan el alta, "Llevo" y "Necesito" de cada fila (escritorio y celular),
+  el diálogo de compra y la carga desde imagen (si el OCR leyó "2 kg manzanas", la fila arranca
+  con kg elegido; "2 kg" de algo nuevo se da de alta en g). La API no sabe de kg: recibe y
+  devuelve g/ml.
+  - Conversión pura: `aCantidadBase(valor, multiplo)` / `desdeCantidadBase` (×/÷ 1000, redondeo a 6
+    decimales: 1,1 kg → 1100, no 1100.0000000000002).
+  - **La unidad en que se ve es una preferencia del artículo** (`Articulo.mostrarEnMultiplo`, API
+    `mostrar_en_multiplo` en cada ítem y en `/articulos`; `PUT /api/lista-compras/[id]` lo acepta y va
+    al artículo, aunque la línea tenga compras). Elegir kg en "Llevo" o "Necesito" la guarda (en el
+    mismo PUT que la cantidad, sólo si cambió) y vale para los dos campos, todos los meses y todos los
+    dispositivos. Con ella también se muestran en kg/l "Faltan …", "Pasaste por …", la cantidad de
+    "Última vez" y la de cada compra (`fmtCantidad` en `formato.ts`). El diálogo de compra, el alta
+    (al elegir un artículo del catálogo) y la carga desde imagen arrancan en esa unidad, pero ahí
+    cambiar el selector no la guarda. Un artículo **nuevo** cargado en kg se crea con la preferencia
+    (`mostrar_en_multiplo` en el `POST`; uno existente conserva la suya).
+  - **Cambiar el selector** (`textoAlCambiarUnidad`): si el campo muestra todavía la cantidad de
+    referencia (lo guardado o precargado) se **convierte** (2500 g → 2,5 kg; es la misma cantidad
+    y no se guarda nada distinto); si ya se tipeó otro número, se **conserva** y pasa a
+    significar kg ("1" + kg = 1000 g).
+  - En las filas (edición en línea) se guarda al salir del campo **o al elegir la unidad**; ir del
+    campo a su propio selector no guarda (el número tipeado todavía puede cambiar de significado).
+    Si el artículo deja de estar en g/ml, el kg elegido se ignora.
+  - Los +/− del celular suman/restan el paso en g/ml (100) aunque se vea en kg.
+  - **kg y l no son unidades de artículo**: `POST /api/lista-compras/unidades` y el renombre
+    (`PUT .../unidades/[id]`) responden **400** con un nombre múltiplo (`esUnidadMultiplo`: kg,
+    kilo(s), kilogramo(s), l, lt(s), litro(s); sin acentos, mayúsculas ni puntos) con el mensaje
+    `errorMultiplo` ("usá g y elegí kg al cargar la cantidad").
+  - Los artículos que estaban en kg/l se pasan a g/ml con
+    `node scripts/migrar-lista-compras-a-unidades.js [--apply]` (dry-run por defecto): cambia la
+    unidad del artículo, multiplica por 1000 las cantidades de sus líneas y compras y divide por
+    1000 sus precios (lo pagado no cambia), y borra las unidades kg/l. La DB es una sola para
+    todos los ambientes: correrlo **después** de desplegar este cambio.
 - **Un solo precio unitario por línea**: si las compras parciales salieron a precios distintos,
   se carga el último/promedio; no hay precio por compra.
 - **Agregar una unidad/rubro nuevo es un paso aparte** (`POST /api/lista-compras/unidades|rubros`)
@@ -83,11 +121,16 @@ parcial: sólo las claves presentes; `cantidad_comprada >= 0`; `precio_unitario:
 `desdePrecioBase`, `parseUnidadPatch` (nombre y/o `subunidad_de`), `esCompleto`, `resolverPatchComprado` (traduce el atajo
 `comprado: true|false` a `cantidadComprada` = lo pedido / 0; una `cantidad_comprada` explícita
 gana, y nunca se persiste `comprado`), `toItemResponse` (agrega `cantidad_comprada`, `faltante`,
-`comprado` derivado y `total_llevado` = llevado × precio), `totalesLista`:
+`comprado` derivado y `total`/`total_llevado` de `importesLinea`), `totalesLista`:
 
-- `estimado` = Σ `cantidad × (precio del mes ?? precio de referencia)`.
-- `gastado` = Σ `cantidad_comprada × precio` (lo que **ya se compró**) en las líneas con precio
-  cargado: un precio sin nada llevado todavía no suma al gastado, sí al estimado.
+- **`importesLinea`** (por línea): sin compras registradas, `total_llevado` = llevado × precio y
+  `total` = cantidad × precio. **Con compras**, `total_llevado` = **lo realmente pagado** (Σ
+  `cantidad × precio` de cada compra: una compra a $0 cuesta 0, aunque el promedio no la cuente);
+  las compras sin precio se valorizan al precio de la línea (sin él, `null`), y `total` =
+  `total_llevado` + lo que falta × precio (comprar de más no lo baja de lo pagado).
+- `estimado` = Σ `total` de la línea o, sin precio, `cantidad × precio de referencia`.
+- `gastado` = Σ `total_llevado` (lo que **ya se compró**): un precio sin nada llevado todavía no
+  suma al gastado, sí al estimado.
 - `comprados` = líneas completas, `parciales` = con algo llevado pero no todo, `pendientes` = no
   completas (incluye las parciales).
 - `sin_precio` = líneas sin precio propio ni referencia (no entran al estimado).
@@ -171,9 +214,13 @@ el **promedio ponderado por cantidad**.
   cascade desde la línea). Migración `20261103180000_lista_compras_compras/` (tabla nueva y vacía:
   no migra datos). `precioUnitario` null = no se anotó el precio de esa compra.
 - **Promedio ponderado, no simple** (`resumenCompras`): 2 kg a $1.000 + 3 kg a $1.100 → $1.060 (el
-  simple daría $1.050). Es lo correcto porque `cantidad × promedio` **coincide con lo realmente
-  pagado**, así que `gastado` no se desvía; con promedio simple pesaría igual una compra de 1 u
-  que una de 9. Las compras sin precio **o con precio 0** suman cantidad pero no entran al promedio (un 0 hundiría la referencia del mes siguiente); si todas están en 0 o sin precio, la línea conserva el suyo.
+  simple daría $1.050); con promedio simple pesaría igual una compra de 1 u que una de 9. Las
+  compras sin precio **o con precio 0** suman cantidad pero no entran al promedio (un 0 hundiría la
+  referencia del mes siguiente); si todas están en 0 o sin precio, la línea conserva el suyo. Por
+  eso lo gastado **no** es `llevado × promedio` sino lo pagado en las compras (`importesLinea`):
+  400 g a $7.525/kg + 400 g gratis + 600 g a $7.093,75/kg → promedio $7.266,25/kg, gastado $7.266,25.
+  Las líneas guardadas con la regla vieja (el 0 dentro del promedio) se corrigen con
+  `node scripts/recalcular-promedios-lista-compras.js [--apply]` (dry-run por defecto, idempotente).
   El promedio se guarda **sin redondear** (para que los totales cierren), pero en los campos de
   precio de la fila y en el precargado del diálogo de compra se muestra **a centavos**
   (`precioCampo` en `formato.ts`: 5190.178571 → 5190.18). Salir del campo de precio sin tocarlo

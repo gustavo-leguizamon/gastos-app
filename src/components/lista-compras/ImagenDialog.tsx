@@ -23,8 +23,9 @@ import toast from 'react-hot-toast'
 import TextField from '@/components/shared/AppTextField'
 import { fmtARS, hoyLocal, parseNum } from '@/components/lista-compras/formato'
 import type { OpcionCatalogo } from '@/components/lista-compras/useListaCompras'
+import CampoCantidad from '@/components/lista-compras/CampoCantidad'
 import CampoPrecio from '@/components/lista-compras/CampoPrecio'
-import { entradaDePrecio, normalizarBusqueda, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
+import { aCantidadBase, desdeCantidadBase, entradaDePrecio, esUnidadMultiplo, normalizarBusqueda, precioUnitarioDeEntrada, type ModoPrecio, type SubunidadDe } from '@/lib/lista-compras-compute'
 import { mejorCoincidencia } from '@/lib/lista-compras-match'
 import { fechaDeTicket, parseLineasOcr } from '@/lib/lista-compras-ocr'
 import type { ArticuloCatalogo, ListaCompraItem } from '@/lib/types'
@@ -47,6 +48,10 @@ interface Fila {
   /** Cantidad que leyó el OCR: es la de una compra. La de un alta sale de la última usada. */
   cantLeida: number
   cantidad: string
+  /** La cantidad está en kg/l (se registra ×1000 en g/ml). */
+  kg: boolean
+  /** kg/l si el OCR leyó la cantidad en kg o litros ("2 kg manzanas"). */
+  multLeido: SubunidadDe | null
   unidadId: number
   rubroId: number | null
   /** Importe del ticket (total de la línea). */
@@ -132,18 +137,27 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
       : { precio: '', modo: baseDe(unidadId) ? 'total' : 'unitario' }
 
   /** Lo que se precarga al elegir un artículo propio: unidad, rubro y la última cantidad usada. */
-  const datosDe = (art: ArticuloCatalogo, cantLeida: number) => ({
-    unidadId: art.unidad_id,
-    rubroId: art.rubro_id,
-    // Una compra lleva lo que dice la imagen; un alta, lo que se pidió la última vez.
-    cantidad: String(lineaDe(art) ? cantLeida : art.ultima_cantidad ?? cantLeida),
-  })
+  const datosDe = (art: ArticuloCatalogo, cantLeida: number, multLeido: SubunidadDe | null) => {
+    // Una compra lleva lo que dice la imagen; un alta, lo que se pidió la última vez (ya en g/ml).
+    const base = baseDe(art.unidad_id)
+    // "2 kg" de un artículo en g: se muestra 2 con kg elegido (se registra 2000).
+    if (!!lineaDe(art) || art.ultima_cantidad == null) {
+      const kg = base != null && (multLeido != null ? multLeido === base : art.mostrar_en_multiplo)
+      // Leído sin unidad en un artículo que se ve en kg: lo leído ya se toma en kg.
+      return { unidadId: art.unidad_id, rubroId: art.rubro_id, cantidad: String(cantLeida), kg }
+    }
+    // La última cantidad está guardada en g/ml: se muestra en la unidad que prefiere el artículo.
+    const kg = art.mostrar_en_multiplo && base != null
+    return { unidadId: art.unidad_id, rubroId: art.rubro_id, cantidad: String(desdeCantidadBase(art.ultima_cantidad, kg)), kg }
+  }
 
   const armarFilas = (texto: string): Fila[] => {
     const unidadDefault = (unidades.find((u) => u.nombre.toLowerCase() === 'un') ?? unidades[0])?.id
     const porArticulo = new Map<number, Fila>()
     const out: Fila[] = []
-    parseLineasOcr(texto, unidades.map((u) => u.nombre)).forEach((c, i) => {
+    // kg y l no son unidades de artículo, pero se leen para cargar la cantidad en kg/l.
+    parseLineasOcr(texto, [...unidades.map((u) => u.nombre), 'kg', 'l']).forEach((c, i) => {
+      const multLeido = c.unidad ? esUnidadMultiplo(c.unidad) : null
       // Se mapea al artículo propio más parecido a lo leído; si ninguno se parece, queda como se leyó.
       const m = mejorCoincidencia(c.nombre, catalogo)
       const art = m ? catalogo.find((a) => a.id === m.id) ?? null : null
@@ -157,16 +171,19 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
           if (lineaDe(art)) previa.cantidad = String(previa.cantLeida)
           return
         }
-        const fila: Fila = { key: i, incluir: true, leido: c.nombre, nombre: art.nombre, cantLeida: c.cantidad, total: c.total, ...datosDe(art, c.cantidad), ...precioInicial(c.total, art.unidad_id) }
+        const fila: Fila = { key: i, incluir: true, leido: c.nombre, nombre: art.nombre, cantLeida: c.cantidad, multLeido, total: c.total, ...datosDe(art, c.cantidad, multLeido), ...precioInicial(c.total, art.unidad_id) }
         porArticulo.set(art.id, fila)
         out.push(fila)
         return
       }
-      const unidadLeida = c.unidad ? unidades.find((u) => u.nombre === c.unidad)?.id : undefined
+      // Leído en kg/l: la unidad es la g/ml que le corresponde, con la cantidad cargada en kg/l.
+      const unidadLeida = multLeido
+        ? unidades.find((u) => u.subunidad_de === multLeido)?.id
+        : c.unidad ? unidades.find((u) => u.nombre === c.unidad)?.id : undefined
       const unidadId = unidadLeida ?? unidadDefault
       if (unidadId == null) return
       // Sin coincidencia: no se agrega solo; hay que elegir un artículo propio o confirmarlo como nuevo.
-      out.push({ key: i, incluir: false, leido: c.nombre, nombre: c.nombre, cantLeida: c.cantidad, total: c.total, cantidad: String(c.cantidad), unidadId, rubroId: null, ...precioInicial(c.total, unidadId) })
+      out.push({ key: i, incluir: false, leido: c.nombre, nombre: c.nombre, cantLeida: c.cantidad, multLeido, total: c.total, cantidad: String(c.cantidad), kg: multLeido != null && baseDe(unidadId) === multLeido, unidadId, rubroId: null, ...precioInicial(c.total, unidadId) })
     })
     return out
   }
@@ -207,13 +224,18 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   /** Se eligió (o se escribió) un artículo: si es uno propio se precargan sus datos y la fila se incluye. */
   const elegir = (f: Fila, valor: string) => {
     const art = conocido(valor)
-    cambiar(f.key, art ? { nombre: art.nombre, incluir: true, ...datosDe(art, f.cantLeida) } : { nombre: valor })
+    cambiar(f.key, art ? { nombre: art.nombre, incluir: true, ...datosDe(art, f.cantLeida, f.multLeido) } : { nombre: valor })
+  }
+
+  /** Cantidad de la fila en la unidad del artículo (g/ml…), que es como se registra; `null` si no es válida. */
+  const cantidadDe = (f: Fila): number | null => {
+    const c = parseNum(f.cantidad)
+    return c != null && Number.isFinite(c) ? aCantidadBase(c, f.kg && baseDe(f.unidadId) != null) : null
   }
 
   /** Al cambiar entre unitario y total el campo se convierte: no queda un número con otro significado. */
   const cambiarModo = (f: Fila, nuevo: ModoPrecio) => {
-    const c = parseNum(f.cantidad)
-    const cant = c != null && Number.isFinite(c) ? c : null
+    const cant = cantidadDe(f)
     const p = parseNum(f.precio)
     let precio = f.precio
     if (p != null && Number.isFinite(p) && p >= 0) {
@@ -228,9 +250,8 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   /** Precio por la unidad de la línea (lo que se guarda); `null` si no se cargó o no se puede calcular. */
   const precioDe = (f: Fila): number | null => {
     const p = parseNum(f.precio)
-    const c = parseNum(f.cantidad)
     if (p == null || !Number.isFinite(p) || p < 0) return null
-    return precioUnitarioDeEntrada(f.modo, p, c != null && Number.isFinite(c) ? c : null, baseDe(f.unidadId))
+    return precioUnitarioDeEntrada(f.modo, p, cantidadDe(f), baseDe(f.unidadId))
   }
   const precioInvalido = (f: Fila) => {
     const p = parseNum(f.precio)
@@ -250,7 +271,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
     setGuardando(true)
     try {
       const out: ImportItem[] = seleccionadas.map((f) => {
-        const cantidad = parseNum(f.cantidad) as number
+        const cantidad = cantidadDe(f) as number
         const linea = lineaDe(conocido(f.nombre))
         const precio = precioDe(f)
         if (linea) return { tipo: 'compra', item_id: linea.id, cantidad, precio_unitario: precio }
@@ -372,12 +393,14 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                         <TextField {...params} label="Artículo" error={f.incluir && !f.nombre.trim()} />
                       )}
                     />
-                    <TextField
-                      size="small"
+                    <CampoCantidad
                       label="Cant."
                       value={f.cantidad}
-                      onChange={(e) => cambiar(f.key, { cantidad: e.target.value })}
-                      inputProps={{ inputMode: 'decimal' }}
+                      onChange={(v) => cambiar(f.key, { cantidad: v })}
+                      multiplo={f.kg && baseDe(f.unidadId) != null}
+                      onMultiplo={(kg) => cambiar(f.key, { kg })}
+                      unidad={unidadNombre(f.unidadId)}
+                      base={baseDe(f.unidadId)}
                       error={f.incluir && invalida(f)}
                     />
                     <TextField
@@ -410,7 +433,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                       onChange={(v) => cambiar(f.key, { precio: v })}
                       base={baseDe(f.unidadId)}
                       unidad={unidadNombre(f.unidadId)}
-                      cantidad={(() => { const c = parseNum(f.cantidad); return c != null && Number.isFinite(c) ? c : null })()}
+                      cantidad={cantidadDe(f)}
                       opcional
                       sx={{ gridColumn: { xs: '2 / 4', md: '2 / 6' } }}
                     />

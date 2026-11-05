@@ -23,9 +23,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     )
   }
 
-  // Nombre, unidad y rubro son del artículo (valen para todos los meses); el resto, de la línea.
+  // Nombre, unidad, rubro y en qué unidad se muestra son del artículo (valen para todos los meses); el resto, de la línea.
   // El atajo `comprado` se convierte en cantidad: lo único que se persiste es lo llevado.
-  const { unidadId, rubroId, nombre, ...linea } = resolverPatchComprado(patch, existente.cantidad)
+  const { unidadId, rubroId, nombre, mostrarEnMultiplo, ...linea } = resolverPatchComprado(patch, existente.cantidad)
   // El nombre es único sin distinguir mayúsculas: chocar con **otro** artículo es 409 (fusionarlos
   // mezclaría sus históricos de precio). El propio se excluye para poder corregir el casing.
   if (nombre !== undefined) {
@@ -40,13 +40,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (rubroId != null && !(await prisma.rubro.findUnique({ where: { id: rubroId } }))) {
     return NextResponse.json({ error: 'El rubro no existe' }, { status: 400 })
   }
-  if (unidadId !== undefined || rubroId !== undefined || nombre !== undefined) {
+  if (unidadId !== undefined || rubroId !== undefined || nombre !== undefined || mostrarEnMultiplo !== undefined) {
     await prisma.articulo.update({
       where: { id: existente.articuloId },
       data: {
         ...(unidadId !== undefined ? { unidadId } : {}),
         ...(rubroId !== undefined ? { rubroId } : {}),
         ...(nombre !== undefined ? { nombre } : {}),
+        ...(mostrarEnMultiplo !== undefined ? { mostrarEnMultiplo } : {}),
       },
     })
   }

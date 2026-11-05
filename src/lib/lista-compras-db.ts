@@ -13,7 +13,7 @@ export function antesDe(mes: number, anio: number) {
  */
 export async function resolveArticulo(
   db: any,
-  data: { nombre: string; unidadId: number; rubroId: number | null },
+  data: { nombre: string; unidadId: number; rubroId: number | null; mostrarEnMultiplo?: boolean },
 ): Promise<number> {
   const nombre = normalizeNombre(data.nombre)
   const buscar = () =>
@@ -23,7 +23,7 @@ export async function resolveArticulo(
   if (existente) return existente.id
   try {
     const creado = await db.articulo.create({
-      data: { nombre, unidadId: data.unidadId, rubroId: data.rubroId },
+      data: { nombre, unidadId: data.unidadId, rubroId: data.rubroId, mostrarEnMultiplo: data.mostrarEnMultiplo ?? false },
       select: { id: true },
     })
     return creado.id
