@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   ultimosDeArticulo,
+  precargaCompra,
   parseItemBody,
   parseItemPatch,
   parseCopiarBody,
@@ -740,5 +741,30 @@ describe('metros / milímetros', () => {
     expect(errorMultiplo('m')).toContain('"mm"')
     expect(errorMultiplo('kg')).toContain('"g"')
     expect(errorMultiplo('l')).toContain('"ml"')
+  })
+})
+
+describe('precargaCompra', () => {
+  const linea = { faltante: 3, cantidad: 5, precio_unitario: 1000, referencia: { precio_unitario: 900 } }
+  const art = { ultima_cantidad: 4, ultimo_precio: 800 }
+
+  it('con línea en el mes: lo que falta y el precio del mes', () => {
+    expect(precargaCompra(linea, art)).toEqual({ cantidad: 3, precio_unitario: 1000 })
+  })
+
+  it('línea ya completa: ofrece lo pedido, no 0', () => {
+    expect(precargaCompra({ ...linea, faltante: 0 }, art).cantidad).toBe(5)
+  })
+
+  it('línea sin precio: cae a la referencia y después al último precio del artículo', () => {
+    expect(precargaCompra({ ...linea, precio_unitario: null }, art).precio_unitario).toBe(900)
+    expect(precargaCompra({ ...linea, precio_unitario: null, referencia: null }, art).precio_unitario).toBe(800)
+    expect(precargaCompra({ ...linea, precio_unitario: null, referencia: null }, null).precio_unitario).toBeNull()
+  })
+
+  it('sin línea: la última cantidad y el último precio del artículo', () => {
+    expect(precargaCompra(null, art)).toEqual({ cantidad: 4, precio_unitario: 800 })
+    expect(precargaCompra(null, { ultima_cantidad: null, ultimo_precio: null })).toEqual({ cantidad: null, precio_unitario: null })
+    expect(precargaCompra(null, null)).toEqual({ cantidad: null, precio_unitario: null })
   })
 })

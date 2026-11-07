@@ -10,7 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle'
 import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
 import AppDateField from '@/components/shared/AppDateField'
-import { aCantidadBase, desdeCantidadBase, entradaDePrecio, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
+import { aCantidadBase, desdeCantidadBase, entradaDePrecio, precargaCompra, precioUnitarioDeEntrada, type ModoPrecio } from '@/lib/lista-compras-compute'
 import type { ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 import CampoCantidad from './CampoCantidad'
 import CampoPrecio from './CampoPrecio'
@@ -53,8 +53,9 @@ export default function CompraDialog({ open, item, compra, onClose, onGuardar }:
   useEffect(() => {
     if (!open || !item) return
     const modoInicial: ModoPrecio = base ? 'total' : 'unitario'
-    const cant = compra ? compra.cantidad : item.faltante > 0 ? item.faltante : item.cantidad
-    const precioInicial = compra ? compra.precio_unitario : item.precio_unitario ?? item.referencia?.precio_unitario ?? null
+    const precarga = precargaCompra(item, null)
+    const cant = compra ? compra.cantidad : precarga.cantidad ?? item.cantidad
+    const precioInicial = compra ? compra.precio_unitario : precarga.precio_unitario
     const entrada = precioInicial == null ? null : entradaDePrecio(modoInicial, precioInicial, cant, base)
     setModo(modoInicial)
     // Arranca en la unidad en que el artículo se muestra (kg/l si lo prefiere); se registra igual en g/ml.
