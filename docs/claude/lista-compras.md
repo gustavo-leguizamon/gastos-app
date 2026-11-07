@@ -353,6 +353,29 @@ Botón **"Desde imagen"** (escritorio) / icono de cámara (celular) junto a "Uni
   `guardarCompra(..., false)` no recargan en cada uno; se recarga una sola vez al final. `agregar` ahora devuelve la línea creada (o
   `null`), no un boolean. No hay endpoint nuevo ni migración.
 
+## Cargar varias compras del mismo día
+
+Botón **"Varias compras"** (escritorio) / icono `PlaylistAdd` (celular), junto a "Desde imagen": abre el
+**mismo `ImagenDialog`** con `origen="manual"`, que salta el OCR y arranca directo en la **revisión** con una
+fila vacía y la fecha de hoy. Es la carga desde imagen sin la imagen: una sola fecha para todas las filas y
+el mismo destino por fila (compra si el artículo ya está en la lista del mes, alta si no).
+
+- **"Agregar otro artículo"** suma una fila (con el foco en el artículo); cada fila tiene un botón para
+  **quitarla** en lugar de la casilla de incluir. Las filas sin artículo ni cantidad **se ignoran** (no se
+  marcan como error), así sobra una vacía al final sin molestar.
+- **Al elegir un artículo propio** se precarga como en "Registrar compra" (`precargaCompra` en
+  `lista-compras-compute.ts`, compartida con `CompraDialog`): si ya está en la lista, **lo que falta**
+  (o lo pedido, si ya se completó) y el último precio conocido (promedio del mes → referencia → último
+  precio del artículo); si no está, su última cantidad y su último precio. Unidad y rubro quedan fijos. El
+  precio arranca en "total pagado" con g/ml y en unitario con las demás. Volver a elegir el mismo artículo
+  (el blur del autocompletar lo re-dispara) **no pisa** lo tipeado (`Fila.precargadoDe`).
+- **Diferencia con la imagen:** lo que **no está en la lista del mes** se da de alta **y se registra la compra
+  aunque no tenga precio** (`ImportItem` alta con `comprar: true`): todo lo cargado acá ya se compró. Desde
+  imagen, en cambio, un alta sin precio queda como pendiente (puede ser una lista escrita). Un nombre que no es
+  un artículo propio se crea como nuevo (unidad "un" por default, editable).
+- Mismo `importarDeImagen` de la página (una sola recarga al final y toast con altas/compras). No hay endpoint
+  nuevo ni migración.
+
 ## Mobile
 
 Debajo del breakpoint `md` (900px) la página pasa a un diseño **compacto** (`useMediaQuery`); arriba

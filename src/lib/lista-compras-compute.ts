@@ -312,6 +312,25 @@ export function entradaDePrecio(
 }
 
 /**
+ * Qué se precarga al registrar una compra de un artículo: lo que **falta** para completar la línea
+ * (o lo pedido, si ya se completó) y el **último precio conocido** (promedio del mes, o la referencia
+ * del mes anterior). Sin línea en el mes, la última cantidad y el último precio del artículo. Todo en
+ * la unidad del artículo (g/ml…); `null` = no hay de dónde sacarlo.
+ */
+export function precargaCompra(
+  linea: { faltante: number; cantidad: number; precio_unitario: number | null; referencia: { precio_unitario: number } | null } | null,
+  articulo: { ultima_cantidad: number | null; ultimo_precio: number | null } | null,
+): { cantidad: number | null; precio_unitario: number | null } {
+  if (linea) {
+    return {
+      cantidad: linea.faltante > 0 ? linea.faltante : linea.cantidad,
+      precio_unitario: linea.precio_unitario ?? linea.referencia?.precio_unitario ?? articulo?.ultimo_precio ?? null,
+    }
+  }
+  return { cantidad: articulo?.ultima_cantidad ?? null, precio_unitario: articulo?.ultimo_precio ?? null }
+}
+
+/**
  * Lo último que se usó de un artículo, para precargar el alta: la cantidad de su línea más reciente y
  * el último precio que tuvo (que puede ser de una línea anterior). `lineas` de la más nueva a la más vieja.
  */

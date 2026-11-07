@@ -29,6 +29,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ClearIcon from '@mui/icons-material/Clear'
 import CloseIcon from '@mui/icons-material/Close'
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import SearchIcon from '@mui/icons-material/Search'
 import SettingsIcon from '@mui/icons-material/Settings'
 import toast from 'react-hot-toast'
@@ -69,6 +70,7 @@ export default function ListaComprasPage() {
   const [cantidadKg, setCantidadKg] = useState(false)
   const [adminAbierto, setAdminAbierto] = useState(false)
   const [imagenAbierta, setImagenAbierta] = useState(false)
+  const [manualAbierta, setManualAbierta] = useState(false)
   // Diálogo de alta del celular (y el botón flotante que lo abre).
   const [altaAbierta, setAltaAbierta] = useState(false)
   const nombreRef = useRef<HTMLInputElement>(null)
@@ -189,7 +191,10 @@ export default function ListaComprasPage() {
     { label: 'Comprados', value: `${totales.comprados} / ${totales.items}`, hint: (totales.parciales > 0 ? `${totales.parciales} en curso · ${totales.pendientes} sin completar` : `${totales.pendientes} pendiente(s)`) + (totales.excedidos > 0 ? ` · ⚠ ${totales.excedidos} de más` : ''), color: 'success.main' },
   ]
 
-  /** Alta en tanda de lo detectado en una imagen; con precio, también la registra como comprada. */
+  /**
+   * Alta en tanda de lo detectado en una imagen o cargado a mano; con precio (o `comprar`, en la carga
+   * manual) también la registra como comprada.
+   */
   const importarDeImagen = async (nuevos: ImportItem[], fecha: string) => {
     let agregados = 0
     let compras = 0
@@ -202,7 +207,7 @@ export default function ListaComprasPage() {
       const creada = await agregar({ nombre: n.nombre, unidad_id: n.unidad_id, rubro_id: n.rubro_id, cantidad: n.cantidad }, false)
       if (!creada) continue
       agregados++
-      if (n.precio_unitario != null && await guardarCompra(creada.id, { cantidad: n.cantidad, precio_unitario: n.precio_unitario, fecha }, undefined, false)) compras++
+      if ((n.comprar || n.precio_unitario != null) && await guardarCompra(creada.id, { cantidad: n.cantidad, precio_unitario: n.precio_unitario, fecha }, undefined, false)) compras++
     }
     await recargarTodo()
     if (agregados + compras > 0) {
@@ -351,6 +356,17 @@ export default function ListaComprasPage() {
               <Typography variant="subtitle1" fontWeight={600}>Agregar artículo</Typography>
             )}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Tooltip title="Cargar varias compras del mismo día">
+              <span>
+                {compacta ? (
+                  <IconButton onClick={() => setManualAbierta(true)} aria-label="Cargar varias compras"><PlaylistAddIcon /></IconButton>
+                ) : (
+                  <Button size="small" startIcon={<PlaylistAddIcon />} onClick={() => setManualAbierta(true)}>
+                    Varias compras
+                  </Button>
+                )}
+              </span>
+            </Tooltip>
             <Tooltip title="Cargar artículos desde la foto de una lista o de un ticket">
               <span>
                 {compacta ? (
@@ -544,6 +560,17 @@ export default function ListaComprasPage() {
         catalogo={catalogo}
         items={items}
         onClose={() => setImagenAbierta(false)}
+        onImportar={importarDeImagen}
+      />
+
+      <ImagenDialog
+        origen="manual"
+        open={manualAbierta}
+        unidades={unidades}
+        rubros={rubros}
+        catalogo={catalogo}
+        items={items}
+        onClose={() => setManualAbierta(false)}
         onImportar={importarDeImagen}
       />
 
