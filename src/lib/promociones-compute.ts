@@ -482,3 +482,30 @@ export function ordenarPorDisponible<T extends { progreso: ProgresoPromocion }>(
     return b.progreso.disponible - a.progreso.disponible
   })
 }
+
+// ── Aviso en /gastos ─────────────────────────────────────────────────────────────────
+
+/**
+ * Qué mostrar en el popup de promociones de la pantalla de gastos, el día `hoy` (`YYYY-MM-DD`
+ * local): las promos que valen **hoy** y todavía tienen tope por aprovechar (una con el tope
+ * agotado no tiene nada que ganar, así que no merece interrumpir), ordenadas por disponible, y
+ * los **reintegros pendientes de usar** (saldo a favor que se pierde si vence). `promos` tiene
+ * que ser el progreso del **mes de hoy**, no el del período que se esté mirando.
+ * `mostrar` es falso cuando no hay ninguna de las dos cosas: el popup no abre.
+ */
+export function avisoPromociones<
+  P extends { activa: boolean; vigente?: boolean; dias: number[]; progreso: ProgresoPromocion },
+  R extends { vence_el: string | null; utilizado: boolean; reintegrado: number },
+>(promos: P[], reintegros: R[], hoy: string) {
+  const dia = diaSemanaDeFecha(hoy)
+  const deHoy = dia == null
+    ? []
+    : ordenarPorDisponible(promosDelDia(promos, dia).filter(p => p.progreso.disponible > 0))
+  const saldos = reintegrosPendientes(reintegros).filter(r => r.reintegrado > 0)
+  return {
+    deHoy,
+    saldos,
+    saldoTotal: r2(saldos.reduce((s, r) => s + r.reintegrado, 0)),
+    mostrar: deHoy.length > 0 || saldos.length > 0,
+  }
+}
