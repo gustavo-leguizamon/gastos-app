@@ -55,6 +55,15 @@ Para no perder un reintegro por no usarlo a tiempo, cada reintegro puede llevar 
 - **Color** (`estadoVencimiento(venceEl, hoy)`): `vencido` y `urgente` (≤ 7 días, incluye hoy) en rojo, `proximo` (≤ 15) en naranja, `ok` neutro. Los días se cuentan en UTC sobre el string (`diasHasta`) y `hoy` es la fecha local del cliente.
 - Se listan sólo los **no utilizados con fecha y monto reintegrado > 0** (con 0 no hay nada que perder), ordenados por fecha (`reintegrosPendientes`). Los vencidos siguen apareciendo hasta marcarlos como usados o quitarles la fecha.
 
+### Popup en `/gastos` (`PromocionesHoyAlert`)
+
+Al entrar a la pantalla principal de gastos sale un popup "Promociones" con:
+
+- **Vigentes hoy**: las promos activas, vigentes en el mes y que valen el día de la semana de hoy, **con tope por aprovechar** (las de tope agotado no interrumpen), ordenadas por disponible, con "Podés recuperar $X · gastando $Y más".
+- **Saldo de reintegros para usar**: los mismos pendientes que `ReintegrosPorVencer` (no utilizados, con fecha y monto > 0, de cualquier mes) con su chip de vencimiento y el total.
+
+La selección la hace `avisoPromociones(promos, reintegros, hoy)` (pura, en `promociones-compute.ts`); si no hay ninguna de las dos cosas no abre. Mira siempre el **mes de hoy** (`GET /api/promociones?mes=&anio=` con la fecha local + `GET /api/promociones/vencimientos`), no el período elegido en el dashboard. Sale **una vez por día**: al cerrarlo (o al ir a "Ver promociones") guarda la fecha en `localStorage` (`gastos:aviso-promociones`, con try/catch: sin storage vuelve a salir). Para no apilar dos diálogos, espera a que se cierre `VencimientosHoyAlert` (prop `onDone`, que también se llama si no había vencimientos o falló el fetch).
+
 ## API
 
 | Ruta | Qué hace |

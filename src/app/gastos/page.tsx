@@ -19,6 +19,7 @@ import GastosTable from '@/components/gastos/GastosTable'
 import GastoDialog from '@/components/gastos/GastoDialog'
 import CopiarMesDialog from '@/components/gastos/CopiarMesDialog'
 import VencimientosHoyAlert from '@/components/gastos/VencimientosHoyAlert'
+import PromocionesHoyAlert from '@/components/gastos/PromocionesHoyAlert'
 import type { Gasto } from '@/lib/types'
 
 export default function GastosPage() {
@@ -30,6 +31,8 @@ export default function GastosPage() {
   const [categoriaIds, setCategoriaIds] = useState<number[]>([])
   const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
   const [tarjetaIds, setTarjetaIds] = useState<number[]>([])
+  // El aviso de promociones espera a que se cierre el de vencimientos: no se apilan dos popups.
+  const [vencimientosVistos, setVencimientosVistos] = useState(false)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -37,7 +40,8 @@ export default function GastosPage() {
 
   return (
     <Box sx={{ pb: { xs: 10, sm: 12 } }}>
-      <VencimientosHoyAlert />
+      <VencimientosHoyAlert onDone={() => setVencimientosVistos(true)} />
+      <PromocionesHoyAlert habilitado={vencimientosVistos} />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 2, sm: 3 } }}>
         <Box>
           <Typography variant="h5" fontWeight={700}>Gastos</Typography>

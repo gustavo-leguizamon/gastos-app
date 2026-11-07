@@ -22,6 +22,7 @@ import {
   tieneCriterios,
   criterioCoincide,
   whereGastoCriterios,
+  avisoPromociones,
 } from './promociones-compute'
 
 const bodyOk = (over: Record<string, any> = {}) => ({
@@ -439,5 +440,51 @@ describe('diaCoincide', () => {
   it('sin fecha válida no descarta', () => {
     expect(diaCoincide({ dias: [1] }, null)).toBe(true)
     expect(diaCoincide({ dias: [1] }, 'basura')).toBe(true)
+  })
+})
+
+describe('avisoPromociones', () => {
+  // 2026-11-06 es viernes (4).
+  const HOY = '2026-11-06'
+  const promo = (id: number, over: Record<string, any> = {}) => ({
+    id,
+    activa: true,
+    vigente: true,
+    dias: [4],
+    progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 0, 0),
+    ...over,
+  })
+  const saldo = (reintegrado: number, vence_el: string | null = '2026-11-20', utilizado = false) =>
+    ({ reintegrado, vence_el, utilizado })
+
+  it('lista las promos de hoy con tope por aprovechar, más disponible primero', () => {
+    const a = promo(1, { progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 30000, 0) }) // disponible 4000
+    const b = promo(2) // disponible 10000
+    const r = avisoPromociones([a, b], [], HOY)
+    expect(r.deHoy.map(p => p.id)).toEqual([2, 1])
+    expect(r.mostrar).toBe(true)
+  })
+
+  it('omite las de otro día, inactivas, fuera de vigencia y con el tope agotado', () => {
+    const otroDia = promo(1, { dias: [0] })
+    const inactiva = promo(2, { activa: false })
+    const fuera = promo(3, { vigente: false })
+    const agotada = promo(4, { progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 60000, 0) })
+    const r = avisoPromociones([otroDia, inactiva, fuera, agotada], [], HOY)
+    expect(r.deHoy).toEqual([])
+    expect(r.mostrar).toBe(false)
+  })
+
+  it('suma los reintegros pendientes de usar, sin los usados, sin fecha o en 0', () => {
+    const r = avisoPromociones([], [saldo(1500.5), saldo(2000, '2026-11-01'), saldo(900, null), saldo(700, '2026-11-10', true), saldo(0)], HOY)
+    expect(r.saldos.map(s => s.reintegrado)).toEqual([2000, 1500.5])
+    expect(r.saldoTotal).toBe(3500.5)
+    expect(r.mostrar).toBe(true)
+  })
+
+  it('con una fecha inválida no lista promos del día pero sí los saldos', () => {
+    const r = avisoPromociones([promo(1)], [saldo(100)], 'basura')
+    expect(r.deHoy).toEqual([])
+    expect(r.saldos).toHaveLength(1)
   })
 })

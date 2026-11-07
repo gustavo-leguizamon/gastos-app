@@ -17,15 +17,17 @@ import MenuItem from '@mui/material/MenuItem'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
+import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera'
 import toast from 'react-hot-toast'
 import TextField from '@/components/shared/AppTextField'
-import { fmtARS, hoyLocal, parseNum } from '@/components/lista-compras/formato'
+import { fmtARS, hoyLocal, parseNum, precioCampo } from '@/components/lista-compras/formato'
 import type { OpcionCatalogo } from '@/components/lista-compras/useListaCompras'
 import CampoCantidad from '@/components/lista-compras/CampoCantidad'
 import CampoPrecio from '@/components/lista-compras/CampoPrecio'
-import { aCantidadBase, desdeCantidadBase, entradaDePrecio, esUnidadMultiplo, normalizarBusqueda, precioUnitarioDeEntrada, type ModoPrecio, type SubunidadDe } from '@/lib/lista-compras-compute'
+import { aCantidadBase, desdeCantidadBase, entradaDePrecio, esUnidadMultiplo, normalizarBusqueda, precargaCompra, precioUnitarioDeEntrada, type ModoPrecio, type SubunidadDe } from '@/lib/lista-compras-compute'
 import { mejorCoincidencia } from '@/lib/lista-compras-match'
 import { fechaDeTicket, parseLineasOcr } from '@/lib/lista-compras-ocr'
 import type { ArticuloCatalogo, ListaCompraItem } from '@/lib/types'
@@ -35,7 +37,8 @@ import type { ArticuloCatalogo, ListaCompraItem } from '@/lib/types'
  * compra para una línea que ya está en ella.
  */
 export type ImportItem =
-  | { tipo: 'alta'; nombre: string; unidad_id: number; rubro_id: number | null; cantidad: number; precio_unitario: number | null }
+  /** `comprar`: registrar la compra aunque no tenga precio (carga manual: lo cargado ya se compró). */
+  | { tipo: 'alta'; nombre: string; unidad_id: number; rubro_id: number | null; cantidad: number; precio_unitario: number | null; comprar?: boolean }
   | { tipo: 'compra'; item_id: number; cantidad: number; precio_unitario: number | null }
 
 interface Fila {
@@ -59,6 +62,8 @@ interface Fila {
   /** Precio tal como se tipea: por unidad (por kg/litro en g/ml) o total pagado, según `modo`. Vacío = sin precio. */
   precio: string
   modo: ModoPrecio
+  /** Carga manual: artículo cuyos datos ya se precargaron (re-elegirlo no pisa lo tipeado). */
+  precargadoDe?: number
 }
 
 type Fase = 'elegir' | 'leyendo' | 'revisar'
@@ -83,6 +88,11 @@ async function prepararImagen(file: File): Promise<Blob> {
 
 interface Props {
   open: boolean
+  /**
+   * `imagen` (default): se lee una foto con OCR. `manual`: se arranca directo en la revisión con
+   * filas vacías, para cargar a mano varias compras del mismo día.
+   */
+  origen?: 'imagen' | 'manual'
   unidades: OpcionCatalogo[]
   rubros: OpcionCatalogo[]
   catalogo: ArticuloCatalogo[]
@@ -99,7 +109,7 @@ interface Props {
  * la lista del mes se registra una **compra** (con el precio y la fecha del ticket) en vez de un alta.
  * Todo pasa por una revisión editable, porque el OCR se equivoca.
  */
-export default function ImagenDialog({ open, unidades, rubros, catalogo, items, onClose, onImportar }: Props) {
+export default function ImagenDialog({ open, origen = 'imagen', unidades, rubros, catalogo, items, onClose, onImportar }: Props) {
   const theme = useTheme()
   const compacta = useMediaQuery(theme.breakpoints.down('md'))
   const [fase, setFase] = useState<Fase>('elegir')
@@ -110,13 +120,34 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   const [fecha, setFecha] = useState(hoyLocal())
   const inputRef = useRef<HTMLInputElement>(null)
   const cancelado = useRef(false)
+  const manual = origen === 'manual'
+  /** Claves de las filas agregadas a mano (las del OCR usan el índice de la línea leída). */
+  const siguienteKey = useRef(100000)
+  /** Fila recién agregada a mano: recibe el foco. */
+  const [focoKey, setFocoKey] = useState<number | null>(null)
 
-  // Al cerrar se vuelve a empezar: la próxima foto no hereda la revisión anterior.
+  const unidadDefault = () => (unidades.find((u) => u.nombre.toLowerCase() === 'un') ?? unidades[0])?.id
+  const filaVacia = (): Fila => {
+    const unidadId = unidadDefault() ?? 0
+    return {
+      key: siguienteKey.current++, incluir: true, leido: '', nombre: '', cantLeida: 0, cantidad: '', kg: false,
+      multLeido: null, unidadId, rubroId: null, total: null, precio: '', modo: baseDe(unidadId) ? 'total' : 'unitario',
+    }
+  }
+
+  // Al cerrar se vuelve a empezar: la próxima foto no hereda la revisión anterior. La carga manual
+  // abre directo en la revisión, con una fila vacía y la fecha de hoy.
   useEffect(() => {
-    if (open) return
+    if (open) {
+      if (manual) {
+        const fila = filaVacia()
+        setFilas([fila]); setFocoKey(fila.key); setFecha(hoyLocal()); setTextoVacio(false); setFase('revisar')
+      }
+      return
+    }
     cancelado.current = true
-    setFase('elegir'); setFilas([]); setProgreso(0); setTextoVacio(false)
-  }, [open])
+    setFase('elegir'); setFilas([]); setProgreso(0); setTextoVacio(false); setFocoKey(null)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const porNombre = useMemo(() => new Map(catalogo.map((a) => [normalizarBusqueda(a.nombre), a])), [catalogo])
   const conocido = (nombre: string) => porNombre.get(normalizarBusqueda(nombre)) ?? null
@@ -151,8 +182,31 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
     return { unidadId: art.unidad_id, rubroId: art.rubro_id, cantidad: String(desdeCantidadBase(art.ultima_cantidad, kg)), kg }
   }
 
+  /**
+   * Carga manual: lo que se precarga al elegir un artículo propio, igual que al registrar una compra
+   * (`precargaCompra`): lo que falta de su línea y el último precio conocido.
+   */
+  const datosManual = (art: ArticuloCatalogo): Partial<Fila> => {
+    const base = baseDe(art.unidad_id)
+    const kg = art.mostrar_en_multiplo && base != null
+    const modo: ModoPrecio = base ? 'total' : 'unitario'
+    const p = precargaCompra(lineaDe(art), art)
+    const entrada = p.precio_unitario == null ? null : entradaDePrecio(modo, p.precio_unitario, p.cantidad, base)
+    return {
+      precargadoDe: art.id, unidadId: art.unidad_id, rubroId: art.rubro_id, kg, modo,
+      cantidad: p.cantidad == null ? '' : String(desdeCantidadBase(p.cantidad, kg)),
+      precio: entrada == null ? '' : precioCampo(entrada),
+    }
+  }
+
+  const agregarFila = () => {
+    const fila = filaVacia()
+    setFilas((prev) => [...prev, fila])
+    setFocoKey(fila.key)
+  }
+  const quitarFila = (key: number) => setFilas((prev) => prev.filter((f) => f.key !== key))
+
   const armarFilas = (texto: string): Fila[] => {
-    const unidadDefault = (unidades.find((u) => u.nombre.toLowerCase() === 'un') ?? unidades[0])?.id
     const porArticulo = new Map<number, Fila>()
     const out: Fila[] = []
     // kg, l y m no son unidades de artículo, pero se leen para cargar la cantidad en kg/l/m.
@@ -180,7 +234,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
       const unidadLeida = multLeido
         ? unidades.find((u) => u.subunidad_de === multLeido)?.id
         : c.unidad ? unidades.find((u) => u.nombre === c.unidad)?.id : undefined
-      const unidadId = unidadLeida ?? unidadDefault
+      const unidadId = unidadLeida ?? unidadDefault()
       if (unidadId == null) return
       // Sin coincidencia: no se agrega solo; hay que elegir un artículo propio o confirmarlo como nuevo.
       out.push({ key: i, incluir: false, leido: c.nombre, nombre: c.nombre, cantLeida: c.cantidad, multLeido, total: c.total, cantidad: String(c.cantidad), kg: multLeido != null && baseDe(unidadId) === multLeido, unidadId, rubroId: null, ...precioInicial(c.total, unidadId) })
@@ -224,7 +278,10 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   /** Se eligió (o se escribió) un artículo: si es uno propio se precargan sus datos y la fila se incluye. */
   const elegir = (f: Fila, valor: string) => {
     const art = conocido(valor)
-    cambiar(f.key, art ? { nombre: art.nombre, incluir: true, ...datosDe(art, f.cantLeida, f.multLeido) } : { nombre: valor })
+    if (!art) return cambiar(f.key, { nombre: valor, precargadoDe: undefined })
+    // Mismo artículo que ya estaba elegido (el blur re-dispara el onChange): no se pisa lo tipeado.
+    if (manual && f.precargadoDe === art.id) return cambiar(f.key, { nombre: art.nombre })
+    cambiar(f.key, { nombre: art.nombre, incluir: true, ...(manual ? datosManual(art) : datosDe(art, f.cantLeida, f.multLeido)) })
   }
 
   /** Cantidad de la fila en la unidad del artículo (g/ml…), que es como se registra; `null` si no es válida. */
@@ -258,7 +315,9 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
     return p != null && (!Number.isFinite(p) || p < 0)
   }
 
-  const seleccionadas = filas.filter((f) => f.incluir)
+  /** Fila manual sin tocar: se ignora en vez de marcarla como error. */
+  const vacia = (f: Fila) => manual && !f.nombre.trim() && !f.cantidad.trim()
+  const seleccionadas = filas.filter((f) => f.incluir && !vacia(f))
   const invalida = (f: Fila) => {
     const c = parseNum(f.cantidad)
     return !f.nombre.trim() || c == null || !Number.isFinite(c) || c <= 0
@@ -277,7 +336,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
         if (linea) return { tipo: 'compra', item_id: linea.id, cantidad, precio_unitario: precio }
         return {
           tipo: 'alta', nombre: f.nombre.trim(), unidad_id: f.unidadId, rubro_id: f.rubroId, cantidad,
-          precio_unitario: precio,
+          precio_unitario: precio, comprar: manual,
         }
       })
       await onImportar(out, fecha)
@@ -290,6 +349,11 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   const estado = (f: Fila) => {
     const t = tipoDe(f)
     if (t === 'compra') return <Chip size="small" color="success" variant="outlined" label="Ya está en la lista: se registra la compra" />
+    if (manual) {
+      if (!f.nombre.trim()) return null
+      if (t === 'alta') return <Chip size="small" color="primary" variant="outlined" label="No está en la lista: se agrega como comprado" />
+      return <Chip size="small" color="warning" variant="outlined" label="Artículo nuevo: se crea y se agrega como comprado" />
+    }
     if (t === 'alta') return <Chip size="small" color="primary" variant="outlined" label="Se agrega a la lista" />
     return <Chip size="small" color="warning" variant="outlined" label="Sin coincidencia: se crea como artículo nuevo" />
   }
@@ -297,7 +361,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
   return (
     <Dialog open={open} onClose={onClose} fullScreen={compacta} fullWidth maxWidth="md">
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
-        Cargar desde una imagen
+        {manual ? 'Cargar varias compras' : 'Cargar desde una imagen'}
         <IconButton onClick={onClose} aria-label="Cerrar"><CloseIcon /></IconButton>
       </DialogTitle>
 
@@ -340,7 +404,12 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
 
         {fase === 'revisar' && (
           <>
-            {textoVacio ? (
+            {manual ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Cargá todo lo que compraste el mismo día. Si el artículo ya está en la lista del mes se registra la
+                compra; si no, se agrega a la lista como comprado. El precio es opcional.
+              </Typography>
+            ) : textoVacio ? (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 No se detectó ningún artículo. Probá con una foto más nítida y de frente.
               </Alert>
@@ -351,7 +420,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
               </Typography>
             )}
 
-            {filas.length > 0 && (
+            {(filas.length > 0 || manual) && (
               <TextField
                 size="small"
                 type="date"
@@ -380,7 +449,13 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                       borderColor: 'divider',
                     }}
                   >
-                    <Checkbox checked={f.incluir} onChange={(e) => cambiar(f.key, { incluir: e.target.checked })} sx={{ p: 0.5 }} />
+                    {manual ? (
+                      <IconButton size="small" onClick={() => quitarFila(f.key)} aria-label="Quitar fila" sx={{ p: 0.5 }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    ) : (
+                      <Checkbox checked={f.incluir} onChange={(e) => cambiar(f.key, { incluir: e.target.checked })} sx={{ p: 0.5 }} />
+                    )}
                     <Autocomplete
                       freeSolo
                       autoSelect
@@ -390,7 +465,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                       onChange={(_, v) => elegir(f, v ?? '')}
                       onInputChange={(_, v, reason) => { if (reason === 'input') cambiar(f.key, { nombre: v }) }}
                       renderInput={(params) => (
-                        <TextField {...params} label="Artículo" error={f.incluir && !f.nombre.trim()} />
+                        <TextField {...params} label="Artículo" autoFocus={f.key === focoKey} error={f.incluir && !vacia(f) && !f.nombre.trim()} />
                       )}
                     />
                     <CampoCantidad
@@ -401,7 +476,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                       onMultiplo={(kg) => cambiar(f.key, { kg })}
                       unidad={unidadNombre(f.unidadId)}
                       base={baseDe(f.unidadId)}
-                      error={f.incluir && invalida(f)}
+                      error={f.incluir && !vacia(f) && invalida(f)}
                     />
                     <TextField
                       select
@@ -439,20 +514,27 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
                     />
                     <Box sx={{ gridColumn: { xs: '2 / 4', md: '2 / 6' }, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mt: -0.5 }}>
                       {estado(f)}
-                      <Typography variant="caption" color="text.secondary">
-                        Leído: “{f.leido}”{f.total != null ? ` · ${fmtARS(f.total)}` : ''}
-                      </Typography>
+                      {!manual && (
+                        <Typography variant="caption" color="text.secondary">
+                          Leído: “{f.leido}”{f.total != null ? ` · ${fmtARS(f.total)}` : ''}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
                 )
               })}
             </Box>
+            {manual && (
+              <Button startIcon={<AddIcon />} onClick={agregarFila} sx={{ mt: 1.5 }}>
+                Agregar otro artículo
+              </Button>
+            )}
           </>
         )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        {fase === 'revisar' && (
+        {fase === 'revisar' && !manual && (
           <Button onClick={() => { setFase('elegir'); setFilas([]) }} disabled={guardando} sx={{ mr: 'auto' }}>
             Otra imagen
           </Button>
@@ -460,7 +542,7 @@ export default function ImagenDialog({ open, unidades, rubros, catalogo, items, 
         <Button onClick={onClose} disabled={guardando}>Cancelar</Button>
         {fase === 'revisar' && (
           <Button variant="contained" onClick={importar} disabled={guardando || seleccionadas.length === 0}>
-            {guardando ? 'Guardando…' : `Aceptar ${seleccionadas.length}`}
+            {guardando ? 'Guardando…' : manual ? `Registrar ${seleccionadas.length}` : `Aceptar ${seleccionadas.length}`}
           </Button>
         )}
       </DialogActions>

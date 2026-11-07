@@ -23,7 +23,12 @@ function fmtARS(n: number) {
 const COLOR_HOY = '#f59e0b'
 const COLOR_VENCIDO = '#dc2626'
 
-export default function VencimientosHoyAlert() {
+interface Props {
+  /** Se llama cuando el popup ya no está en pantalla (se cerró, o no había nada que avisar). */
+  onDone?: () => void
+}
+
+export default function VencimientosHoyAlert({ onDone }: Props = {}) {
   const [pendientes, setPendientes] = useState<VencimientoHoy[]>([])
   const [open, setOpen] = useState(false)
 
@@ -46,10 +51,18 @@ export default function VencimientosHoyAlert() {
         if (out.length > 0) {
           setPendientes(out)
           setOpen(true)
+        } else {
+          onDone?.()
         }
       })
-      .catch(() => {})
+      .catch(() => onDone?.())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const cerrar = () => {
+    setOpen(false)
+    onDone?.()
+  }
 
   if (pendientes.length === 0) return null
 
@@ -97,7 +110,7 @@ export default function VencimientosHoyAlert() {
   }
 
   return (
-    <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={cerrar} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1, color: colorTitulo }}>
         <WarningAmberIcon /> {hayVencidos ? 'Vencimientos pendientes' : 'Vencimientos del día'}
       </DialogTitle>
@@ -128,7 +141,7 @@ export default function VencimientosHoyAlert() {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => setOpen(false)} variant="contained">Entendido</Button>
+        <Button onClick={cerrar} variant="contained">Entendido</Button>
       </DialogActions>
     </Dialog>
   )
