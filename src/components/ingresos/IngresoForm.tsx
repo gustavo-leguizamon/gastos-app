@@ -5,6 +5,7 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import TextField from '@/components/shared/AppTextField'
+import AppMontoField from '@/components/shared/AppMontoField'
 import AppDateField from '@/components/shared/AppDateField'
 import AppSelect from '@/components/shared/AppSelect'
 import AddIcon from '@mui/icons-material/Add'
@@ -147,13 +148,11 @@ export default function IngresoForm({ mes, anio, casas, monedas, editing, onSubm
           inputProps={{ min: `${anio}-${mm}-01`, max: `${anio}-${mm}-${String(ultimoDia).padStart(2, '0')}` }}
           sx={{ minWidth: { xs: 'auto', sm: 160 } }}
         />
-        <TextField
+        <AppMontoField
           label={`Monto (${monedaSeleccionada?.codigo ?? 'moneda'})`}
-          type="number"
           value={monto}
           onChange={(e) => setMonto(e.target.value)}
           size="small"
-          inputProps={{ step: '0.01' }}
           sx={{ minWidth: { xs: 'auto', sm: 160 } }}
         />
       </Box>
