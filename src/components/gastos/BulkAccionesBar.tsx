@@ -15,9 +15,15 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import IconButton from '@mui/material/IconButton'
 import AppSelect from '@/components/shared/AppSelect'
 import type { Categoria, Etiqueta } from '@/lib/types'
+import type { TotalesSeleccion } from '@/lib/gastos-seleccion'
+
+function fmtARS(n: number) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 }).format(n)
+}
 
 interface Props {
   count: number
+  totales: TotalesSeleccion
   totalFiltrados: number
   allSelected: boolean
   onToggleAll: (checked: boolean) => void
@@ -33,9 +39,11 @@ interface Props {
  *  - asignar/quitar la **categoría única** (partición) de todos los seleccionados;
  *  - agregar/quitar una **etiqueta** (corte transversal M2M) de todos los seleccionados;
  *  - **eliminar** todos los seleccionados (con confirmación en `GastosTable`).
+ * Arriba muestra la **suma** de los seleccionados (total, pagado y restante).
  */
 export default function BulkAccionesBar({
   count,
+  totales,
   totalFiltrados,
   allSelected,
   onToggleAll,
@@ -104,6 +112,21 @@ export default function BulkAccionesBar({
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
+
+      {/* Suma de lo seleccionado (mismo total que muestra la columna "Total ARS") */}
+      {totales.cantidad > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 2, rowGap: 0.5, px: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">
+            Total: <strong>{fmtARS(totales.total)}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Pagado: <strong>{fmtARS(totales.pagado)}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Restante: <strong style={{ color: totales.restante > 0 ? '#f59e0b' : '#22c55e' }}>{fmtARS(totales.restante)}</strong>
+          </Typography>
+        </Box>
+      )}
 
       <Divider />
 
