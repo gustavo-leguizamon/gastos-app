@@ -435,6 +435,29 @@ export function estadoCantidad(cantidad: number, cantidadComprada: number): Esta
   return 'por_debajo'
 }
 
+/** Filtro por estado de la lista: todas, las que faltan, las ya compradas, las compradas de más. */
+export type FiltroEstado = 'todos' | 'faltan' | 'realizadas' | 'de_mas'
+
+/**
+ * Si una línea entra en el filtro de estado. `faltan` = todavía no alcanza lo pedido (sin compras
+ * o por debajo); `realizadas` = ya se llevó lo pedido, **incluidas** las que se pasaron (están
+ * compradas); `de_mas` = sólo las que se llevaron más de lo pedido. `faltan` y `realizadas` son
+ * complementarias: entre las dos cubren toda la lista.
+ */
+export function coincideEstado(item: { cantidad: number; cantidad_comprada: number }, filtro: FiltroEstado): boolean {
+  if (filtro === 'todos') return true
+  const estado = estadoCantidad(item.cantidad, item.cantidad_comprada)
+  if (filtro === 'de_mas') return estado === 'por_encima'
+  const completa = estado === 'completo' || estado === 'por_encima'
+  return filtro === 'realizadas' ? completa : !completa
+}
+
+/** Cuántas líneas entran en cada filtro de estado (para los contadores de los chips). */
+export function contarPorEstado(items: { cantidad: number; cantidad_comprada: number }[]): Record<FiltroEstado, number> {
+  const filtros: FiltroEstado[] = ['todos', 'faltan', 'realizadas', 'de_mas']
+  return Object.fromEntries(filtros.map((f) => [f, items.filter((i) => coincideEstado(i, f)).length])) as Record<FiltroEstado, number>
+}
+
 /**
  * Traduce el atajo `comprado` a una cantidad: `true` → lo pedido (el `cantidad` nuevo si el mismo
  * patch lo cambia), `false` → 0. Si el patch ya trae `cantidadComprada` explícita, esa gana.

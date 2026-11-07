@@ -7,6 +7,7 @@ import Button from '@mui/material/Button'
 import ButtonBase from '@mui/material/ButtonBase'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
+import Chip from '@mui/material/Chip'
 import Collapse from '@mui/material/Collapse'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -44,7 +45,7 @@ import FilaLista from '@/components/lista-compras/FilaLista'
 import ImagenDialog, { type ImportItem } from '@/components/lista-compras/ImagenDialog'
 import { fmtARS, parseNum } from '@/components/lista-compras/formato'
 import { useListaCompras, type AltaItem } from '@/components/lista-compras/useListaCompras'
-import { aCantidadBase, coincideBusqueda, parseColapsados, totalesLista } from '@/lib/lista-compras-compute'
+import { aCantidadBase, coincideBusqueda, coincideEstado, contarPorEstado, parseColapsados, totalesLista, type FiltroEstado } from '@/lib/lista-compras-compute'
 import type { ArticuloCatalogo, ListaCompraCompra, ListaCompraItem } from '@/lib/types'
 
 const CLAVE_COLAPSADOS = 'lista-compras:rubros-colapsados'
@@ -78,6 +79,7 @@ export default function ListaComprasPage() {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
   const [colapsadosListos, setColapsadosListos] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos')
   const [aQuitar, setAQuitar] = useState<ListaCompraItem | null>(null)
   // Compra que se está registrando (compra = null) o editando, y compra a confirmar para borrar.
   const [compraDialog, setCompraDialog] = useState<{ item: ListaCompraItem; compra: ListaCompraCompra | null } | null>(null)
@@ -132,15 +134,18 @@ export default function ListaComprasPage() {
     })
   const todosPlegados = grupos.length > 0 && grupos.every(([n]) => colapsados.has(n))
 
-  // Buscador: deja sólo las líneas que coinciden y los rubros que tienen alguna. `filas` conserva
-  // todas las del rubro (para el resumen del encabezado) y `visibles` las que se muestran.
+  // Buscador + filtro por estado: deja sólo las líneas que cumplen los dos y los rubros que tienen
+  // alguna. `filas` conserva todas las del rubro (para el resumen del encabezado) y `visibles` las
+  // que se muestran.
   const buscando = busqueda.trim() !== ''
+  const filtrando = buscando || filtroEstado !== 'todos'
+  const conteoEstado = useMemo(() => contarPorEstado(items), [items])
   const gruposVista = useMemo(
     () => grupos.flatMap(([nombre, filas]) => {
-      const visibles = buscando ? filas.filter((i) => coincideBusqueda(i, busqueda)) : filas
+      const visibles = filas.filter((i) => coincideEstado(i, filtroEstado) && (!buscando || coincideBusqueda(i, busqueda)))
       return visibles.length ? [{ nombre, filas, visibles }] : []
     }),
-    [grupos, busqueda, buscando],
+    [grupos, busqueda, buscando, filtroEstado],
   )
   const coincidencias = gruposVista.reduce((n, g) => n + g.visibles.length, 0)
 
@@ -401,7 +406,7 @@ export default function ListaComprasPage() {
         <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="subtitle1" fontWeight={600}>Lista de {MESES[mes - 1]}</Typography>
-            {grupos.length > 1 && !buscando && (
+            {grupos.length > 1 && !filtrando && (
               <Button
                 size={compacta ? 'medium' : 'small'}
                 startIcon={todosPlegados ? <ExpandMoreIcon /> : <ExpandLessIcon />}
@@ -434,12 +439,38 @@ export default function ListaComprasPage() {
                 </InputAdornment>
               ) : undefined,
             }}
-            sx={{ mb: 1.5 }}
+            sx={{ mb: 1 }}
           />
-          {buscando && items.length > 0 && (
+          {items.length > 0 && (
+            <Box role="group" aria-label="Filtrar por estado" sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+              {([
+                ['todos', 'Todos', 'primary'],
+                ['faltan', 'Faltan', 'primary'],
+                ['realizadas', 'Comprados', 'success'],
+                ['de_mas', 'De más', 'error'],
+              ] as const).map(([valor, label, color]) => {
+                const activo = filtroEstado === valor
+                return (
+                  <Chip
+                    key={valor}
+                    label={`${label} (${conteoEstado[valor]})`}
+                    color={activo ? color : 'default'}
+                    variant={activo ? 'filled' : 'outlined'}
+                    size={compacta ? 'medium' : 'small'}
+                    aria-pressed={activo}
+                    // Tocar el activo lo suelta: vuelve a "Todos".
+                    onClick={() => setFiltroEstado(activo ? 'todos' : valor)}
+                  />
+                )
+              })}
+            </Box>
+          )}
+          {filtrando && items.length > 0 && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               {coincidencias === 0
-                ? `Ningún artículo coincide con "${busqueda.trim()}".`
+                ? buscando
+                  ? `Ningún artículo coincide con "${busqueda.trim()}"${filtroEstado !== 'todos' ? ' en este filtro' : ''}.`
+                  : 'No hay artículos en este estado.'
                 : `${coincidencias} de ${items.length} artículo${items.length === 1 ? '' : 's'}`}
             </Typography>
           )}
@@ -451,15 +482,15 @@ export default function ListaComprasPage() {
           )}
 
           {gruposVista.map(({ nombre: rubroNombre, filas, visibles }) => {
-            // Buscando, los rubros con coincidencias se muestran desplegados aunque estén plegados.
-            const plegado = !buscando && colapsados.has(rubroNombre)
+            // Buscando o filtrando, los rubros con coincidencias se muestran desplegados aunque estén plegados.
+            const plegado = !filtrando && colapsados.has(rubroNombre)
             const resumen = totalesLista(filas)
             return (
             <Box key={rubroNombre} sx={{ mb: 1 }}>
               {/* Encabezado tocable: pliega el rubro y, plegado, sigue mostrando cuánto va. */}
               <ButtonBase
                 onClick={() => alternarRubro(rubroNombre)}
-                disabled={buscando}
+                disabled={filtrando}
                 aria-expanded={!plegado}
                 sx={{ width: '100%', justifyContent: 'space-between', gap: 1, py: compacta ? 1.25 : 0.75, px: 0.5, borderRadius: 1, textAlign: 'left', '&:hover': { bgcolor: 'action.hover' } }}
               >
@@ -468,7 +499,7 @@ export default function ListaComprasPage() {
                   <Typography variant="overline" color="text.secondary" fontWeight={700} noWrap>{rubroNombre}</Typography>
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  {buscando ? `${visibles.length} de ${filas.length} · ` : ''}{resumen.comprados}/{resumen.items} comprados{plegado && resumen.estimado > 0 ? ` · ${fmtARS(resumen.estimado)}` : ''}
+                  {filtrando ? `${visibles.length} de ${filas.length} · ` : ''}{resumen.comprados}/{resumen.items} comprados{plegado && resumen.estimado > 0 ? ` · ${fmtARS(resumen.estimado)}` : ''}
                   {/* Las alertas se ven aunque el rubro esté plegado. */}
                   {resumen.excedidos > 0 && <Box component="span" sx={{ color: 'error.main', fontWeight: 700, ml: 1 }}>⚠ {resumen.excedidos} de más</Box>}
                   {resumen.parciales > 0 && <Box component="span" sx={{ color: 'warning.main', fontWeight: 700, ml: 1 }}>{resumen.parciales} por debajo</Box>}

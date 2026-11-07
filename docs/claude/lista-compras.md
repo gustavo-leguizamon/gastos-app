@@ -195,6 +195,14 @@ sola query** de histórico para todos los artículos de la lista.
   "Colapsar todos". Debajo se ve "N de M artículos" o "Ningún artículo coincide con «x»". Los
   totales de arriba (estimado, gastado, comprados) **no se filtran**: son los del mes. Lo escrito no se
   recuerda al recargar.
+- **Filtro por estado** (chips debajo del buscador, con la cantidad de cada uno): **Todos**, **Faltan**
+  (sin compras o por debajo de lo pedido), **Comprados** (ya se llevó lo pedido, **incluidos** los que
+  se pasaron) y **De más** (sólo los que se llevaron más de lo pedido). Lo decide `coincideEstado`
+  sobre `estadoCantidad` (Faltan y Comprados son complementarios); los contadores salen de
+  `contarPorEstado` sobre todo el mes, sin aplicar la búsqueda. Tocar el chip activo vuelve a Todos.
+  Se combina con el buscador (AND) y se comporta igual que él: rubros sin líneas ocultos, los demás
+  desplegados con "N de M", sin "Colapsar todos", y "No hay artículos en este estado" si no queda
+  ninguno. Tampoco filtra los totales de arriba ni se recuerda al recargar.
 - **Rubros plegables**: el encabezado de cada rubro se toca para plegarlo/desplegarlo. Plegado sigue
   mostrando "x/y comprados · $estimado del rubro" (`totalesLista` sobre las líneas del grupo), así no
   hace falta abrirlo para saber cómo viene. Si hay más de un rubro aparece **Colapsar todos / Expandir
