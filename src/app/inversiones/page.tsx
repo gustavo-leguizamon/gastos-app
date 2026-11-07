@@ -6,6 +6,7 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import TextField from '@/components/shared/AppTextField'
+import AppMontoField from '@/components/shared/AppMontoField'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
@@ -408,7 +409,7 @@ export default function InversionesPage() {
               >
                 <AppDateField label="Fecha" value={fecha} onChange={(e) => setFecha(e.target.value)} size="small" sx={{ minWidth: { xs: 'auto', sm: 170 } }} />
                 <TextField label="Monto actual" type="number" value={montoActual} onChange={(e) => setMontoActual(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
-                <TextField label="Movimiento" type="number" value={movimientoMonto} onChange={(e) => setMovimientoMonto(e.target.value)} size="small" inputProps={{ step: '0.01' }} sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
+                <AppMontoField label="Movimiento" value={movimientoMonto} onChange={(e) => setMovimientoMonto(e.target.value)} size="small" sx={{ minWidth: { xs: 'auto', sm: 180 } }} />
                 <TextField
                   label="Descripción"
                   value={descripcion}

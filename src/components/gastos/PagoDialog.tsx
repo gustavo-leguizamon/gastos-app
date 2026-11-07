@@ -7,6 +7,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@/components/shared/AppTextField'
+import AppMontoField from '@/components/shared/AppMontoField'
 import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -189,12 +190,11 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
                       onChange={e => setEditing(s => s ? { ...s, fecha: e.target.value } : s)}
                       sx={{ width: { xs: '100%', sm: 155 } }}
                     />
-                    <TextField
-                      size="small" label="Monto (ARS)" type="number"
+                    <AppMontoField
+                      size="small" label="Monto (ARS)"
                       value={editing.monto}
                       onChange={e => setEditing(s => s ? { ...s, monto: e.target.value } : s)}
                       onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
-                      inputProps={{ step: 0.01 }}
                       sx={{ flex: 1 }}
                     />
                     <IconButton size="small" color="primary" onClick={handleSaveEdit} disabled={savingEdit}>
@@ -245,12 +245,11 @@ export default function PagoDialog({ open, gasto, onClose, onChanged }: Props) {
             onChange={e => setFecha(e.target.value)}
             sx={{ width: { xs: '100%', sm: 160 } }}
           />
-          <TextField
-            size="small" label="Monto (ARS)" type="number"
+          <AppMontoField
+            size="small" label="Monto (ARS)"
             value={monto}
             onChange={e => setMonto(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            inputProps={{ step: 0.01 }}
             sx={{ flex: 1 }}
           />
           <Button

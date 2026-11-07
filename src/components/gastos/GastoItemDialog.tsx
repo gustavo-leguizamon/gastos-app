@@ -7,6 +7,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@/components/shared/AppTextField'
+import AppMontoField from '@/components/shared/AppMontoField'
 import Autocomplete from '@mui/material/Autocomplete'
 import AppDateField from '@/components/shared/AppDateField'
 import Box from '@mui/material/Box'
@@ -293,11 +294,10 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged, onRel
         )}
       />
       <Box sx={{ display: 'flex', gap: 1.5 }}>
-        <TextField
-          size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+        <AppMontoField
+          size="small" label="Monto (ARS)" sx={{ flex: 1 }}
           value={monto} onChange={e => setMonto(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          inputProps={{ step: 0.01 }}
         />
         <AppDateField
           size="small" label="Fecha (opcional)" sx={{ width: 155 }}
@@ -479,11 +479,10 @@ export default function GastoItemDialog({ open, gasto, onClose, onChanged, onRel
                       )}
                     />
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <TextField
-                        size="small" label="Monto (ARS)" type="number" sx={{ flex: 1 }}
+                      <AppMontoField
+                        size="small" label="Monto (ARS)" sx={{ flex: 1 }}
                         value={editing.monto}
                         onChange={e => setEditing(p => p ? { ...p, monto: e.target.value } : p)}
-                        inputProps={{ step: 0.01 }}
                       />
                       <AppDateField
                         size="small" label="Fecha (opcional)" sx={{ width: 150 }}

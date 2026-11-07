@@ -7,7 +7,7 @@
 - `total_pagado = SUM(pagos.monto)` — del relation `Pago`, **no** de `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
-**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total.
+**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total. Todos esos campos usan **`AppMontoField`**, que agrega un botón **±** para cambiar el signo porque el teclado numérico del celular suele no tener "-" (ver `docs/claude/inversiones-shared.md` → AppMontoField).
 
 Los únicos pisos numéricos que quedan son `tipo_cambio > 0` (`min(0.0001)`) y las cuotas `>= 1`. Los pagos siguen rechazando monto `0` (`PagoDialog` valida `montoNum !== 0`).
 
@@ -382,6 +382,7 @@ Permite, desde la grilla, seleccionar varios gastos a la vez y **asignar/quitar 
     - **Categoría** (`AppSelect` de `/api/categorias`): **Asignar** / **Quitar categoría**.
     - **Etiqueta** (`AppSelect` de `/api/etiquetas`): **Agregar etiqueta** / **Quitar etiqueta**.
     - **Borrado**: botón rojo **"Eliminar seleccionados"**, que abre un `ConfirmDialog` ("Eliminar N") en `GastosTable`.
+  - **Suma de la selección**: con al menos un gasto seleccionado, la barra muestra **Total / Pagado / Restante** de los seleccionados (`totalesSeleccion` en `src/lib/gastos-seleccion.ts`, redondeado a centavos). El total de cada gasto es el **mismo que muestra la columna "Total ARS"** (`totalVisible`: sin confirmar y con sub-items → subtotal de sub-items; si no, `total_ars`), y los montos negativos restan. Suma sobre todos los `gastos` cargados cuyo id está seleccionado (no sólo los filtrados), igual que el contador y las acciones.
   - "Todos" selecciona/deselecciona **los gastos filtrados** (respeta estado de pago, búsqueda y fecha).
   - El modo selección se resetea automáticamente al cambiar de mes/año o ante un refresh global (`filtros`/`refreshKey`).
 - **Aplicar clasificación**: helper `applyBulk` en `GastosTable` hace `PATCH /api/gastos/categorias` o `/api/gastos/etiquetas` con `{ gasto_ids, action, ... }`. Al terminar recarga la grilla (`loadGastos`) manteniendo la selección para encadenar más acciones. Toast de éxito/error.

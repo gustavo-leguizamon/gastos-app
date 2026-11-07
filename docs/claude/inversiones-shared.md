@@ -56,6 +56,10 @@ El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccio
 
 `src/components/shared/AppTextField.tsx` — wrapper de MUI `TextField` que auto-selecciona el contenido al recibir foco (`e.target.select()` con `setTimeout(0)` para ganarle al cursor). Mantiene API completa. Todos los forms de la app importan desde acá en vez de `@mui/material/TextField`. Para desactivar: `autoSelectOnFocus={false}` o `onFocus` propio. Para crudo, importar `@mui/material/TextField`.
 
+## AppMontoField
+
+`src/components/shared/AppMontoField.tsx` — `AppTextField` numérico (`type="number"`, `step: 0.01`) con un botón **±** como `startAdornment`, para los montos que admiten negativos. Existe porque en el celular el teclado numérico muchas veces no trae la tecla "-". Tocar ± invierte el signo del valor cargado; si el campo está vacío o en 0, el signo queda **pendiente** (el ± en rojo con fondo) y se aplica al primer número que se tipee. El ± está en rojo cuando el monto es negativo. Emite el cambio como `onChange({ target: { value } })`, así funciona con `field.onChange` de react-hook-form y con `setX(e.target.value)`. El botón hace `preventDefault` en `mousedown` para no sacarle el foco al input (si no, se cierra el teclado). Lógica pura en `src/lib/signo-monto.ts` (`invertirSigno`, `aplicarNegativo`, `esNegativo`, `tieneMagnitud`), que conserva los decimales tal como se tipearon. Hoy se usa en `GastoForm` (total, total pagado, pasaje), `GastoItemDialog` (monto del sub-item, alta y edición), `PagoDialog` (monto, alta y edición), `IngresoForm` (monto) y `/inversiones` (**Movimiento**, donde el negativo es un retiro; el "Monto actual" es un saldo y queda como campo común).
+
 ## AppDateField
 
 `src/components/shared/AppDateField.tsx` — wrapper de MUI `TextField` para fechas. Setea `type="date"`, `InputLabelProps.shrink=true`, y abre el calendario nativo al recibir foco vía `HTMLInputElement.showPicker()` (try/catch). El usuario puede tipear manual. Todos los inputs de fecha (gastos: `GastoForm`, `GastoItemDialog`, `PagoDialog`; inversiones: `inversiones/page.tsx`) deben usar este componente.
