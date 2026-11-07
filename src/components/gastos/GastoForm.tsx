@@ -16,6 +16,7 @@ import {
 } from '@/lib/propina'
 import Grid from '@mui/material/Grid'
 import TextField from '@/components/shared/AppTextField'
+import AppMontoField from '@/components/shared/AppMontoField'
 import Autocomplete from '@mui/material/Autocomplete'
 import AppDateField from '@/components/shared/AppDateField'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
@@ -456,13 +457,11 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
             name="total_moneda"
             control={control}
             render={({ field }) => (
-              <TextField
+              <AppMontoField
                 {...field}
                 fullWidth
                 label={`Total (${monedaSeleccionada?.codigo ?? 'moneda'})`}
-                type="number"
                 size="small"
-                inputProps={{ step: 0.01 }}
                 error={!!errors.total_moneda}
                 helperText={errors.total_moneda?.message ?? origenHelper('total_moneda')}
               />
@@ -839,13 +838,11 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                       name="total_pagado"
                       control={control}
                       render={({ field }) => (
-                        <TextField
+                        <AppMontoField
                           {...field}
                           fullWidth
                           label="Total Pagado (ARS)"
-                          type="number"
                           size="small"
-                          inputProps={{ step: 0.01 }}
                           error={!!errors.total_pagado}
                           helperText={isEditing ? errors.total_pagado?.message : (errors.total_pagado?.message ?? 'Si es distinto de 0, se crea un pago con la fecha del gasto')}
                         />
@@ -893,13 +890,11 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
                       name="pasaje_mes_siguiente"
                       control={control}
                       render={({ field }) => (
-                        <TextField
+                        <AppMontoField
                           {...field}
                           fullWidth
                           label="Pasaje Mes Siguiente (ARS)"
-                          type="number"
                           size="small"
-                          inputProps={{ step: 0.01 }}
                           error={!!errors.pasaje_mes_siguiente}
                           helperText={errors.pasaje_mes_siguiente?.message}
                         />

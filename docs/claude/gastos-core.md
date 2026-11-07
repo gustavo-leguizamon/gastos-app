@@ -7,7 +7,7 @@
 - `total_pagado = SUM(pagos.monto)` — del relation `Pago`, **no** de `Gasto.totalPagado`
 - `total_restante = total_ars - total_pagado`
 
-**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total.
+**Montos negativos:** **todos** los campos de monto del gasto admiten valores negativos, para reflejar devoluciones/reintegros de tarjeta de crédito y ajustes: `total_moneda`, `total_pagado`, `pasaje_mes_siguiente`, el monto de los pagos (`PagoDialog`, alta y edición) y el de los sub-items (`GastoItem.monto`). Ningún campo de monto lleva `min` en `inputProps` ni `min(0)` en Yup. El negativo se propaga a `total_ars` y a los agregados del resumen restando del total. Todos esos campos usan **`AppMontoField`**, que agrega un botón **±** para cambiar el signo porque el teclado numérico del celular suele no tener "-" (ver `docs/claude/inversiones-shared.md` → AppMontoField).
 
 Los únicos pisos numéricos que quedan son `tipo_cambio > 0` (`min(0.0001)`) y las cuotas `>= 1`. Los pagos siguen rechazando monto `0` (`PagoDialog` valida `montoNum !== 0`).
 
