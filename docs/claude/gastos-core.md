@@ -382,6 +382,7 @@ Permite, desde la grilla, seleccionar varios gastos a la vez y **asignar/quitar 
     - **Categoría** (`AppSelect` de `/api/categorias`): **Asignar** / **Quitar categoría**.
     - **Etiqueta** (`AppSelect` de `/api/etiquetas`): **Agregar etiqueta** / **Quitar etiqueta**.
     - **Borrado**: botón rojo **"Eliminar seleccionados"**, que abre un `ConfirmDialog` ("Eliminar N") en `GastosTable`.
+  - **Suma de la selección**: con al menos un gasto seleccionado, la barra muestra **Total / Pagado / Restante** de los seleccionados (`totalesSeleccion` en `src/lib/gastos-seleccion.ts`, redondeado a centavos). El total de cada gasto es el **mismo que muestra la columna "Total ARS"** (`totalVisible`: sin confirmar y con sub-items → subtotal de sub-items; si no, `total_ars`), y los montos negativos restan. Suma sobre todos los `gastos` cargados cuyo id está seleccionado (no sólo los filtrados), igual que el contador y las acciones.
   - "Todos" selecciona/deselecciona **los gastos filtrados** (respeta estado de pago, búsqueda y fecha).
   - El modo selección se resetea automáticamente al cambiar de mes/año o ante un refresh global (`filtros`/`refreshKey`).
 - **Aplicar clasificación**: helper `applyBulk` en `GastosTable` hace `PATCH /api/gastos/categorias` o `/api/gastos/etiquetas` con `{ gasto_ids, action, ... }`. Al terminar recarga la grilla (`loadGastos`) manteniendo la selección para encadenar más acciones. Toast de éxito/error.

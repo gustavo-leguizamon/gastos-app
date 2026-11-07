@@ -52,6 +52,7 @@ import MoverGastoDialog from './MoverGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
 import { matchBusqueda } from '@/lib/gastos-filtro'
+import { totalesSeleccion } from '@/lib/gastos-seleccion'
 import { gastosACsv, subitemsACsv, aplanarSubitems } from '@/lib/csv-export'
 import { descargarCsv } from '@/lib/csv-descargar'
 import { nombreArchivo } from '@/lib/csv'
@@ -737,6 +738,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
   const filteredIds = gastosFiltrados.map(g => g.id)
   const allSelected = filteredIds.length > 0 && filteredIds.every(id => selectedIds.has(id))
   const toggleAll = (checked: boolean) => setSelectedIds(checked ? new Set(filteredIds) : new Set())
+  // Sobre `gastos` (no sólo los filtrados): las acciones masivas también aplican a
+  // toda la selección, así que la suma tiene que coincidir con el contador.
+  const totalesSel = totalesSeleccion(gastos, selectedIds)
 
   const cantSubitems = aplanarSubitems(gastosFiltrados).length
 
@@ -1073,6 +1077,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       {selectionMode ? (
         <BulkAccionesBar
           count={selectedIds.size}
+          totales={totalesSel}
           totalFiltrados={filteredIds.length}
           allSelected={allSelected}
           onToggleAll={toggleAll}
