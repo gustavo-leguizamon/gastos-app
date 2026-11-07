@@ -10,6 +10,8 @@ import {
   estadoCantidad,
   normalizarBusqueda,
   coincideBusqueda,
+  coincideEstado,
+  contarPorEstado,
   parseColapsados,
   precioUnitarioDeEntrada,
   entradaDePrecio,
@@ -380,6 +382,39 @@ describe('normalizarBusqueda', () => {
     expect(normalizarBusqueda('  CAFÉ   Molido ')).toBe('cafe molido')
     expect(normalizarBusqueda('Limón')).toBe('limon')
     expect(normalizarBusqueda('Añejo')).toBe('anejo') // la ñ se descompone: se busca igual con n
+  })
+})
+
+describe('coincideEstado / contarPorEstado (filtro por estado)', () => {
+  const sinCompras = { cantidad: 2, cantidad_comprada: 0 }
+  const parcial = { cantidad: 2, cantidad_comprada: 1 }
+  const justa = { cantidad: 0.3, cantidad_comprada: 0.1 + 0.2 } // ruido de float: cuenta como justa
+  const deMas = { cantidad: 2, cantidad_comprada: 3 }
+  const todas = [sinCompras, parcial, justa, deMas]
+
+  it('todos: entra cualquier línea', () => {
+    expect(todas.every((i) => coincideEstado(i, 'todos'))).toBe(true)
+  })
+
+  it('faltan: sin compras y por debajo de lo pedido', () => {
+    expect(todas.filter((i) => coincideEstado(i, 'faltan'))).toEqual([sinCompras, parcial])
+  })
+
+  it('realizadas: lo pedido justo y también lo comprado de más', () => {
+    expect(todas.filter((i) => coincideEstado(i, 'realizadas'))).toEqual([justa, deMas])
+  })
+
+  it('de más: sólo las que se pasaron de lo pedido', () => {
+    expect(todas.filter((i) => coincideEstado(i, 'de_mas'))).toEqual([deMas])
+  })
+
+  it('faltan y realizadas cubren toda la lista sin solaparse', () => {
+    for (const i of todas) expect(coincideEstado(i, 'faltan')).toBe(!coincideEstado(i, 'realizadas'))
+  })
+
+  it('cuenta las líneas de cada filtro', () => {
+    expect(contarPorEstado(todas)).toEqual({ todos: 4, faltan: 2, realizadas: 2, de_mas: 1 })
+    expect(contarPorEstado([])).toEqual({ todos: 0, faltan: 0, realizadas: 0, de_mas: 0 })
   })
 })
 

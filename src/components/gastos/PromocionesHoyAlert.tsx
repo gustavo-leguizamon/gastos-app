@@ -23,20 +23,9 @@ const MESES = [
 const fmtARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
-/** Clave de `localStorage` con la última fecha en que se cerró el aviso: sale una vez por día. */
-const STORAGE_KEY = 'gastos:aviso-promociones'
-
 function hoyLocal() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function yaVistoHoy(hoy: string) {
-  try { return localStorage.getItem(STORAGE_KEY) === hoy } catch { return false }
-}
-
-function marcarVisto(hoy: string) {
-  try { localStorage.setItem(STORAGE_KEY, hoy) } catch { /* sin storage: vuelve a salir */ }
 }
 
 interface Props {
@@ -50,7 +39,7 @@ interface Props {
 /**
  * Popup de `/gastos` con las promociones que **valen hoy** y todavía tienen tope por aprovechar,
  * y los **reintegros pendientes de usar** (saldo a favor con fecha de vencimiento). Mira siempre
- * el mes de hoy, no el período elegido en el dashboard. Sale una vez por día.
+ * el mes de hoy, no el período elegido en el dashboard. Sale cada vez que se entra a la pantalla.
  */
 export default function PromocionesHoyAlert({ habilitado }: Props) {
   const [hoy] = useState(hoyLocal)
@@ -58,7 +47,6 @@ export default function PromocionesHoyAlert({ habilitado }: Props) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (yaVistoHoy(hoy)) return
     const [anio, mes] = hoy.split('-').map(Number)
     Promise.all([
       fetch(`/api/promociones?mes=${mes}&anio=${anio}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)),
@@ -77,10 +65,7 @@ export default function PromocionesHoyAlert({ habilitado }: Props) {
 
   if (!aviso) return null
 
-  const cerrar = () => {
-    marcarVisto(hoy)
-    setOpen(false)
-  }
+  const cerrar = () => setOpen(false)
   const dia = diaSemanaDeFecha(hoy)
 
   return (
@@ -137,7 +122,7 @@ export default function PromocionesHoyAlert({ habilitado }: Props) {
         )}
       </DialogContent>
       <DialogActions>
-        <Button component={Link} href="/promociones" onClick={() => marcarVisto(hoy)}>Ver promociones</Button>
+        <Button component={Link} href="/promociones">Ver promociones</Button>
         <Button onClick={cerrar} variant="contained">Entendido</Button>
       </DialogActions>
     </Dialog>
