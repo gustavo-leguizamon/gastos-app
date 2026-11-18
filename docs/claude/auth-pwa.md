@@ -63,7 +63,7 @@ Y desde la UI, el botón **"Probar notificación"** de `/configuracion` (`POST /
 **Limitaciones a tener en cuenta:**
 
 - **iOS**: sólo funciona si la PWA está instalada en la pantalla de inicio (iOS 16.4+) y se abre desde ahí; el permiso se pierde si se desinstala.
-- **Vercel Hobby**: un solo cron por día y se dispara *dentro* de la hora agendada, no al minuto exacto.
+- **Vercel Hobby**: cada cron corre una vez por día (hay un segundo cron, `/api/cron/copiar-tarjetas`, ver `docs/claude/tarjetas.md`) y se dispara *dentro* de la hora agendada, no al minuto exacto.
 - Si el usuario borra datos del sitio o el browser rota la suscripción, el endpoint viejo muere y el job lo limpia solo — pero hay que volver a activar desde `/configuracion`.
 
 ## Responsive / mobile UI

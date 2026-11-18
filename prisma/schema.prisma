@@ -53,6 +53,9 @@ model TarjetaCierre {
   fechaCierre        String?
   fechaVencimiento   String?
   fechaProximoCierre String?
+  /// Cuándo el cron copió automáticamente el resumen de este período al mes siguiente
+  /// (una vez pasada `fechaCierre`). null = todavía no. Ver src/lib/tarjetas-autocopia.ts.
+  autoCopiadoAt      DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
