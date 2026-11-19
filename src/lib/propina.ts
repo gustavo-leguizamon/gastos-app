@@ -116,6 +116,7 @@ export function buildPropinaGasto(data: GastoFormData, split: SplitPropina): Gas
     categoria_id: data.propina_categoria_id ?? null,
     // La promo es del consumo, no de la propina.
     promocion_id: null,
+    promocion_fecha: null,
     etiqueta_ids: data.propina_etiqueta_ids ?? data.etiqueta_ids ?? [],
     total_moneda: split.total_propina,
     total_pagado: 0,

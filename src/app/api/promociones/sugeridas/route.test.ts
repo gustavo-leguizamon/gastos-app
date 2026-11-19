@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({
     concepto: { findFirst: vi.fn() },
     promocion: { findMany: vi.fn() },
     gasto: { findMany: vi.fn() },
+    promocionUso: { findMany: vi.fn() },
   },
 }))
 
@@ -21,18 +22,20 @@ function rawPromo(over: Record<string, any> = {}) {
     porcentaje: 30, topeMensual: 30000, dias: [1], efectivo: false, activa: true, notas: null,
     vigenteDesde: null, vigenteHasta: null,
     tarjetas: [{ id: 10, nombre: 'Visa', banco: null, marca: 'visa', bancoLogo: null, bancoIcono: null }],
-    usos: [],
     ...over,
   }
 }
 
 const base = 'descripcion=pedidosya&tipo_pago=C&tarjeta_id=10&mes=10&anio=2026'
+const gasto = (totalMoneda: number, mes = 10, promocionFecha: string | null = null) =>
+  ({ promocionId: 1, mes, anio: 2026, promocionFecha, totalMoneda, tipoCambio: 1 })
 
 beforeEach(() => {
   vi.clearAllMocks()
   mp.concepto.findFirst.mockResolvedValue({ id: 5, nombre: 'PedidosYa' })
   mp.promocion.findMany.mockResolvedValue([rawPromo()])
   mp.gasto.findMany.mockResolvedValue([])
+  mp.promocionUso.findMany.mockResolvedValue([])
 })
 
 describe('GET /api/promociones/sugeridas', () => {
@@ -103,13 +106,29 @@ describe('GET /api/promociones/sugeridas', () => {
   })
 
   it('sugiere la promo con lo que queda por reintegrar', async () => {
-    mp.gasto.findMany.mockResolvedValue([{ promocionId: 1, totalMoneda: 50000, tipoCambio: 1 }]) // 15.000 reintegrados
+    mp.gasto.findMany.mockResolvedValue([gasto(50000)]) // 15.000 reintegrados
     const [s] = await (await GET(url(base))).json()
     expect(s).toEqual({ id: 1, lugar: 'PedidosYa', porcentaje: 30, disponible: 15000, tope_alcanzado: false, coincide: true })
   })
 
+  it('con fecha de compra mira el ciclo de esa fecha según el día de reinicio de la promo', async () => {
+    mp.promocion.findMany.mockResolvedValue([rawPromo({ diaReinicio: 5 })])
+    // Martes 03/11 (antes del 5): ciclo de octubre (05/10 → 04/11).
+    mp.gasto.findMany.mockResolvedValue([gasto(50000, 10), gasto(20000, 11, '2026-11-06')])
+    const [s] = await (await GET(url('descripcion=pedidosya&tipo_pago=C&tarjeta_id=10&mes=11&anio=2026&fecha=2026-11-03'))).json()
+    expect(s.disponible).toBe(15000)
+    // La query trae los sin fecha del mes del ciclo y los con fecha dentro de su rango.
+    expect(mp.gasto.findMany.mock.calls[0][0].where).toEqual({
+      promocionId: { in: [1] },
+      OR: [
+        { promocionFecha: null, OR: [{ mes: 10, anio: 2026 }] },
+        { promocionFecha: { gte: '2026-10-05', lte: '2026-11-04' } },
+      ],
+    })
+  })
+
   it('marca tope alcanzado', async () => {
-    mp.gasto.findMany.mockResolvedValue([{ promocionId: 1, totalMoneda: 100000, tipoCambio: 1 }])
+    mp.gasto.findMany.mockResolvedValue([gasto(100000)])
     const [s] = await (await GET(url(base))).json()
     expect(s).toMatchObject({ tope_alcanzado: true, disponible: 0 })
   })

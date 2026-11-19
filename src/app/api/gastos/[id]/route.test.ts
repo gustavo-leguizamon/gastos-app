@@ -103,6 +103,19 @@ describe('PUT /api/gastos/[id]', () => {
     expect(mockPrisma.gasto.update.mock.calls[2][0].data.promocionId).toBeUndefined()
   })
 
+  it('promocion_fecha: se guarda con la promo, se borra al quitarla y un PUT sin las claves no la toca', async () => {
+    mockPrisma.gasto.update.mockResolvedValue(rawGasto({ id: 5 }))
+    mockPrisma.gastoItem.findMany.mockResolvedValue([])
+    const put = (b: any) => PUT({ json: async () => ({ descripcion: 'X', mes: 6, anio: 2026, ...b }) } as any, { params: { id: '5' } })
+
+    await put({ promocion_id: 12, promocion_fecha: '2026-06-04' })
+    expect(mockPrisma.gasto.update.mock.calls[0][0].data.promocionFecha).toBe('2026-06-04')
+    await put({ promocion_id: null, promocion_fecha: '2026-06-04' })
+    expect(mockPrisma.gasto.update.mock.calls[1][0].data.promocionFecha).toBeNull()
+    await put({})
+    expect(mockPrisma.gasto.update.mock.calls[2][0].data.promocionFecha).toBeUndefined()
+  })
+
   it('no rompe el flujo si la propagación de items falla', async () => {
     mockPrisma.gasto.update.mockResolvedValue(rawGasto({ id: 5 }))
     mockPrisma.gastoItem.findMany.mockRejectedValue(new Error('db down'))

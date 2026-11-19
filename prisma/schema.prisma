@@ -212,6 +212,9 @@ model Gasto {
   categoriaId Int?
   /// Promoción de reintegro a la que cuenta este gasto (asociación explícita, ver Promocion).
   promocionId Int?
+  /// Fecha de compra con la promo (YYYY-MM-DD): decide a qué ciclo de la promo cuenta el gasto
+  /// cuando se reinicia otro día que el 1. null = cuenta en el ciclo que empieza en su `mes`.
+  promocionFecha String?
 
   casa      Casa        @relation(fields: [casaId], references: [id])
   moneda    Moneda      @relation(fields: [monedaId], references: [id])
@@ -482,12 +485,18 @@ model Promocion {
   topeMensual  Float
   dias         Int[]
   efectivo     Boolean  @default(false)
+  /// Dónde vale la promo: `presencial`, `virtual` o `ambas` (default `virtual`).
+  modalidad    String   @default("virtual")
   activa       Boolean  @default(true)
   notas        String?
   /// Vigencia opcional (YYYY-MM-DD, inclusive). null = sin límite de ese lado. Sirve para no
   /// sugerir ni contar la promo fuera de ese rango; no filtra gastos (no tienen fecha de compra).
   vigenteDesde String?
   vigenteHasta String?
+  /// Día del mes en que el tope se reinicia (1–31, default 1 = mes calendario). El ciclo va del
+  /// día de reinicio de un mes al día anterior al reinicio del siguiente; en un mes más corto se
+  /// recorta al último día. El ciclo se nombra por el mes en que empieza.
+  diaReinicio  Int      @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -498,6 +507,24 @@ model Promocion {
   usos       PromocionUso[]
   gastos     Gasto[]
   reintegros PromocionReintegro[]
+  saldoUsos  PromocionSaldoUso[]
+}
+
+/// Uso del **saldo a favor** de una promo (lo ya reintegrado): "de lo que recuperé, gasté $X el
+/// día Y". Se descuenta de los reintegros que vencen antes (FIFO por vencimiento); el saldo se
+/// calcula, no se persiste. Ver `saldoPromocion`.
+model PromocionSaldoUso {
+  id          Int      @id @default(autoincrement())
+  promocionId Int
+  /// YYYY-MM-DD
+  fecha       String
+  monto       Float
+  notas       String?
+  createdAt   DateTime @default(now())
+
+  promocion Promocion @relation(fields: [promocionId], references: [id], onDelete: Cascade)
+
+  @@index([promocionId])
 }
 
 /// Consumo con promo registrado a mano ("gasté $X el día Y"). Suma al consumo que sale de los

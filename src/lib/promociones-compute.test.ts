@@ -2,12 +2,23 @@ import { describe, it, expect } from 'vitest'
 import {
   diaSemanaDeFecha,
   diaCoincide,
+  coincideModalidad,
   parsePromocionBody,
   parseUsoBody,
   toPromocionResponse,
   consumoAutomatico,
   medioCoincide,
-  vigenteEnMes,
+  vigenteEnCiclo,
+  rangoCiclo,
+  ultimoDiaDelMes,
+  cicloDeFecha,
+  cicloDeGasto,
+  promocionFechaDeBody,
+  consumoEnCiclo,
+  lotesPromocion,
+  saldoPromocion,
+  parseSaldoUsoBody,
+  ordenarPorVencimiento,
   progresoPromocion,
   totalesPromociones,
   promosDelDia,
@@ -17,7 +28,6 @@ import {
   toReintegroResponse,
   diasHasta,
   estadoVencimiento,
-  reintegrosPendientes,
   criteriosDe,
   tieneCriterios,
   criterioCoincide,
@@ -53,6 +63,15 @@ describe('diaSemanaDeFecha', () => {
   })
 })
 
+describe('coincideModalidad', () => {
+  it('todas no filtra; presencial/virtual incluyen las ambas', () => {
+    const ps = [{ modalidad: 'presencial' }, { modalidad: 'virtual' }, { modalidad: 'ambas' }, {}]
+    expect(ps.filter(x => coincideModalidad(x, 'todas'))).toHaveLength(4)
+    expect(ps.filter(x => coincideModalidad(x, 'presencial')).map(x => x.modalidad)).toEqual(['presencial', 'ambas'])
+    expect(ps.filter(x => coincideModalidad(x, 'virtual')).map(x => x.modalidad)).toEqual(['virtual', 'ambas', undefined])
+  })
+})
+
 describe('parsePromocionBody', () => {
   it('normaliza lugar, ordena y deduplica días y tarjetas', () => {
     expect(parsePromocionBody(bodyOk({ tarjeta_ids: [2, 1, 2] }))).toEqual({
@@ -65,11 +84,39 @@ describe('parsePromocionBody', () => {
       dias: [2, 4],
       tarjetaIds: [2, 1],
       efectivo: false,
+      modalidad: 'virtual',
       activa: true,
       notas: null,
       vigenteDesde: null,
       vigenteHasta: null,
+      diaReinicio: 1,
     })
+  })
+
+  it('día de reinicio: 1–31, sin valor = 1, fuera de rango o no entero es inválido', () => {
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: 5 }))).toMatchObject({ diaReinicio: 5 })
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: '31' }))).toMatchObject({ diaReinicio: 31 })
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: '' }))).toMatchObject({ diaReinicio: 1 })
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: 0 }))).toBeNull()
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: 32 }))).toBeNull()
+    expect(parsePromocionBody(bodyOk({ dia_reinicio: 2.5 }))).toBeNull()
+  })
+
+  it('toPromocionResponse expone dia_reinicio (1 si la fila no lo tiene)', () => {
+    expect(toPromocionResponse({ id: 1, lugar: 'x', diaReinicio: 5 }).dia_reinicio).toBe(5)
+    expect(toPromocionResponse({ id: 1, lugar: 'x' }).dia_reinicio).toBe(1)
+  })
+
+  it('modalidad: presencial / virtual / ambas; sin valor = virtual; desconocida es inválida', () => {
+    expect(parsePromocionBody(bodyOk({ modalidad: 'presencial' }))).toMatchObject({ modalidad: 'presencial' })
+    expect(parsePromocionBody(bodyOk({ modalidad: 'virtual' }))).toMatchObject({ modalidad: 'virtual' })
+    expect(parsePromocionBody(bodyOk({ modalidad: '' }))).toMatchObject({ modalidad: 'virtual' })
+    expect(parsePromocionBody(bodyOk({ modalidad: 'telefonica' }))).toBeNull()
+  })
+
+  it('la respuesta expone la modalidad (y cae en virtual si la fila no la trae)', () => {
+    expect(toPromocionResponse({ id: 1, lugar: 'X', modalidad: 'virtual' }).modalidad).toBe('virtual')
+    expect(toPromocionResponse({ id: 1, lugar: 'X' }).modalidad).toBe('virtual')
   })
 
   it('acepta sólo efectivo (sin tarjetas) y varios conceptos vinculados (sin repetir)', () => {
@@ -229,28 +276,193 @@ describe('medioCoincide', () => {
   })
 })
 
-describe('vigenteEnMes', () => {
+describe('vigenteEnCiclo', () => {
   it('sin vigencia vale siempre', () => {
-    expect(vigenteEnMes({}, 10, 2026)).toBe(true)
-    expect(vigenteEnMes({ vigenteDesde: null, vigenteHasta: null }, 1, 2030)).toBe(true)
+    expect(vigenteEnCiclo({}, 10, 2026)).toBe(true)
+    expect(vigenteEnCiclo({ vigenteDesde: null, vigenteHasta: null }, 1, 2030)).toBe(true)
   })
 
   it('una promo que arranca a mitad de mes ya vale en ese mes, no en los anteriores', () => {
     const p = { vigenteDesde: '2026-10-15' }
-    expect(vigenteEnMes(p, 9, 2026)).toBe(false)
-    expect(vigenteEnMes(p, 10, 2026)).toBe(true)
-    expect(vigenteEnMes(p, 11, 2026)).toBe(true)
+    expect(vigenteEnCiclo(p, 9, 2026)).toBe(false)
+    expect(vigenteEnCiclo(p, 10, 2026)).toBe(true)
+    expect(vigenteEnCiclo(p, 11, 2026)).toBe(true)
   })
 
   it('vence a mitad de mes: sigue vigente ese mes, no los siguientes', () => {
     const p = { vigenteHasta: '2026-10-10' }
-    expect(vigenteEnMes(p, 10, 2026)).toBe(true)
-    expect(vigenteEnMes(p, 11, 2026)).toBe(false)
+    expect(vigenteEnCiclo(p, 10, 2026)).toBe(true)
+    expect(vigenteEnCiclo(p, 11, 2026)).toBe(false)
   })
 
   it('cruza el año', () => {
-    expect(vigenteEnMes({ vigenteDesde: '2026-12-20' }, 12, 2026)).toBe(true)
-    expect(vigenteEnMes({ vigenteHasta: '2026-12-20' }, 1, 2027)).toBe(false)
+    expect(vigenteEnCiclo({ vigenteDesde: '2026-12-20' }, 12, 2026)).toBe(true)
+    expect(vigenteEnCiclo({ vigenteHasta: '2026-12-20' }, 1, 2027)).toBe(false)
+  })
+
+  it('con reinicio el 5 mira el ciclo 05 → 04, no el mes calendario', () => {
+    // Termina el 03/12: el ciclo de noviembre (05/11 → 04/12) la incluye, el de diciembre no.
+    const p = { vigenteHasta: '2026-12-03', diaReinicio: 5 }
+    expect(vigenteEnCiclo(p, 11, 2026)).toBe(true)
+    expect(vigenteEnCiclo(p, 12, 2026)).toBe(false)
+    // Arranca el 02/11: cae en el ciclo de octubre (05/10 → 04/11).
+    expect(vigenteEnCiclo({ vigenteDesde: '2026-11-02', diaReinicio: 5 }, 10, 2026)).toBe(true)
+  })
+})
+
+describe('ciclo del tope', () => {
+  it('con reinicio el 1 el ciclo es el mes calendario', () => {
+    expect(rangoCiclo(11, 2026, 1)).toEqual({ desde: '2026-11-01', hasta: '2026-11-30' })
+    expect(rangoCiclo(2, 2028, 1)).toEqual({ desde: '2028-02-01', hasta: '2028-02-29' })
+  })
+
+  it('con reinicio el 5 va del 5 al 4 del mes siguiente, cruzando el año', () => {
+    expect(rangoCiclo(11, 2026, 5)).toEqual({ desde: '2026-11-05', hasta: '2026-12-04' })
+    expect(rangoCiclo(12, 2026, 5)).toEqual({ desde: '2026-12-05', hasta: '2027-01-04' })
+  })
+
+  it('un reinicio que no existe en el mes se recorta al último día', () => {
+    expect(rangoCiclo(1, 2027, 31)).toEqual({ desde: '2027-01-31', hasta: '2027-02-27' })
+    expect(rangoCiclo(2, 2027, 31)).toEqual({ desde: '2027-02-28', hasta: '2027-03-30' })
+    expect(ultimoDiaDelMes(2, 2027)).toBe(28)
+  })
+
+  it('cicloDeFecha: antes del reinicio es el ciclo del mes anterior', () => {
+    expect(cicloDeFecha('2026-12-03', 5)).toEqual({ mes: 11, anio: 2026 })
+    expect(cicloDeFecha('2026-12-05', 5)).toEqual({ mes: 12, anio: 2026 })
+    expect(cicloDeFecha('2027-01-04', 5)).toEqual({ mes: 12, anio: 2026 })
+    expect(cicloDeFecha('2026-12-03', 1)).toEqual({ mes: 12, anio: 2026 })
+    expect(cicloDeFecha('2027-02-28', 31)).toEqual({ mes: 2, anio: 2027 })
+    expect(cicloDeFecha('x', 5)).toBeNull()
+  })
+
+  it('cicloDeGasto: la fecha de compra manda; sin ella, el mes del gasto', () => {
+    expect(cicloDeGasto({ mes: 12, anio: 2026, promocionFecha: '2026-12-03' }, 5)).toEqual({ mes: 11, anio: 2026 })
+    expect(cicloDeGasto({ mes: 12, anio: 2026, promocionFecha: null }, 5)).toEqual({ mes: 12, anio: 2026 })
+    expect(cicloDeGasto({ mes: 12, anio: 2026 }, 5)).toEqual({ mes: 12, anio: 2026 })
+  })
+})
+
+describe('promocionFechaDeBody', () => {
+  it('alta: la fecha sólo se guarda con promo y válida', () => {
+    expect(promocionFechaDeBody({ promocion_id: 3, promocion_fecha: '2026-11-19' }, false)).toBe('2026-11-19')
+    expect(promocionFechaDeBody({ promocion_id: 3, promocion_fecha: '' }, false)).toBeNull()
+    expect(promocionFechaDeBody({ promocion_id: 3 }, false)).toBeNull()
+    expect(promocionFechaDeBody({ promocion_id: null, promocion_fecha: '2026-11-19' }, false)).toBeNull()
+    expect(promocionFechaDeBody({ promocion_fecha: '2026-11-19' }, false)).toBeNull()
+  })
+
+  it('PUT parcial: sin las claves no toca nada; sacar la promo borra la fecha', () => {
+    expect(promocionFechaDeBody({ total_moneda: 5 }, true)).toBeUndefined()
+    expect(promocionFechaDeBody({ promocion_id: 3 }, true)).toBeUndefined()
+    expect(promocionFechaDeBody({ promocion_id: 3, promocion_fecha: '2026-11-19' }, true)).toBe('2026-11-19')
+    expect(promocionFechaDeBody({ promocion_id: 3, promocion_fecha: null }, true)).toBeNull()
+    expect(promocionFechaDeBody({ promocion_id: null }, true)).toBeNull()
+    expect(promocionFechaDeBody({ promocion_fecha: '2026-11-20' }, true)).toBe('2026-11-20')
+  })
+})
+
+describe('consumoEnCiclo', () => {
+  const promo = { id: 1, diaReinicio: 5 }
+  const g = (mes: number, total: number, promocionFecha: string | null = null, promocionId = 1) =>
+    ({ promocionId, mes, anio: 2026, promocionFecha, totalMoneda: total, tipoCambio: 1 })
+
+  it('cuenta cada gasto en el ciclo de su fecha de compra, o de su mes si no tiene', () => {
+    const gastos = [
+      g(12, 1000, '2026-12-03'), // ciclo nov
+      g(12, 2000, '2026-12-06'), // ciclo dic
+      g(11, 4000), // sin fecha → ciclo nov
+      g(11, 8000, null, 2), // otra promo
+    ]
+    expect(consumoEnCiclo(promo, { mes: 11, anio: 2026 }, gastos, []).auto).toBe(5000)
+    expect(consumoEnCiclo(promo, { mes: 12, anio: 2026 }, gastos, []).auto).toBe(2000)
+  })
+
+  it('los usos manuales van por su fecha', () => {
+    const usos = [{ fecha: '2026-12-04', montoGasto: 300 }, { fecha: '2026-12-05', montoGasto: 700 }]
+    expect(consumoEnCiclo(promo, { mes: 11, anio: 2026 }, [], usos).manual).toBe(300)
+    expect(consumoEnCiclo(promo, { mes: 12, anio: 2026 }, [], usos).manual).toBe(700)
+  })
+})
+
+describe('lotesPromocion', () => {
+  // 50% hasta $10.000 por ciclo.
+  const promo = { id: 1, porcentaje: 50, topeMensual: 10000, diaReinicio: 1 }
+  const g = (mes: number, total: number) => ({ promocionId: 1, mes, anio: 2026, promocionFecha: null, totalMoneda: total, tipoCambio: 1 })
+
+  it('un lote por ciclo con reintegro, topeado, con su vencimiento cargado', () => {
+    const lotes = lotesPromocion(
+      promo,
+      [g(11, 10000), g(10, 40000), g(9, -500)],
+      [],
+      [{ mes: 11, anio: 2026, venceEl: '2026-12-31', utilizado: false }],
+    )
+    expect(lotes).toEqual([
+      { mes: 10, anio: 2026, desde: '2026-10-01', monto: 10000, vence_el: null, utilizado: false },
+      { mes: 11, anio: 2026, desde: '2026-11-01', monto: 5000, vence_el: '2026-12-31', utilizado: false },
+    ])
+  })
+})
+
+describe('saldoPromocion', () => {
+  const lote = (mes: number, monto: number, vence_el: string | null = null, utilizado = false) =>
+    ({ mes, anio: 2026, desde: `2026-${String(mes).padStart(2, '0')}-01`, monto, vence_el, utilizado })
+
+  it('recupero 5000 y uso 2000: quedan 3000; lo próximo que recupere se suma', () => {
+    const s = saldoPromocion([lote(10, 5000)], [{ fecha: '2026-10-20', monto: 2000 }], '2026-10-25')
+    expect(s).toMatchObject({ disponible: 3000, reintegrado: 5000, usado: 2000, vencido: 0, sin_respaldo: 0 })
+
+    const s2 = saldoPromocion([lote(10, 5000), lote(11, 4000)], [{ fecha: '2026-10-20', monto: 2000 }], '2026-11-10')
+    expect(s2.disponible).toBe(7000)
+  })
+
+  it('un uso descuenta primero de lo que vence antes', () => {
+    const s = saldoPromocion(
+      [lote(10, 5000, '2026-12-31'), lote(11, 4000, '2026-11-30')],
+      [{ fecha: '2026-11-15', monto: 6000 }],
+      '2026-11-16',
+    )
+    expect(s.lotes.map(l => [l.mes, l.usado, l.restante])).toEqual([[10, 2000, 3000], [11, 4000, 0]])
+    expect(s.disponible).toBe(3000)
+    expect(s.proximo_vencimiento).toEqual({ vence_el: '2026-12-31', monto: 3000 })
+  })
+
+  it('lo que no se usó antes de vencer se pierde y no suma al saldo', () => {
+    const s = saldoPromocion([lote(10, 5000, '2026-11-10'), lote(11, 4000)], [{ fecha: '2026-11-05', monto: 1000 }], '2026-11-11')
+    expect(s).toMatchObject({ disponible: 4000, vencido: 4000, usado: 1000 })
+    expect(s.lotes[0].estado).toBe('vencido')
+    // El día del vencimiento todavía se puede usar.
+    expect(saldoPromocion([lote(10, 5000, '2026-11-10')], [], '2026-11-10').disponible).toBe(5000)
+  })
+
+  it('un uso no consume un lote que ya había vencido ni uno de un ciclo posterior', () => {
+    const s = saldoPromocion(
+      [lote(10, 5000, '2026-10-31'), lote(12, 4000)],
+      [{ fecha: '2026-11-15', monto: 1000 }],
+      '2026-12-10',
+    )
+    expect(s.sin_respaldo).toBe(1000)
+    expect(s.disponible).toBe(4000)
+    expect(s.vencido).toBe(5000)
+  })
+
+  it('"ya lo usé" consume el lote entero', () => {
+    const s = saldoPromocion([lote(10, 5000, null, true), lote(11, 1000)], [], '2026-11-10')
+    expect(s).toMatchObject({ disponible: 1000, usado: 5000 })
+    expect(s.lotes[0].estado).toBe('usado')
+  })
+
+  it('sin lotes: saldo 0 y sin vencimiento', () => {
+    expect(saldoPromocion([], [], '2026-11-10')).toMatchObject({ disponible: 0, reintegrado: 0, proximo_vencimiento: null })
+  })
+})
+
+describe('parseSaldoUsoBody', () => {
+  it('fecha válida y monto > 0', () => {
+    expect(parseSaldoUsoBody({ fecha: '2026-11-10', monto: '2000.456', notas: ' x ' })).toEqual({ fecha: '2026-11-10', monto: 2000.46, notas: 'x' })
+    expect(parseSaldoUsoBody({ fecha: '2026-11-10', monto: 0 })).toBeNull()
+    expect(parseSaldoUsoBody({ fecha: 'x', monto: 5 })).toBeNull()
+    expect(parseSaldoUsoBody(null)).toBeNull()
   })
 })
 
@@ -302,7 +514,16 @@ describe('totalesPromociones', () => {
 
   it('suma sólo las activas y cuenta las completas', () => {
     const t = totalesPromociones([item(true, 1000, 10000), item(true, 2000, 5000), item(false, 9999, 0)])
-    expect(t).toEqual({ tope_total: 3000, reintegrado: 1500, disponible: 1500, completas: 1 })
+    expect(t).toEqual({ tope_total: 3000, reintegrado: 1500, disponible: 1500, completas: 1, saldo: 0 })
+  })
+
+  it('el saldo suma todas las promos, también las inactivas o fuera de vigencia', () => {
+    const t = totalesPromociones([
+      { ...item(true, 1000, 0), saldo: { disponible: 300 } },
+      { ...item(false, 1000, 0), saldo: { disponible: 200 } },
+      { ...item(true, 1000, 0), vigente: false, saldo: { disponible: 100 } },
+    ])
+    expect(t.saldo).toBe(600)
   })
 
   it('no cuenta las promos fuera de vigencia en el período', () => {
@@ -416,18 +637,14 @@ describe('estadoVencimiento', () => {
   })
 })
 
-describe('reintegrosPendientes', () => {
-  const r = (vence_el: string | null, utilizado = false) => ({ vence_el, utilizado })
+describe('ordenarPorVencimiento', () => {
+  const p = (id: number, vence_el: string | null) =>
+    ({ id, saldo: { proximo_vencimiento: vence_el ? { vence_el, monto: 1 } : null } })
 
-  it('descarta los utilizados y los sin fecha, y ordena por vencimiento (los vencidos primero)', () => {
-    const lista = [r('2026-12-01'), r('2026-10-20'), r('2026-11-05', true), r(null), r('2026-11-10')]
-    expect(reintegrosPendientes(lista).map(i => i.vence_el)).toEqual(['2026-10-20', '2026-11-10', '2026-12-01'])
-  })
-
-  it('no muta la lista original', () => {
-    const lista = [r('2026-12-01'), r('2026-10-20')]
-    reintegrosPendientes(lista)
-    expect(lista.map(i => i.vence_el)).toEqual(['2026-12-01', '2026-10-20'])
+  it('el vencimiento más cercano primero, sin vencimiento al final, sin mutar', () => {
+    const lista = [p(1, null), p(2, '2026-12-01'), p(3, '2026-11-20')]
+    expect(ordenarPorVencimiento(lista).map(x => x.id)).toEqual([3, 2, 1])
+    expect(lista.map(x => x.id)).toEqual([1, 2, 3])
   })
 })
 
@@ -454,13 +671,16 @@ describe('avisoPromociones', () => {
     progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 0, 0),
     ...over,
   })
-  const saldo = (reintegrado: number, vence_el: string | null = '2026-11-20', utilizado = false) =>
-    ({ reintegrado, vence_el, utilizado })
+  const conSaldo = (id: number, disponible: number, vence_el: string | null = '2026-11-20') =>
+    promo(id, {
+      dias: [0], // no vale hoy: sólo aparece por el saldo
+      saldo: { disponible, proximo_vencimiento: vence_el ? { vence_el, monto: disponible } : null },
+    })
 
   it('lista las promos de hoy con tope por aprovechar, más disponible primero', () => {
     const a = promo(1, { progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 30000, 0) }) // disponible 4000
     const b = promo(2) // disponible 10000
-    const r = avisoPromociones([a, b], [], HOY)
+    const r = avisoPromociones([a, b], HOY)
     expect(r.deHoy.map(p => p.id)).toEqual([2, 1])
     expect(r.mostrar).toBe(true)
   })
@@ -470,20 +690,20 @@ describe('avisoPromociones', () => {
     const inactiva = promo(2, { activa: false })
     const fuera = promo(3, { vigente: false })
     const agotada = promo(4, { progreso: progresoPromocion({ porcentaje: 20, topeMensual: 10000 }, 60000, 0) })
-    const r = avisoPromociones([otroDia, inactiva, fuera, agotada], [], HOY)
+    const r = avisoPromociones([otroDia, inactiva, fuera, agotada], HOY)
     expect(r.deHoy).toEqual([])
     expect(r.mostrar).toBe(false)
   })
 
-  it('suma los reintegros pendientes de usar, sin los usados, sin fecha o en 0', () => {
-    const r = avisoPromociones([], [saldo(1500.5), saldo(2000, '2026-11-01'), saldo(900, null), saldo(700, '2026-11-10', true), saldo(0)], HOY)
-    expect(r.saldos.map(s => s.reintegrado)).toEqual([2000, 1500.5])
-    expect(r.saldoTotal).toBe(3500.5)
+  it('lista las promos con saldo a favor (también sin vencimiento), la que vence antes primero', () => {
+    const r = avisoPromociones([conSaldo(1, 1500.5), conSaldo(2, 2000, '2026-11-08'), conSaldo(3, 900, null), conSaldo(4, 0)], HOY)
+    expect(r.saldos.map(p => p.id)).toEqual([2, 1, 3])
+    expect(r.saldoTotal).toBe(4400.5)
     expect(r.mostrar).toBe(true)
   })
 
   it('con una fecha inválida no lista promos del día pero sí los saldos', () => {
-    const r = avisoPromociones([promo(1)], [saldo(100)], 'basura')
+    const r = avisoPromociones([promo(1), conSaldo(2, 100)], 'basura')
     expect(r.deHoy).toEqual([])
     expect(r.saldos).toHaveLength(1)
   })

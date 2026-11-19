@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Grid from '@mui/material/Grid'
 import AppSelect from '@/components/shared/AppSelect'
+import AppDateField from '@/components/shared/AppDateField'
 
 interface Sugerida {
   id: number
@@ -27,6 +28,13 @@ interface Props {
   value: number | null
   onChange: (v: number | null) => void
   /**
+   * Fecha de compra con la promo (`YYYY-MM-DD`): decide el día de la semana y a qué ciclo del tope
+   * cuenta el gasto (importa en las promos que se reinician otro día que el 1). Vacía = el ciclo
+   * del mes del gasto.
+   */
+  fecha: string | null
+  onFechaChange: (v: string | null) => void
+  /**
    * Alta: si hay una promo que coincide (concepto/categoría/etiqueta + medio de pago + vigente en el mes) y le
    * queda tope, queda **elegida de entrada**. Editando no se toca nada solo.
    */
@@ -45,8 +53,10 @@ const fmtARS = (n: number) =>
  * No renderiza nada si no hay promo para ofrecer, así que no ensucia el form en el caso común.
  */
 export default function PromocionGastoField({
-  descripcion, categoriaId, etiquetaIds, tipoPago, tarjetaId, mes, anio, esTarjeta, value, onChange, autoSeleccionar,
+  descripcion, categoriaId, etiquetaIds, tipoPago, tarjetaId, mes, anio, esTarjeta, value, onChange, fecha, onFechaChange,
+  autoSeleccionar,
 }: Props) {
+  const fechaValida = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : ''
   // Clave estable para el efecto: el array de etiquetas cambia de identidad en cada render del form.
   const etiquetasKey = [...etiquetaIds].sort((a, b) => a - b).join(',')
   const hayCriterio = !!descripcion.trim() || categoriaId != null || etiquetasKey !== ''
@@ -76,10 +86,10 @@ export default function PromocionGastoField({
 
     let cancelado = false
     const t = setTimeout(async () => {
-      // El gasto no guarda fecha de compra: el día de la promo se mide contra hoy (fecha local, no UTC).
-      const d = new Date()
-      const fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const qs = new URLSearchParams({ descripcion, tipo_pago: tipoPago, mes: String(mes), anio: String(anio), fecha })
+      // La fecha de compra con la promo decide el día de la semana y el ciclo del tope; sin ella,
+      // el server usa el mes del gasto y no filtra por día.
+      const qs = new URLSearchParams({ descripcion, tipo_pago: tipoPago, mes: String(mes), anio: String(anio) })
+      if (fechaValida) qs.set('fecha', fechaValida)
       if (tarjetaId) qs.set('tarjeta_id', String(tarjetaId))
       if (categoriaId != null) qs.set('categoria_id', String(categoriaId))
       if (etiquetasKey) qs.set('etiqueta_ids', etiquetasKey)
@@ -103,7 +113,7 @@ export default function PromocionGastoField({
       cancelado = true
       clearTimeout(t)
     }
-  }, [descripcion, categoriaId, etiquetasKey, hayCriterio, tipoPago, tarjetaId, mes, anio, esTarjeta, autoSeleccionar])
+  }, [descripcion, categoriaId, etiquetasKey, hayCriterio, tipoPago, tarjetaId, mes, anio, esTarjeta, autoSeleccionar, fechaValida])
 
   const options = useMemo(
     () =>
@@ -117,23 +127,36 @@ export default function PromocionGastoField({
   if (esTarjeta || options.length === 0) return null
 
   return (
-    <Grid item xs={12}>
-      <AppSelect
-        label="Promoción"
-        options={options}
-        value={value}
-        onChange={v => {
-          tocada.current = true
-          onChange(v == null ? null : Number(v))
-        }}
-        fullWidth
-        emptyLabel="Sin promoción"
-        helperText={
-          value != null
-            ? 'Este gasto suma al reintegro de la promo.'
-            : 'Hay una promo para este gasto. Elegila si la tuviste; si la compra fue antes de que empezara, dejala sin promoción.'
-        }
-      />
-    </Grid>
+    <>
+      <Grid item xs={12} sm={value != null ? 8 : 12}>
+        <AppSelect
+          label="Promoción"
+          options={options}
+          value={value}
+          onChange={v => {
+            tocada.current = true
+            onChange(v == null ? null : Number(v))
+          }}
+          fullWidth
+          emptyLabel="Sin promoción"
+          helperText={
+            value != null
+              ? 'Este gasto suma al reintegro de la promo.'
+              : 'Hay una promo para este gasto. Elegila si la tuviste; si la compra fue antes de que empezara, dejala sin promoción.'
+          }
+        />
+      </Grid>
+      {value != null && (
+        <Grid item xs={12} sm={4}>
+          <AppDateField
+            label="Fecha de compra"
+            fullWidth
+            value={fechaValida}
+            onChange={e => onFechaChange(e.target.value || null)}
+            helperText={fechaValida ? 'Define a qué ciclo del tope cuenta.' : 'Vacía: cuenta en el mes del gasto.'}
+          />
+        </Grid>
+      )}
+    </>
   )
 }

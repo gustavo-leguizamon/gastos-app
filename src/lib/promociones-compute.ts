@@ -4,6 +4,7 @@
 // lugar" o "ya llegaste al tope", y un error acá es plata que se deja de recuperar.
 
 import { mesAnioDeFecha } from './ingresos-compute'
+import { shiftMonth } from './fechas'
 
 /** Días de la semana, **lunes primero** (convención local): 0 = lunes … 6 = domingo. */
 export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as const
@@ -25,6 +26,21 @@ export function diaSemanaDeFecha(fecha: unknown): number | null {
   return (dow + 6) % 7
 }
 
+export const MODALIDADES = ['presencial', 'virtual', 'ambas'] as const
+export type Modalidad = typeof MODALIDADES[number]
+
+export type FiltroModalidad = 'todas' | 'presencial' | 'virtual'
+
+/**
+ * Filtro por modalidad de la página: `todas` no filtra; `presencial`/`virtual` dejan las promos de
+ * esa modalidad **y** las `ambas` (valen en los dos lados). Una fila sin modalidad cuenta como `virtual`.
+ */
+export function coincideModalidad(promo: { modalidad?: string | null }, filtro: FiltroModalidad): boolean {
+  if (filtro === 'todas') return true
+  const m = promo.modalidad ?? 'virtual'
+  return m === 'ambas' || m === filtro
+}
+
 export interface PromocionData {
   lugar: string
   conceptoIds: number[]
@@ -35,10 +51,12 @@ export interface PromocionData {
   dias: number[]
   tarjetaIds: number[]
   efectivo: boolean
+  modalidad: Modalidad
   activa: boolean
   notas: string | null
   vigenteDesde: string | null
   vigenteHasta: string | null
+  diaReinicio: number
 }
 
 /** Lista opcional de ids (dedup). `null` si algún id no es un entero positivo. */
@@ -86,6 +104,10 @@ export function parsePromocionBody(body: any): PromocionData | null {
   const efectivo = body.efectivo === true
   if (tarjetaIds.length === 0 && !efectivo) return null
 
+  // Sin `modalidad` en el body = `virtual` (la más usada); un valor desconocido es inválido.
+  const modalidad = body.modalidad == null || body.modalidad === '' ? 'virtual' : body.modalidad
+  if (!MODALIDADES.includes(modalidad)) return null
+
   const conceptoIds = parseIds(body.concepto_ids)
   const categoriaIds = parseIds(body.categoria_ids)
   const etiquetaIds = parseIds(body.etiqueta_ids)
@@ -98,6 +120,10 @@ export function parsePromocionBody(body: any): PromocionData | null {
   if (vigenteDesde === false || vigenteHasta === false) return null
   if (vigenteDesde && vigenteHasta && vigenteHasta < vigenteDesde) return null
 
+  // Sin día de reinicio = 1 (mes calendario, lo más común).
+  const diaReinicio = body.dia_reinicio == null || body.dia_reinicio === '' ? 1 : Number(body.dia_reinicio)
+  if (!Number.isInteger(diaReinicio) || diaReinicio < 1 || diaReinicio > 31) return null
+
   return {
     lugar,
     conceptoIds,
@@ -108,10 +134,12 @@ export function parsePromocionBody(body: any): PromocionData | null {
     dias,
     tarjetaIds,
     efectivo,
+    modalidad,
     activa: body.activa !== false,
     notas,
     vigenteDesde,
     vigenteHasta,
+    diaReinicio,
   }
 }
 
@@ -165,11 +193,19 @@ export function toPromocionResponse(row: any) {
       banco_icono: t.bancoIcono ?? null,
     })),
     efectivo: !!row.efectivo,
+    modalidad: MODALIDADES.includes(row.modalidad) ? row.modalidad : 'virtual',
     activa: row.activa !== false,
     notas: row.notas ?? null,
     vigente_desde: row.vigenteDesde ?? null,
     vigente_hasta: row.vigenteHasta ?? null,
+    dia_reinicio: diaReinicioDe(row),
   }
+}
+
+/** Día de reinicio de una fila (camelCase); sin dato o inválido = 1. */
+export function diaReinicioDe(row: { diaReinicio?: number | null }): number {
+  const d = Number(row.diaReinicio)
+  return Number.isInteger(d) && d >= 1 && d <= 31 ? d : 1
 }
 
 export function toUsoResponse(row: any) {
@@ -246,14 +282,188 @@ export function estadoVencimiento(venceEl: string | null | undefined, hoy: strin
   return { dias, nivel }
 }
 
+// ── Saldo a favor (lo reintegrado, menos lo usado y lo vencido) ──────────────────────
+
+/** Uso del saldo cargado a mano (`PromocionSaldoUso`). */
+export interface PromocionSaldoUsoData {
+  fecha: string
+  monto: number
+  notas: string | null
+}
+
+/** Valida el body de un uso del saldo: fecha válida y monto `> 0`. `null` si es inválido. */
+export function parseSaldoUsoBody(body: any): PromocionSaldoUsoData | null {
+  if (!body || typeof body !== 'object') return null
+  if (!mesAnioDeFecha(body.fecha)) return null
+  const monto = Number(body.monto)
+  if (!Number.isFinite(monto) || monto <= 0) return null
+  const notas = typeof body.notas === 'string' && body.notas.trim() ? body.notas.trim() : null
+  return { fecha: body.fecha, monto: r2(monto), notas }
+}
+
+export function toSaldoUsoResponse(row: any) {
+  return { id: row.id, promocion_id: row.promocionId, fecha: row.fecha, monto: row.monto, notas: row.notas ?? null }
+}
+
+/** Lo reintegrado en un ciclo: un "lote" de saldo con su propio vencimiento. */
+export interface LoteReintegro {
+  mes: number
+  anio: number
+  /** Inicio del ciclo: un uso del saldo anterior a esta fecha no puede consumir este lote. */
+  desde: string
+  monto: number
+  vence_el: string | null
+  /** Marcado a mano como usado entero ("Ya lo usé"). */
+  utilizado: boolean
+}
+
+export interface GastoDeCiclo extends GastoConsumo {
+  mes: number
+  anio: number
+  promocionFecha?: string | null
+}
+
 /**
- * Los reintegros pendientes de usar (con fecha de vencimiento y sin marcar como utilizados),
- * los que vencen antes primero. Los ya vencidos van al principio: son los que más urgen mirar.
+ * Consumo de una promo en un ciclo: los gastos asociados que caen en ese ciclo (por su fecha de
+ * compra, o por su mes si no la tienen) + los usos manuales cuya fecha cae en él.
  */
-export function reintegrosPendientes<T extends { vence_el: string | null; utilizado: boolean }>(items: T[]): T[] {
-  return items
-    .filter(i => !i.utilizado && !!i.vence_el)
-    .sort((a, b) => (a.vence_el as string).localeCompare(b.vence_el as string))
+export function consumoEnCiclo(
+  promo: { id: number; diaReinicio?: number | null },
+  ciclo: { mes: number; anio: number },
+  gastos: GastoDeCiclo[],
+  usos: { fecha: string; montoGasto: number }[],
+): { auto: number; manual: number } {
+  const dia = diaReinicioDe(promo)
+  const auto = consumoAutomatico(promo.id, gastos.filter(g => mismoCiclo(cicloDeGasto(g, dia), ciclo)))
+  const manual = r2(usos.reduce((s, u) => {
+    const c = cicloDeFecha(u.fecha, dia)
+    return c && mismoCiclo(c, ciclo) ? s + u.montoGasto : s
+  }, 0))
+  return { auto, manual }
+}
+
+/**
+ * Los lotes de saldo de una promo: lo reintegrado (topeado) en **cada ciclo** con consumo, con el
+ * vencimiento y la marca de "ya lo usé" cargados para ese ciclo. Los ciclos sin reintegro no
+ * generan lote. Ordenados por ciclo.
+ */
+export function lotesPromocion(
+  promo: { id: number; porcentaje: number; topeMensual: number; diaReinicio?: number | null },
+  gastos: GastoDeCiclo[],
+  usos: { fecha: string; montoGasto: number }[],
+  reintegros: { mes: number; anio: number; venceEl: string | null; utilizado: boolean }[],
+): LoteReintegro[] {
+  const dia = diaReinicioDe(promo)
+  const ciclos = new Map<string, { mes: number; anio: number }>()
+  const agregar = (c: { mes: number; anio: number } | null) => {
+    if (c) ciclos.set(`${c.anio}-${pad2(c.mes)}`, c)
+  }
+  gastos.filter(g => g.promocionId === promo.id).forEach(g => agregar(cicloDeGasto(g, dia)))
+  usos.forEach(u => agregar(cicloDeFecha(u.fecha, dia)))
+
+  const lotes: LoteReintegro[] = []
+  for (const [, c] of Array.from(ciclos.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    const { auto, manual } = consumoEnCiclo(promo, c, gastos, usos)
+    const monto = progresoPromocion(promo, auto, manual).reintegrado
+    if (monto <= 0) continue
+    const fila = reintegros.find(r => mismoCiclo(r, c))
+    lotes.push({
+      mes: c.mes,
+      anio: c.anio,
+      desde: rangoCiclo(c.mes, c.anio, dia).desde,
+      monto,
+      vence_el: fila?.venceEl ?? null,
+      utilizado: !!fila?.utilizado,
+    })
+  }
+  return lotes
+}
+
+export type EstadoLote = 'disponible' | 'usado' | 'vencido'
+
+export interface LoteSaldo extends LoteReintegro {
+  usado: number
+  /** Lo que queda de este lote (si está vencido, es lo que se perdió). */
+  restante: number
+  estado: EstadoLote
+}
+
+export interface SaldoPromocion {
+  /** Lo que tenés para usar hoy: lo reintegrado, menos lo usado, menos lo vencido. */
+  disponible: number
+  /** Todo lo reintegrado (todos los ciclos). */
+  reintegrado: number
+  usado: number
+  /** Lo que venció sin usarse. */
+  vencido: number
+  /** Usos cargados por encima del saldo que había a esa fecha (no se descuentan de nada). */
+  sin_respaldo: number
+  /** El vencimiento más cercano de lo que queda, con el monto que vence ese día. */
+  proximo_vencimiento: { vence_el: string; monto: number } | null
+  lotes: LoteSaldo[]
+}
+
+/**
+ * El saldo a favor de una promo al día `hoy`.
+ *
+ * Cada ciclo con reintegro es un lote (`lotesPromocion`). Los usos del saldo se aplican en orden
+ * de fecha y cada uno se descuenta de los lotes **que ya existían y no habían vencido a esa
+ * fecha**, primero los que vencen antes (FIFO por vencimiento; sin vencimiento al final): así un
+ * uso consume la plata que se iba a perder antes. Lo que un uso no pudo descontar queda en
+ * `sin_respaldo`. Un lote marcado "ya lo usé" se toma como consumido entero.
+ *
+ * Al día `hoy`, lo que quede de un lote vencido (`vence_el < hoy`) se perdió y no suma al saldo.
+ */
+export function saldoPromocion(
+  lotes: LoteReintegro[],
+  usos: { fecha: string; monto: number }[],
+  hoy: string,
+): SaldoPromocion {
+  const estado = lotes.map(l => ({ ...l, usado: l.utilizado ? l.monto : 0, restante: l.utilizado ? 0 : l.monto }))
+  let sinRespaldo = 0
+
+  const ordenUso = [...usos].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  for (const u of ordenUso) {
+    let falta = u.monto
+    const elegibles = estado
+      .filter(l => l.restante > 0 && l.desde <= u.fecha && (!l.vence_el || u.fecha <= l.vence_el))
+      .sort((a, b) => {
+        if (a.vence_el !== b.vence_el) {
+          if (!a.vence_el) return 1
+          if (!b.vence_el) return -1
+          return a.vence_el.localeCompare(b.vence_el)
+        }
+        return a.desde.localeCompare(b.desde)
+      })
+    for (const l of elegibles) {
+      if (falta <= 0) break
+      const toma = Math.min(l.restante, falta)
+      l.restante = r2(l.restante - toma)
+      l.usado = r2(l.usado + toma)
+      falta = r2(falta - toma)
+    }
+    sinRespaldo = r2(sinRespaldo + Math.max(0, falta))
+  }
+
+  const conEstado: LoteSaldo[] = estado.map(l => ({
+    ...l,
+    estado: l.restante <= 0 ? 'usado' : l.vence_el && l.vence_el < hoy ? 'vencido' : 'disponible',
+  }))
+  const vivos = conEstado.filter(l => l.estado === 'disponible')
+  const conFecha = vivos.filter(l => l.vence_el).sort((a, b) => (a.vence_el as string).localeCompare(b.vence_el as string))
+  const proxima = conFecha[0]?.vence_el ?? null
+
+  return {
+    disponible: r2(vivos.reduce((s, l) => s + l.restante, 0)),
+    reintegrado: r2(conEstado.reduce((s, l) => s + l.monto, 0)),
+    usado: r2(conEstado.reduce((s, l) => s + l.usado, 0)),
+    vencido: r2(conEstado.filter(l => l.estado === 'vencido').reduce((s, l) => s + l.restante, 0)),
+    sin_respaldo: sinRespaldo,
+    proximo_vencimiento: proxima
+      ? { vence_el: proxima, monto: r2(conFecha.filter(l => l.vence_el === proxima).reduce((s, l) => s + l.restante, 0)) }
+      : null,
+    lotes: conEstado,
+  }
 }
 
 // ── Consumo ──────────────────────────────────────────────────────────────────────────
@@ -336,22 +546,94 @@ export function diaCoincide(promo: { dias: number[] }, fecha: unknown): boolean 
   return dia == null || promo.dias.includes(dia)
 }
 
+// ── Ciclo del tope (día de reinicio) ─────────────────────────────────────────────────
+//
+// El tope se reinicia el `diaReinicio` de cada mes (default 1 = mes calendario). El ciclo
+// `(mes, anio)` va del día de reinicio de ese mes al día anterior al reinicio del siguiente:
+// con reinicio el 5, el ciclo de noviembre es 05/11 → 04/12. Lo que no se usó del tope al
+// llegar el reinicio se pierde; lo ya reintegrado pasa al saldo (ver `saldoPromocion`).
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const fechaStr = (anio: number, mes: number, dia: number) => `${anio}-${pad2(mes)}-${pad2(dia)}`
+
+/** Último día del mes (28–31). */
+export function ultimoDiaDelMes(mes: number, anio: number): number {
+  return new Date(Date.UTC(anio, mes, 0)).getUTCDate()
+}
+
+/** Día en que arranca el ciclo de `(mes, anio)`: el de reinicio, recortado al último del mes. */
+function diaInicio(mes: number, anio: number, diaReinicio: number): number {
+  return Math.min(Math.max(1, diaReinicio || 1), ultimoDiaDelMes(mes, anio))
+}
+
+/** Desde y hasta (YYYY-MM-DD, inclusive) del ciclo que empieza en `(mes, anio)`. */
+export function rangoCiclo(mes: number, anio: number, diaReinicio: number): { desde: string; hasta: string } {
+  const desde = fechaStr(anio, mes, diaInicio(mes, anio, diaReinicio))
+  const sig = shiftMonth(mes, anio, 1)
+  // Día anterior al inicio del siguiente ciclo (UTC sobre números, sin correr de día).
+  const fin = new Date(Date.UTC(sig.anio, sig.mes - 1, diaInicio(sig.mes, sig.anio, diaReinicio) - 1))
+  return { desde, hasta: fechaStr(fin.getUTCFullYear(), fin.getUTCMonth() + 1, fin.getUTCDate()) }
+}
+
 /**
- * Si la promo está vigente en algún día del mes `(mes, anio)`. Sin límite de un lado = abierta
- * de ese lado. Compara strings `YYYY-MM-DD` (orden lexicográfico = cronológico): el último día
- * del mes se toma como `-31`, válido para comparar aunque el mes tenga menos días.
+ * Ciclo al que pertenece una fecha `YYYY-MM-DD`: el del mes si ya pasó el reinicio, si no el
+ * del mes anterior (con reinicio el 5, el 03/12 es del ciclo de noviembre). `null` si la fecha
+ * es inválida.
  */
-export function vigenteEnMes(
-  promo: { vigenteDesde?: string | null; vigenteHasta?: string | null },
+export function cicloDeFecha(fecha: unknown, diaReinicio: number): { mes: number; anio: number } | null {
+  const p = mesAnioDeFecha(fecha)
+  if (!p) return null
+  const dia = Number((fecha as string).slice(8, 10))
+  return dia >= diaInicio(p.mes, p.anio, diaReinicio) ? p : shiftMonth(p.mes, p.anio, -1)
+}
+
+/**
+ * Ciclo al que cuenta un gasto asociado: el de su **fecha de compra con la promo** si la tiene,
+ * si no el que empieza en su `mes` (los asociados antes de que existiera la fecha, o a posteriori
+ * desde "Gastos que cuentan").
+ */
+export function cicloDeGasto(
+  gasto: { mes: number; anio: number; promocionFecha?: string | null },
+  diaReinicio: number,
+): { mes: number; anio: number } {
+  return cicloDeFecha(gasto.promocionFecha, diaReinicio) ?? { mes: gasto.mes, anio: gasto.anio }
+}
+
+const mismoCiclo = (a: { mes: number; anio: number }, b: { mes: number; anio: number }) =>
+  a.mes === b.mes && a.anio === b.anio
+
+/**
+ * Si la promo está vigente en algún día del ciclo `(mes, anio)` (con reinicio el 1, el mes
+ * calendario). Sin límite de un lado = abierta de ese lado. Compara strings `YYYY-MM-DD`
+ * (orden lexicográfico = cronológico).
+ */
+export function vigenteEnCiclo(
+  promo: { vigenteDesde?: string | null; vigenteHasta?: string | null; diaReinicio?: number | null },
   mes: number,
   anio: number,
 ): boolean {
-  const mm = String(mes).padStart(2, '0')
-  const primero = `${anio}-${mm}-01`
-  const ultimo = `${anio}-${mm}-31`
-  if (promo.vigenteDesde && promo.vigenteDesde > ultimo) return false
-  if (promo.vigenteHasta && promo.vigenteHasta < primero) return false
+  const { desde, hasta } = rangoCiclo(mes, anio, diaReinicioDe(promo))
+  if (promo.vigenteDesde && promo.vigenteDesde > hasta) return false
+  if (promo.vigenteHasta && promo.vigenteHasta < desde) return false
   return true
+}
+
+/**
+ * Fecha de compra con la promo que se guarda en el gasto (`Gasto.promocionFecha`):
+ * - `undefined` = no tocar (PUT parcial sin las claves de promo).
+ * - `null` = sin fecha: sin promo, o fecha vacía/inválida (cuenta en el ciclo de su mes).
+ *
+ * Sin promo nunca queda una fecha suelta. `parcial` = PUT (las claves ausentes no se tocan).
+ */
+export function promocionFechaDeBody(body: any, parcial: boolean): string | null | undefined {
+  const valida = (v: unknown) => (mesAnioDeFecha(v) ? (v as string) : null)
+  if (body?.promocion_id === undefined) {
+    if (!parcial) return null
+    return body?.promocion_fecha === undefined ? undefined : valida(body.promocion_fecha)
+  }
+  if (body.promocion_id === null) return null
+  if (body.promocion_fecha === undefined) return parcial ? undefined : null
+  return valida(body.promocion_fecha)
 }
 
 export interface GastoConsumo {
@@ -440,10 +722,15 @@ export interface TotalesPromociones {
   disponible: number
   /** Cuántas promos activas ya agotaron su tope. */
   completas: number
+  /**
+   * Saldo a favor para usar hoy, de **todas** las promos (también inactivas o fuera de vigencia:
+   * lo ya reintegrado no se pierde porque la promo terminó).
+   */
+  saldo: number
 }
 
 export function totalesPromociones(
-  items: { activa: boolean; vigente?: boolean; tope_mensual: number; progreso: ProgresoPromocion }[],
+  items: { activa: boolean; vigente?: boolean; tope_mensual: number; progreso: ProgresoPromocion; saldo?: { disponible: number } | null }[],
 ): TotalesPromociones {
   const activas = items.filter(i => i.activa && i.vigente !== false)
   return {
@@ -451,6 +738,7 @@ export function totalesPromociones(
     reintegrado: r2(activas.reduce((s, i) => s + i.progreso.reintegrado, 0)),
     disponible: r2(activas.reduce((s, i) => s + i.progreso.disponible, 0)),
     completas: activas.filter(i => i.progreso.estado === 'tope_alcanzado').length,
+    saldo: r2(items.reduce((s, i) => s + (i.saldo?.disponible ?? 0), 0)),
   }
 }
 
@@ -489,23 +777,43 @@ export function ordenarPorDisponible<T extends { progreso: ProgresoPromocion }>(
  * Qué mostrar en el popup de promociones de la pantalla de gastos, el día `hoy` (`YYYY-MM-DD`
  * local): las promos que valen **hoy** y todavía tienen tope por aprovechar (una con el tope
  * agotado no tiene nada que ganar, así que no merece interrumpir), ordenadas por disponible, y
- * los **reintegros pendientes de usar** (saldo a favor que se pierde si vence). `promos` tiene
- * que ser el progreso del **mes de hoy**, no el del período que se esté mirando.
+ * las promos con **saldo a favor para usar** (lo reintegrado que todavía no se usó ni venció),
+ * las que vencen antes primero y las sin vencimiento al final. `promos` tiene que ser el
+ * progreso del **ciclo en curso** de cada promo, no el del período que se esté mirando.
  * `mostrar` es falso cuando no hay ninguna de las dos cosas: el popup no abre.
  */
 export function avisoPromociones<
-  P extends { activa: boolean; vigente?: boolean; dias: number[]; progreso: ProgresoPromocion },
-  R extends { vence_el: string | null; utilizado: boolean; reintegrado: number },
->(promos: P[], reintegros: R[], hoy: string) {
+  P extends {
+    activa: boolean
+    vigente?: boolean
+    dias: number[]
+    progreso: ProgresoPromocion
+    saldo?: Pick<SaldoPromocion, 'disponible' | 'proximo_vencimiento'> | null
+  },
+>(promos: P[], hoy: string) {
   const dia = diaSemanaDeFecha(hoy)
   const deHoy = dia == null
     ? []
     : ordenarPorDisponible(promosDelDia(promos, dia).filter(p => p.progreso.disponible > 0))
-  const saldos = reintegrosPendientes(reintegros).filter(r => r.reintegrado > 0)
+  const saldos = ordenarPorVencimiento(promos.filter(p => (p.saldo?.disponible ?? 0) > 0))
   return {
     deHoy,
     saldos,
-    saldoTotal: r2(saldos.reduce((s, r) => s + r.reintegrado, 0)),
+    saldoTotal: r2(saldos.reduce((s, p) => s + (p.saldo?.disponible ?? 0), 0)),
     mostrar: deHoy.length > 0 || saldos.length > 0,
   }
+}
+
+/** Promos con saldo, la que tiene el vencimiento más cercano primero; sin vencimiento al final. */
+export function ordenarPorVencimiento<
+  T extends { saldo?: Pick<SaldoPromocion, 'proximo_vencimiento'> | null },
+>(promos: T[]): T[] {
+  return [...promos].sort((a, b) => {
+    const va = a.saldo?.proximo_vencimiento?.vence_el
+    const vb = b.saldo?.proximo_vencimiento?.vence_el
+    if (va === vb) return 0
+    if (!va) return 1
+    if (!vb) return -1
+    return va.localeCompare(vb)
+  })
 }

@@ -17,15 +17,19 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import MediosPromo from '@/components/promociones/MediosPromo'
 import PromoCard from '@/components/promociones/PromoCard'
 import PromocionDialog from '@/components/promociones/PromocionDialog'
-import ReintegrosPorVencer from '@/components/promociones/ReintegrosPorVencer'
+import SaldosReintegros from '@/components/promociones/SaldosReintegros'
+import SaldoUsoDialog from '@/components/promociones/SaldoUsoDialog'
 import VencimientoReintegroDialog from '@/components/promociones/VencimientoReintegroDialog'
 import SemanaPromos from '@/components/promociones/SemanaPromos'
 import AsociarGastosDialog from '@/components/promociones/AsociarGastosDialog'
 import UsoPromoDialog from '@/components/promociones/UsoPromoDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import { shiftMonth } from '@/lib/fechas'
-import { DIAS_SEMANA, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia } from '@/lib/promociones-compute'
-import type { Promocion, PromocionConProgreso, PromocionesResponse, ReintegroPorVencer, ReintegroPromo, Tarjeta } from '@/lib/types'
+import { DIAS_SEMANA, coincideModalidad, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia, totalesPromociones } from '@/lib/promociones-compute'
+import type { FiltroModalidad } from '@/lib/promociones-compute'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
+import type { Promocion, PromocionConProgreso, PromocionesResponse, ReintegroPromo, Tarjeta } from '@/lib/types'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -61,49 +65,48 @@ export default function PromocionesPage() {
   const [data, setData] = useState<PromocionesResponse | null>(null)
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalidadFiltro, setModalidadFiltro] = useState<FiltroModalidad>('todas')
   const [dialogAbierto, setDialogAbierto] = useState(false)
   const [editando, setEditando] = useState<Promocion | null>(null)
   const [aBorrar, setABorrar] = useState<PromocionConProgreso | null>(null)
   const [usoDe, setUsoDe] = useState<PromocionConProgreso | null>(null)
   const [asociarDe, setAsociarDe] = useState<PromocionConProgreso | null>(null)
-  const [porVencer, setPorVencer] = useState<ReintegroPorVencer[]>([])
+  const [saldoDe, setSaldoDe] = useState<PromocionConProgreso | null>(null)
   const [vencDe, setVencDe] = useState<{
     promocionId: number; lugar: string; mes: number; anio: number; actual: ReintegroPromo | null
   } | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const r = await fetch(`/api/promociones?mes=${filtros.mes}&anio=${filtros.anio}`, { cache: 'no-store' })
-      setData(r.ok ? await r.json() : null)
-    } catch {
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [filtros.mes, filtros.anio])
-
-  useEffect(() => { load() }, [load])
-
-  // Los reintegros por vencer son de todos los meses: no dependen del período que se mira.
-  const loadVencimientos = useCallback(async () => {
-    try {
-      const r = await fetch('/api/promociones/vencimientos', { cache: 'no-store' })
-      setPorVencer(r.ok ? await r.json() : [])
-    } catch {
-      setPorVencer([])
-    }
-  }, [])
-  useEffect(() => { loadVencimientos() }, [loadVencimientos])
-  const recargar = useCallback(async () => { await Promise.all([load(), loadVencimientos()]) }, [load, loadVencimientos])
-  useEffect(() => { fetch('/api/tarjetas').then(r => r.json()).then(setTarjetas).catch(() => {}) }, [])
 
   const hoy = hoyLocal()
   const [hoyAnio, hoyMes] = hoy.split('-').map(Number)
   const esMesActual = filtros.mes === hoyMes && filtros.anio === hoyAnio
   const diaHoy = diaSemanaDeFecha(hoy)
 
-  const promos = useMemo(() => data?.promociones ?? [], [data])
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      // En el mes actual se mira el ciclo EN CURSO de cada promo (con reinicio el 5, el 3 todavía
+      // es el ciclo anterior); en otro mes, el ciclo que empieza en ese mes. El saldo es siempre a hoy.
+      const qs = new URLSearchParams({ mes: String(filtros.mes), anio: String(filtros.anio), hoy })
+      if (esMesActual) qs.set('actual', '1')
+      const r = await fetch(`/api/promociones?${qs}`, { cache: 'no-store' })
+      setData(r.ok ? await r.json() : null)
+    } catch {
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [filtros.mes, filtros.anio, hoy, esMesActual])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => { fetch('/api/tarjetas').then(r => r.json()).then(setTarjetas).catch(() => {}) }, [])
+
+  const todas = useMemo(() => data?.promociones ?? [], [data])
+  const promos = useMemo(() => todas.filter(p => coincideModalidad(p, modalidadFiltro)), [todas, modalidadFiltro])
+  // Con filtro, los KPIs se recalculan sobre lo que se ve (los del server son de todas las promos).
+  const t = useMemo(
+    () => (data ? (modalidadFiltro === 'todas' ? data.totales : totalesPromociones(promos)) : undefined),
+    [data, promos, modalidadFiltro],
+  )
   // Tarjetas a mano para las que no tengan fila de promo todavía: orden de las cards = lo más
   // útil primero (activas con tope por aprovechar, después las completas y las inactivas).
   const ordenadas = useMemo(() => {
@@ -133,23 +136,16 @@ export default function PromocionesPage() {
     await load()
   }
 
-  const marcarUsado = async (i: ReintegroPorVencer) => {
-    const res = await fetch('/api/promociones/' + i.promocion_id + '/reintegro', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mes: i.mes, anio: i.anio, vence_el: i.vence_el, utilizado: true }),
-    })
-    if (!res.ok) { toast.error('Error al marcar como usado'); return }
-    toast.success('Reintegro marcado como usado')
-    await recargar()
+  const handleBorrarSaldoUso = async (promoId: number, usoId: number) => {
+    const res = await fetch(`/api/promociones/${promoId}/saldo-usos/${usoId}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Error al quitar el uso del saldo'); return }
+    await load()
   }
 
   const irAMes = (delta: number) => {
     const n = shiftMonth(filtros.mes, filtros.anio, delta)
     setFiltros({ mes: n.mes, anio: n.anio })
   }
-
-  const t = data?.totales
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, p: { xs: 2, md: 3 } }}>
@@ -164,20 +160,39 @@ export default function PromocionesPage() {
         <Button variant="contained" startIcon={<AddIcon />} onClick={abrirNueva}>Nueva promoción</Button>
       </Box>
 
-      <ReintegrosPorVencer
-        items={porVencer}
+      <SaldosReintegros
+        promos={todas}
         hoy={hoy}
-        onEditar={i => setVencDe({
-          promocionId: i.promocion_id, lugar: i.lugar, mes: i.mes, anio: i.anio,
-          actual: { vence_el: i.vence_el, utilizado: i.utilizado },
+        onVencimiento={(p, l) => setVencDe({
+          promocionId: p.id, lugar: p.lugar, mes: l.mes, anio: l.anio,
+          actual: { vence_el: l.vence_el, utilizado: l.utilizado },
         })}
-        onUsado={marcarUsado}
+        onUsarSaldo={setSaldoDe}
       />
 
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>}
       {!loading && !data && <Alert severity="error">No se pudieron cargar las promociones.</Alert>}
 
-      {data && promos.length === 0 && (
+      {data && todas.length > 0 && (
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={modalidadFiltro}
+          onChange={(_, v) => v && setModalidadFiltro(v)}
+          aria-label="Modalidad"
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          <ToggleButton value="todas">Todas</ToggleButton>
+          <ToggleButton value="presencial">Presencial</ToggleButton>
+          <ToggleButton value="virtual">Virtual</ToggleButton>
+        </ToggleButtonGroup>
+      )}
+
+      {data && todas.length > 0 && promos.length === 0 && (
+        <Alert severity="info">No hay promociones {modalidadFiltro === 'presencial' ? 'presenciales' : 'virtuales'}.</Alert>
+      )}
+
+      {data && todas.length === 0 && (
         <Alert severity="info" action={<Button color="inherit" size="small" onClick={abrirNueva}>Crear la primera</Button>}>
           Todavía no cargaste promociones. Cargá lugar, % de reintegro, tope mensual, días y tarjetas, y acá vas a ver
           cuánto gastar para aprovechar cada tope.
@@ -189,6 +204,7 @@ export default function PromocionesPage() {
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Kpi label="Reintegrado en el mes" valor={fmtARS(t.reintegrado)} color="success.main" />
             <Kpi label="Por reintegrar" valor={fmtARS(t.disponible)} color="primary.main" sub="Lo que todavía podés recuperar" />
+            <Kpi label="Saldo a favor" valor={fmtARS(t.saldo)} color="secondary.main" sub="Reintegrado sin usar ni vencer" />
             <Kpi label="Tope total" valor={fmtARS(t.tope_total)} sub={`${t.completas} ${t.completas === 1 ? 'promo completa' : 'promos completas'}`} />
           </Box>
 
@@ -238,13 +254,16 @@ export default function PromocionesPage() {
                   hoy={esMesActual ? diaHoy : null}
                   hoyFecha={hoy}
                   onVencimiento={() => setVencDe({
-                    promocionId: p.id, lugar: p.lugar, mes: filtros.mes, anio: filtros.anio, actual: p.reintegro,
+                    // El vencimiento es del ciclo que muestra la card (en el mes actual, el en curso).
+                    promocionId: p.id, lugar: p.lugar, mes: p.ciclo.mes, anio: p.ciclo.anio, actual: p.reintegro,
                   })}
                   onUso={() => setUsoDe(p)}
+                  onUsarSaldo={() => setSaldoDe(p)}
                   onAsociar={() => setAsociarDe(p)}
                   onEditar={() => abrirEditar(p)}
                   onBorrar={() => setABorrar(p)}
                   onBorrarUso={usoId => handleBorrarUso(p.id, usoId)}
+                  onBorrarSaldoUso={usoId => handleBorrarSaldoUso(p.id, usoId)}
                 />
               ))}
             </Box>
@@ -274,7 +293,8 @@ export default function PromocionesPage() {
         onClose={() => setAsociarDe(null)}
         onSaved={load}
       />
-      <VencimientoReintegroDialog objetivo={vencDe} onClose={() => setVencDe(null)} onSaved={recargar} />
+      <SaldoUsoDialog promo={saldoDe} hoy={hoy} onClose={() => setSaldoDe(null)} onSaved={load} />
+      <VencimientoReintegroDialog objetivo={vencDe} onClose={() => setVencDe(null)} onSaved={load} />
       <ConfirmDialog
         open={!!aBorrar}
         title="Eliminar promoción"

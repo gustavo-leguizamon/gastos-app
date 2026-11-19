@@ -135,6 +135,8 @@ export interface Gasto {
   categoria_id: number | null
   /** Promoción de reintegro a la que cuenta este gasto, o `null`. */
   promocion_id: number | null
+  /** Fecha de compra con la promo (YYYY-MM-DD): a qué ciclo del tope cuenta. `null` = el de su mes. */
+  promocion_fecha: string | null
   categoria: Categoria | null
   etiqueta_ids: number[]
   etiquetas: Etiqueta[]
@@ -176,6 +178,7 @@ export interface GastoFormData {
   categoria_id: number | null
   /** Promoción de reintegro a la que cuenta este gasto, o `null`. */
   promocion_id?: number | null
+  promocion_fecha?: string | null
   etiqueta_ids: number[]
   es_tarjeta: boolean
   pagado_completo?: boolean
@@ -553,50 +556,80 @@ export interface Promocion {
   tarjetas: PromocionTarjeta[]
   /** Vale pagando en efectivo (débito sin tarjeta). */
   efectivo: boolean
+  /** Dónde vale: en el local, online o en ambos. */
+  modalidad: 'presencial' | 'virtual' | 'ambas'
   activa: boolean
   notas: string | null
   /** Vigencia (YYYY-MM-DD, inclusive); `null` = sin límite de ese lado. */
   vigente_desde: string | null
   vigente_hasta: string | null
+  /** Día del mes en que se reinicia el tope (1 = mes calendario). */
+  dia_reinicio: number
 }
 
-/** Vencimiento del reintegro de una promo en un mes (cargado a mano). */
+/** Vencimiento del reintegro de una promo en un ciclo (cargado a mano). */
 export interface ReintegroPromo {
   /** YYYY-MM-DD, último día para usarlo; `null` = sin vencimiento. */
   vence_el: string | null
-  /** Ya se usó: apaga los avisos. */
+  /** Se usó entero: el lote deja de sumar al saldo. */
   utilizado: boolean
 }
 
-/** Un reintegro pendiente de usar con fecha de vencimiento (`GET /api/promociones/vencimientos`). */
-export interface ReintegroPorVencer extends ReintegroPromo {
-  promocion_id: number
-  lugar: string
-  /** Mes en que se generó el reintegro. */
+/** Lo reintegrado en un ciclo, con lo que se usó y lo que queda (ver `saldoPromocion`). */
+export interface LoteSaldoPromo extends ReintegroPromo {
+  /** Ciclo (mes en que empieza). */
   mes: number
   anio: number
-  /** Lo que hay para usar (reintegrado de ese mes). */
+  desde: string
+  monto: number
+  usado: number
+  restante: number
+  estado: 'disponible' | 'usado' | 'vencido'
+}
+
+/** Saldo a favor de una promo al día de hoy. Se calcula, no se persiste. */
+export interface SaldoPromo {
+  disponible: number
   reintegrado: number
+  usado: number
+  vencido: number
+  sin_respaldo: number
+  proximo_vencimiento: { vence_el: string; monto: number } | null
+  lotes: LoteSaldoPromo[]
+}
+
+export interface PromocionSaldoUso {
+  id: number
+  promocion_id: number
+  fecha: string
+  monto: number
+  notas: string | null
 }
 
 export interface PromocionConProgreso extends Promocion {
-  /** Vigente en el período consultado (`activa` es el interruptor manual, aparte). */
+  /** Ciclo que se está mirando (mes en que empieza + fechas). */
+  ciclo: { mes: number; anio: number; desde: string; hasta: string }
+  /** Vigente en el ciclo consultado (`activa` es el interruptor manual, aparte). */
   vigente: boolean
-  /** Vencimiento del reintegro de este período; `null` = nada cargado. */
+  /** Vencimiento del reintegro de este ciclo; `null` = nada cargado. */
   reintegro: ReintegroPromo | null
   usos: PromocionUso[]
   progreso: ProgresoPromocion
+  saldo: SaldoPromo
+  saldo_usos: PromocionSaldoUso[]
 }
 
 export interface PromocionesResponse {
   mes: number
   anio: number
+  hoy: string
   promociones: PromocionConProgreso[]
   totales: {
     tope_total: number
     reintegrado: number
     disponible: number
     completas: number
+    saldo: number
   }
 }
 
