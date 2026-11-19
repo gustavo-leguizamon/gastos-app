@@ -45,6 +45,10 @@ const byNombre = (a: { nombre: string }, b: { nombre: string }) => a.nombre.loca
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
+/** Fecha local `YYYY-MM-DD` (nunca `toISOString`, que es UTC y corre el día de noche en Argentina). */
+const hoyLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 const schema = gastoFormSchema
 
 /** Campos que el autofill por concepto puede escribir (para marcar su origen en el helper). */
@@ -108,6 +112,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       confirmado: gasto?.confirmado ?? true,
       categoria_id: gasto?.categoria_id ?? null,
       promocion_id: gasto?.promocion_id ?? null,
+      // Alta: la compra con promo se asume de hoy (fecha local). Editando se conserva la guardada.
+      promocion_fecha: gasto ? gasto.promocion_fecha ?? null : hoyLocal(now),
       etiqueta_ids: gasto?.etiqueta_ids ?? [],
       es_tarjeta: gasto?.es_tarjeta ?? false,
       pagado_completo: true,
@@ -164,6 +170,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const etiquetaIds = watch('etiqueta_ids')
   const descripcion = watch('descripcion')
   const promocionId = watch('promocion_id')
+  const promocionFecha = watch('promocion_fecha')
   const mesGasto = watch('mes')
   const anioGasto = watch('anio')
 
@@ -226,6 +233,7 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       notas: '',
       categoria_id: null,
       promocion_id: null,
+      promocion_fecha: hoyLocal(new Date()),
       etiqueta_ids: [],
       cuota_actual: null,
       cuotas_totales: null,
@@ -716,6 +724,8 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
           esTarjeta={esTarjeta}
           value={promocionId ?? null}
           onChange={v => setValue('promocion_id', v, { shouldDirty: true })}
+          fecha={promocionFecha ?? null}
+          onFechaChange={v => setValue('promocion_fecha', v, { shouldDirty: true })}
           autoSeleccionar={!isEditing}
         />
 

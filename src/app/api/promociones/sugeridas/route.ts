@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { normalizeNombre } from '@/lib/conceptos'
-import { promocionesConProgreso } from '@/lib/promociones-db'
-import { criterioCoincide, criteriosDe, diaCoincide, medioCoincide, vigenteEnMes } from '@/lib/promociones-compute'
+import { cicloDePeriodo, promocionesConProgreso } from '@/lib/promociones-db'
+import type { PeriodoPromo } from '@/lib/promociones-db'
+import { mesAnioDeFecha } from '@/lib/ingresos-compute'
+import { criterioCoincide, criteriosDe, diaCoincide, medioCoincide, vigenteEnCiclo } from '@/lib/promociones-compute'
 
 /** Id positivo de un query param, o `null`. */
 function idParam(v: string | null): number | null {
@@ -14,8 +16,8 @@ function idParam(v: string | null): number | null {
  * `GET /api/promociones/sugeridas` — qué promos ofrecerle al form de gasto.
  *
  * Params: `descripcion` (texto del concepto), `categoria_id`, `etiqueta_ids` (ids separados por
- * coma), `tipo_pago` (`C`/`D`), `tarjeta_id`, `mes`, `anio`, `fecha` (`YYYY-MM-DD` del día de
- * carga, opcional) y `promocion_id` (opcional).
+ * coma), `tipo_pago` (`C`/`D`), `tarjeta_id`, `mes`, `anio`, `fecha` (`YYYY-MM-DD` de la compra
+ * con la promo, opcional: decide el día de la semana y el ciclo del tope) y `promocion_id` (opcional).
  *
  * Una promo se sugiere si está **activa**, el gasto coincide con **alguno** de sus criterios
  * (concepto, categoría o alguna etiqueta vinculados — `criterioCoincide`), el medio de pago entra
@@ -61,23 +63,30 @@ export async function GET(req: NextRequest) {
 
   const filas = await prisma.promocion.findMany({
     where: { OR: or },
-    include: { conceptos: true, categorias: true, etiquetas: true, tarjetas: true, usos: { where: { mes, anio } } },
+    include: { conceptos: true, categorias: true, etiquetas: true, tarjetas: true },
     orderBy: { lugar: 'asc' },
   })
 
+  // Con fecha de compra, el ciclo de cada promo sale de esa fecha (y de su día de reinicio): es
+  // el ciclo al que va a contar el gasto. Sin fecha, el que empieza en el mes del gasto.
+  const periodo: PeriodoPromo = mesAnioDeFecha(fecha) ? { fecha: fecha as string } : { mes, anio }
+
   const candidatas = filas
-    .map(p => ({
-      fila: p,
-      coincide:
-        p.activa &&
-        criterioCoincide(criteriosDe(p), gasto) &&
-        vigenteEnMes(p, mes, anio) &&
-        diaCoincide(p, fecha) &&
-        medioCoincide({ tarjetaIds: p.tarjetas.map(t => t.id), efectivo: p.efectivo }, { tipoPago, tarjetaId }),
-    }))
+    .map(p => {
+      const ciclo = cicloDePeriodo(p, periodo)
+      return {
+        fila: p,
+        coincide:
+          p.activa &&
+          criterioCoincide(criteriosDe(p), gasto) &&
+          vigenteEnCiclo(p, ciclo.mes, ciclo.anio) &&
+          diaCoincide(p, fecha) &&
+          medioCoincide({ tarjetaIds: p.tarjetas.map(t => t.id), efectivo: p.efectivo }, { tipoPago, tarjetaId }),
+      }
+    })
     .filter(c => c.coincide || c.fila.id === forzadaId)
 
-  const conProgreso = await promocionesConProgreso(candidatas.map(c => c.fila), mes, anio)
+  const conProgreso = await promocionesConProgreso(candidatas.map(c => c.fila), periodo)
   return NextResponse.json(
     conProgreso.map((p, i) => ({
       id: p.id,

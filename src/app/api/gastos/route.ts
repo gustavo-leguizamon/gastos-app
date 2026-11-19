@@ -4,6 +4,7 @@ import { toGastoResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
 import { parseGastoIdsBatch } from '@/lib/gastos-batch'
 import { cuotasFuturasDebito } from '@/lib/cuotas-futuras'
+import { promocionFechaDeBody } from '@/lib/promociones-compute'
 
 const INCLUDE = {
   casa: true,
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
       confirmado: body.confirmado ?? true,
       categoriaId: body.categoria_id ?? null,
       promocionId: body.promocion_id ?? null,
+      promocionFecha: promocionFechaDeBody(body, false),
       etiquetas: { connect: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
       esTarjeta: body.es_tarjeta ?? false,
     },

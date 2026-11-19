@@ -18,6 +18,8 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import EventIcon from '@mui/icons-material/Event'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout'
 import { DIAS_CORTOS } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 import MediosPromo from './MediosPromo'
@@ -51,19 +53,29 @@ interface Props {
   hoyFecha: string
   onVencimiento: () => void
   onUso: () => void
+  onUsarSaldo: () => void
   onAsociar: () => void
   onEditar: () => void
   onBorrar: () => void
   onBorrarUso: (usoId: number) => void
+  onBorrarSaldoUso: (usoId: number) => void
 }
 
 /**
  * Una promo con lo que hace falta para decidir: cuánto gastaste, cuánto tenés que gastar en
- * total para llegar al tope, cuánto llevás reintegrado y cuánto te queda por ganar.
+ * total para llegar al tope, cuánto llevás reintegrado y cuánto te queda por ganar en el ciclo,
+ * y el saldo a favor acumulado (lo reintegrado que todavía no usaste ni venció).
  */
-export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, onAsociar, onEditar, onBorrar, onBorrarUso }: Props) {
+export default function PromoCard({
+  promo, hoy, hoyFecha, onVencimiento, onUso, onUsarSaldo, onAsociar, onEditar, onBorrar, onBorrarUso, onBorrarSaldoUso,
+}: Props) {
   const [verUsos, setVerUsos] = useState(false)
+  const [verSaldoUsos, setVerSaldoUsos] = useState(false)
   const p = promo.progreso
+  const saldo = promo.saldo
+  const saldoUsos = promo.saldo_usos ?? []
+  // Con reinicio el 1 el ciclo es el mes calendario y no hace falta mostrarlo.
+  const cicloPropio = promo.dia_reinicio !== 1
   const completa = p.estado === 'tope_alcanzado'
   // Con algún criterio vinculado la promo se sugiere al cargar gastos y lista candidatos.
   const vinculada = promo.concepto_ids.length + promo.categoria_ids.length + promo.etiqueta_ids.length > 0
@@ -80,6 +92,16 @@ export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, 
               {promo.activa && !promo.vigente && <Chip size="small" label="Fuera de vigencia" />}
               {(promo.vigente_desde || promo.vigente_hasta) && (
                 <Chip size="small" variant="outlined" label={vigenciaTexto(promo.vigente_desde, promo.vigente_hasta)} />
+              )}
+              {cicloPropio && promo.ciclo && (
+                <Tooltip title={`El tope se reinicia el ${promo.dia_reinicio} de cada mes`}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="info"
+                    label={`Ciclo ${fmtFecha(promo.ciclo.desde).slice(0, 5)} → ${fmtFecha(promo.ciclo.hasta).slice(0, 5)}`}
+                  />
+                </Tooltip>
               )}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5, flexWrap: 'wrap' }}>
@@ -131,7 +153,7 @@ export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, 
           <Dato
             label="Gasto mínimo p/ el tope"
             valor={fmtARS(p.gasto_minimo)}
-            ayuda="Lo que hay que gastar en el mes para que el reintegro llegue justo al tope. Más no suma."
+            ayuda={`Lo que hay que gastar en el ${cicloPropio ? 'ciclo' : 'mes'} para que el reintegro llegue justo al tope. Más no suma.`}
           />
           <Dato label="Reintegrado" valor={fmtARS(p.reintegrado)} color="success.main" />
           <Dato label="Por reintegrar" valor={fmtARS(p.disponible)} color={completa ? 'text.secondary' : 'primary.main'} />
@@ -149,6 +171,60 @@ export default function PromoCard({ promo, hoy, hoyFecha, onVencimiento, onUso, 
               <VencimientoChip venceEl={promo.reintegro.vence_el} hoy={hoyFecha} onClick={onVencimiento} />
             ) : (
               <Button size="small" startIcon={<EventIcon />} onClick={onVencimiento}>Cargar fecha</Button>
+            )}
+          </Box>
+        )}
+
+        {saldo && (saldo.reintegrado > 0 || saldoUsos.length > 0) && (
+          <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: 'action.hover', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <AccountBalanceWalletIcon fontSize="small" color={saldo.disponible > 0 ? 'primary' : 'disabled'} />
+              <Typography variant="body2">
+                Saldo a favor: <b>{fmtARS(saldo.disponible)}</b>
+              </Typography>
+              {saldo.proximo_vencimiento && (
+                <Typography variant="caption" color="text.secondary">
+                  · {fmtARS(saldo.proximo_vencimiento.monto)} vence el {fmtFecha(saldo.proximo_vencimiento.vence_el)}
+                </Typography>
+              )}
+              {saldo.disponible > 0 && (
+                <Button size="small" startIcon={<ShoppingCartCheckoutIcon />} onClick={onUsarSaldo} sx={{ ml: 'auto' }}>
+                  Usé saldo
+                </Button>
+              )}
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Reintegrado en total {fmtARS(saldo.reintegrado)} · usado {fmtARS(saldo.usado)}
+              {saldo.vencido > 0 ? ` · vencido sin usar ${fmtARS(saldo.vencido)}` : ''}
+              {saldo.sin_respaldo > 0 ? ` · usaste ${fmtARS(saldo.sin_respaldo)} más de lo que había` : ''}
+            </Typography>
+            {saldoUsos.length > 0 && (
+              <>
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={() => setVerSaldoUsos(v => !v)}
+                  sx={{ alignSelf: 'flex-start' }}
+                  endIcon={<ExpandMoreIcon sx={{ transform: verSaldoUsos ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />}
+                >
+                  {saldoUsos.length} {saldoUsos.length === 1 ? 'uso del saldo' : 'usos del saldo'}
+                </Button>
+                <Collapse in={verSaldoUsos} unmountOnExit>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    {saldoUsos.map(u => (
+                      <Box key={u.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                        <Typography variant="body2">
+                          {fmtFecha(u.fecha)} · {fmtARS(u.monto)}
+                          {u.notas ? <Typography component="span" variant="caption" color="text.secondary"> — {u.notas}</Typography> : null}
+                        </Typography>
+                        <IconButton size="small" onClick={() => onBorrarSaldoUso(u.id)} aria-label="Quitar uso del saldo">
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Box>
+                </Collapse>
+              </>
             )}
           </Box>
         )}
