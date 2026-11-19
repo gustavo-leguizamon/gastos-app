@@ -24,7 +24,10 @@ import AsociarGastosDialog from '@/components/promociones/AsociarGastosDialog'
 import UsoPromoDialog from '@/components/promociones/UsoPromoDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import { shiftMonth } from '@/lib/fechas'
-import { DIAS_SEMANA, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia } from '@/lib/promociones-compute'
+import { DIAS_SEMANA, coincideModalidad, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia, totalesPromociones } from '@/lib/promociones-compute'
+import type { FiltroModalidad } from '@/lib/promociones-compute'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import type { Promocion, PromocionConProgreso, PromocionesResponse, ReintegroPorVencer, ReintegroPromo, Tarjeta } from '@/lib/types'
 
 const MESES = [
@@ -61,6 +64,7 @@ export default function PromocionesPage() {
   const [data, setData] = useState<PromocionesResponse | null>(null)
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalidadFiltro, setModalidadFiltro] = useState<FiltroModalidad>('todas')
   const [dialogAbierto, setDialogAbierto] = useState(false)
   const [editando, setEditando] = useState<Promocion | null>(null)
   const [aBorrar, setABorrar] = useState<PromocionConProgreso | null>(null)
@@ -103,7 +107,13 @@ export default function PromocionesPage() {
   const esMesActual = filtros.mes === hoyMes && filtros.anio === hoyAnio
   const diaHoy = diaSemanaDeFecha(hoy)
 
-  const promos = useMemo(() => data?.promociones ?? [], [data])
+  const todas = useMemo(() => data?.promociones ?? [], [data])
+  const promos = useMemo(() => todas.filter(p => coincideModalidad(p, modalidadFiltro)), [todas, modalidadFiltro])
+  // Con filtro, los KPIs se recalculan sobre lo que se ve (los del server son de todas las promos).
+  const t = useMemo(
+    () => (data ? (modalidadFiltro === 'todas' ? data.totales : totalesPromociones(promos)) : undefined),
+    [data, promos, modalidadFiltro],
+  )
   // Tarjetas a mano para las que no tengan fila de promo todavía: orden de las cards = lo más
   // útil primero (activas con tope por aprovechar, después las completas y las inactivas).
   const ordenadas = useMemo(() => {
@@ -149,8 +159,6 @@ export default function PromocionesPage() {
     setFiltros({ mes: n.mes, anio: n.anio })
   }
 
-  const t = data?.totales
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, p: { xs: 2, md: 3 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
@@ -177,7 +185,26 @@ export default function PromocionesPage() {
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>}
       {!loading && !data && <Alert severity="error">No se pudieron cargar las promociones.</Alert>}
 
-      {data && promos.length === 0 && (
+      {data && todas.length > 0 && (
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={modalidadFiltro}
+          onChange={(_, v) => v && setModalidadFiltro(v)}
+          aria-label="Modalidad"
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          <ToggleButton value="todas">Todas</ToggleButton>
+          <ToggleButton value="presencial">Presencial</ToggleButton>
+          <ToggleButton value="virtual">Virtual</ToggleButton>
+        </ToggleButtonGroup>
+      )}
+
+      {data && todas.length > 0 && promos.length === 0 && (
+        <Alert severity="info">No hay promociones {modalidadFiltro === 'presencial' ? 'presenciales' : 'virtuales'}.</Alert>
+      )}
+
+      {data && todas.length === 0 && (
         <Alert severity="info" action={<Button color="inherit" size="small" onClick={abrirNueva}>Crear la primera</Button>}>
           Todavía no cargaste promociones. Cargá lugar, % de reintegro, tope mensual, días y tarjetas, y acá vas a ver
           cuánto gastar para aprovechar cada tope.

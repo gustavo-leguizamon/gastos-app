@@ -25,6 +25,21 @@ export function diaSemanaDeFecha(fecha: unknown): number | null {
   return (dow + 6) % 7
 }
 
+export const MODALIDADES = ['presencial', 'virtual', 'ambas'] as const
+export type Modalidad = typeof MODALIDADES[number]
+
+export type FiltroModalidad = 'todas' | 'presencial' | 'virtual'
+
+/**
+ * Filtro por modalidad de la página: `todas` no filtra; `presencial`/`virtual` dejan las promos de
+ * esa modalidad **y** las `ambas` (valen en los dos lados). Una fila sin modalidad cuenta como `virtual`.
+ */
+export function coincideModalidad(promo: { modalidad?: string | null }, filtro: FiltroModalidad): boolean {
+  if (filtro === 'todas') return true
+  const m = promo.modalidad ?? 'virtual'
+  return m === 'ambas' || m === filtro
+}
+
 export interface PromocionData {
   lugar: string
   conceptoIds: number[]
@@ -35,6 +50,7 @@ export interface PromocionData {
   dias: number[]
   tarjetaIds: number[]
   efectivo: boolean
+  modalidad: Modalidad
   activa: boolean
   notas: string | null
   vigenteDesde: string | null
@@ -86,6 +102,10 @@ export function parsePromocionBody(body: any): PromocionData | null {
   const efectivo = body.efectivo === true
   if (tarjetaIds.length === 0 && !efectivo) return null
 
+  // Sin `modalidad` en el body = `virtual` (la más usada); un valor desconocido es inválido.
+  const modalidad = body.modalidad == null || body.modalidad === '' ? 'virtual' : body.modalidad
+  if (!MODALIDADES.includes(modalidad)) return null
+
   const conceptoIds = parseIds(body.concepto_ids)
   const categoriaIds = parseIds(body.categoria_ids)
   const etiquetaIds = parseIds(body.etiqueta_ids)
@@ -108,6 +128,7 @@ export function parsePromocionBody(body: any): PromocionData | null {
     dias,
     tarjetaIds,
     efectivo,
+    modalidad,
     activa: body.activa !== false,
     notas,
     vigenteDesde,
@@ -165,6 +186,7 @@ export function toPromocionResponse(row: any) {
       banco_icono: t.bancoIcono ?? null,
     })),
     efectivo: !!row.efectivo,
+    modalidad: MODALIDADES.includes(row.modalidad) ? row.modalidad : 'virtual',
     activa: row.activa !== false,
     notas: row.notas ?? null,
     vigente_desde: row.vigenteDesde ?? null,

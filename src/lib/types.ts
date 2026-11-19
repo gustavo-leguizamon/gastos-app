@@ -553,6 +553,8 @@ export interface Promocion {
   tarjetas: PromocionTarjeta[]
   /** Vale pagando en efectivo (débito sin tarjeta). */
   efectivo: boolean
+  /** Dónde vale: en el local, online o en ambos. */
+  modalidad: 'presencial' | 'virtual' | 'ambas'
   activa: boolean
   notas: string | null
   /** Vigencia (YYYY-MM-DD, inclusive); `null` = sin límite de ese lado. */

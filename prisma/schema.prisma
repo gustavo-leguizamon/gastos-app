@@ -482,6 +482,8 @@ model Promocion {
   topeMensual  Float
   dias         Int[]
   efectivo     Boolean  @default(false)
+  /// Dónde vale la promo: `presencial`, `virtual` o `ambas` (default `virtual`).
+  modalidad    String   @default("virtual")
   activa       Boolean  @default(true)
   notas        String?
   /// Vigencia opcional (YYYY-MM-DD, inclusive). null = sin límite de ese lado. Sirve para no

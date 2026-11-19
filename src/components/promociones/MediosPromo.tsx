@@ -3,6 +3,8 @@
 import Box from '@mui/material/Box'
 import Tooltip from '@mui/material/Tooltip'
 import PaymentsIcon from '@mui/icons-material/Payments'
+import StorefrontIcon from '@mui/icons-material/Storefront'
+import LanguageIcon from '@mui/icons-material/Language'
 import BancoLogo from '@/components/shared/BancoLogo'
 import TarjetaLogo from '@/components/shared/TarjetaLogo'
 import { hasBancoIcono } from '@/lib/bancos'
@@ -23,7 +25,7 @@ export function TarjetaIcono({ t, size = 20 }: { t: PromocionTarjeta; size?: num
 }
 
 /** Los medios con los que vale una promo: un logo por tarjeta y un billete si vale en efectivo. */
-export default function MediosPromo({ promo, size = 20 }: { promo: Pick<Promocion, 'tarjetas' | 'efectivo'>; size?: number }) {
+export default function MediosPromo({ promo, size = 20 }: { promo: Pick<Promocion, 'tarjetas' | 'efectivo' | 'modalidad'>; size?: number }) {
   return (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
       {promo.tarjetas.map(t => <TarjetaIcono key={t.id} t={t} size={size} />)}
@@ -31,6 +33,12 @@ export default function MediosPromo({ promo, size = 20 }: { promo: Pick<Promocio
         <Tooltip title="Débito / Efectivo">
           <PaymentsIcon sx={{ fontSize: size, color: 'success.main' }} />
         </Tooltip>
+      )}
+      {promo.modalidad !== 'virtual' && (
+        <Tooltip title="Presencial"><StorefrontIcon sx={{ fontSize: size, color: 'text.secondary' }} /></Tooltip>
+      )}
+      {promo.modalidad !== 'presencial' && (
+        <Tooltip title="Virtual"><LanguageIcon sx={{ fontSize: size, color: 'info.main' }} /></Tooltip>
       )}
     </Box>
   )

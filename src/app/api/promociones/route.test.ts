@@ -104,7 +104,7 @@ describe('GET /api/promociones', () => {
 })
 
 describe('POST /api/promociones', () => {
-  const ok = { lugar: 'Coto', porcentaje: 15, tope_mensual: 8000, dias: [1, 3], tarjeta_ids: [10], efectivo: true, concepto_ids: [5, 6], vigente_desde: '2026-10-15' }
+  const ok = { modalidad: 'virtual', lugar: 'Coto', porcentaje: 15, tope_mensual: 8000, dias: [1, 3], tarjeta_ids: [10], efectivo: true, concepto_ids: [5, 6], vigente_desde: '2026-10-15' }
 
   it('400 con body inválido sin tocar la DB', async () => {
     const res = await POST(body({ ...ok, dias: [] }))
@@ -130,7 +130,7 @@ describe('POST /api/promociones', () => {
     const res = await POST(body(ok))
     expect(res.status).toBe(201)
     expect(mp.promocion.create.mock.calls[0][0].data).toMatchObject({
-      lugar: 'Coto', porcentaje: 15, topeMensual: 8000, dias: [1, 3], efectivo: true, vigenteDesde: '2026-10-15', vigenteHasta: null,
+      lugar: 'Coto', porcentaje: 15, topeMensual: 8000, dias: [1, 3], efectivo: true, modalidad: 'virtual', vigenteDesde: '2026-10-15', vigenteHasta: null,
       tarjetas: { connect: [{ id: 10 }] },
       conceptos: { connect: [{ id: 5 }, { id: 6 }] },
       categorias: { connect: [] },
