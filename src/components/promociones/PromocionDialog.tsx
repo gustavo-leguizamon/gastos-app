@@ -65,6 +65,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
   const [dias, setDias] = useState<number[]>([])
   const [tarjetaIds, setTarjetaIds] = useState<number[]>([])
   const [efectivo, setEfectivo] = useState(false)
+  const [modalidad, setModalidad] = useState<Promocion['modalidad']>('virtual')
   const [activa, setActiva] = useState(true)
   const [notas, setNotas] = useState('')
   const [vigenteDesde, setVigenteDesde] = useState('')
@@ -85,6 +86,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     setDias(editando?.dias ?? [])
     setTarjetaIds(editando?.tarjeta_ids ?? [])
     setEfectivo(editando?.efectivo ?? false)
+    setModalidad(editando?.modalidad ?? 'virtual')
     setActiva(editando?.activa ?? true)
     setNotas(editando?.notas ?? '')
     setVigenteDesde(editando?.vigente_desde ?? '')
@@ -133,6 +135,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
           dias,
           tarjeta_ids: tarjetaIds,
           efectivo,
+          modalidad,
           activa,
           notas,
           vigente_desde: vigenteDesde || null,
@@ -204,6 +207,21 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
               setTarjetaIds(v.filter(x => x !== EFECTIVO).map(Number))
             }}
           />
+
+          <Box>
+            <Typography variant="caption" color="text.secondary">Modalidad</Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={modalidad}
+              onChange={(_, v) => v && setModalidad(v)}
+            >
+              <ToggleButton value="presencial">Presencial</ToggleButton>
+              <ToggleButton value="virtual">Virtual</ToggleButton>
+              <ToggleButton value="ambas">Ambas</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           <AppMultiSelect
             label="Conceptos vinculados (opcional)"

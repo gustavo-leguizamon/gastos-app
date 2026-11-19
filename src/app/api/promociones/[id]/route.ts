@@ -29,6 +29,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       topeMensual: data.topeMensual,
       dias: data.dias,
       efectivo: data.efectivo,
+      modalidad: data.modalidad,
       activa: data.activa,
       notas: data.notas,
       vigenteDesde: data.vigenteDesde,

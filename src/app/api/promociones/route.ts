@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       topeMensual: data.topeMensual,
       dias: data.dias,
       efectivo: data.efectivo,
+      modalidad: data.modalidad,
       activa: data.activa,
       notas: data.notas,
       vigenteDesde: data.vigenteDesde,

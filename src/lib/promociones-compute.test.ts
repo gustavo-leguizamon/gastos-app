@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   diaSemanaDeFecha,
   diaCoincide,
+  coincideModalidad,
   parsePromocionBody,
   parseUsoBody,
   toPromocionResponse,
@@ -53,6 +54,15 @@ describe('diaSemanaDeFecha', () => {
   })
 })
 
+describe('coincideModalidad', () => {
+  it('todas no filtra; presencial/virtual incluyen las ambas', () => {
+    const ps = [{ modalidad: 'presencial' }, { modalidad: 'virtual' }, { modalidad: 'ambas' }, {}]
+    expect(ps.filter(x => coincideModalidad(x, 'todas'))).toHaveLength(4)
+    expect(ps.filter(x => coincideModalidad(x, 'presencial')).map(x => x.modalidad)).toEqual(['presencial', 'ambas'])
+    expect(ps.filter(x => coincideModalidad(x, 'virtual')).map(x => x.modalidad)).toEqual(['virtual', 'ambas', undefined])
+  })
+})
+
 describe('parsePromocionBody', () => {
   it('normaliza lugar, ordena y deduplica días y tarjetas', () => {
     expect(parsePromocionBody(bodyOk({ tarjeta_ids: [2, 1, 2] }))).toEqual({
@@ -65,11 +75,24 @@ describe('parsePromocionBody', () => {
       dias: [2, 4],
       tarjetaIds: [2, 1],
       efectivo: false,
+      modalidad: 'virtual',
       activa: true,
       notas: null,
       vigenteDesde: null,
       vigenteHasta: null,
     })
+  })
+
+  it('modalidad: presencial / virtual / ambas; sin valor = virtual; desconocida es inválida', () => {
+    expect(parsePromocionBody(bodyOk({ modalidad: 'presencial' }))).toMatchObject({ modalidad: 'presencial' })
+    expect(parsePromocionBody(bodyOk({ modalidad: 'virtual' }))).toMatchObject({ modalidad: 'virtual' })
+    expect(parsePromocionBody(bodyOk({ modalidad: '' }))).toMatchObject({ modalidad: 'virtual' })
+    expect(parsePromocionBody(bodyOk({ modalidad: 'telefonica' }))).toBeNull()
+  })
+
+  it('la respuesta expone la modalidad (y cae en virtual si la fila no la trae)', () => {
+    expect(toPromocionResponse({ id: 1, lugar: 'X', modalidad: 'virtual' }).modalidad).toBe('virtual')
+    expect(toPromocionResponse({ id: 1, lugar: 'X' }).modalidad).toBe('virtual')
   })
 
   it('acepta sólo efectivo (sin tarjetas) y varios conceptos vinculados (sin repetir)', () => {
