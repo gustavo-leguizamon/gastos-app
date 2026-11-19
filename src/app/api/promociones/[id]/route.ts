@@ -34,6 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       notas: data.notas,
       vigenteDesde: data.vigenteDesde,
       vigenteHasta: data.vigenteHasta,
+      diaReinicio: data.diaReinicio,
       tarjetas: { set: data.tarjetaIds.map(t => ({ id: t })) },
       conceptos: { set: data.conceptoIds.map(c => ({ id: c })) },
       categorias: { set: data.categoriaIds.map(c => ({ id: c })) },

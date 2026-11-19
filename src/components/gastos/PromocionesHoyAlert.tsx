@@ -13,12 +13,7 @@ import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import MediosPromo from '@/components/promociones/MediosPromo'
 import VencimientoChip from '@/components/promociones/VencimientoChip'
 import { DIAS_SEMANA, avisoPromociones, diaSemanaDeFecha } from '@/lib/promociones-compute'
-import type { PromocionConProgreso, PromocionesResponse, ReintegroPorVencer } from '@/lib/types'
-
-const MESES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-]
+import type { PromocionConProgreso, PromocionesResponse } from '@/lib/types'
 
 const fmtARS = (n: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -43,17 +38,16 @@ interface Props {
  */
 export default function PromocionesHoyAlert({ habilitado }: Props) {
   const [hoy] = useState(hoyLocal)
-  const [aviso, setAviso] = useState<ReturnType<typeof avisoPromociones<PromocionConProgreso, ReintegroPorVencer>> | null>(null)
+  const [aviso, setAviso] = useState<ReturnType<typeof avisoPromociones<PromocionConProgreso>> | null>(null)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
     const [anio, mes] = hoy.split('-').map(Number)
-    Promise.all([
-      fetch(`/api/promociones?mes=${mes}&anio=${anio}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)),
-      fetch('/api/promociones/vencimientos', { cache: 'no-store' }).then(r => (r.ok ? r.json() : [])),
-    ])
-      .then(([data, vencimientos]: [PromocionesResponse | null, ReintegroPorVencer[]]) => {
-        const a = avisoPromociones(data?.promociones ?? [], vencimientos ?? [], hoy)
+    // `actual=1`: el ciclo en curso de cada promo (respeta su día de reinicio), y el saldo a hoy.
+    fetch(`/api/promociones?mes=${mes}&anio=${anio}&hoy=${hoy}&actual=1`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: PromocionesResponse | null) => {
+        const a = avisoPromociones(data?.promociones ?? [], hoy)
         if (a.mostrar) setAviso(a)
       })
       .catch(() => {})
@@ -104,19 +98,24 @@ export default function PromocionesHoyAlert({ habilitado }: Props) {
               <Typography variant="body2" fontWeight={800} color="primary.main">{fmtARS(aviso.saldoTotal)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {aviso.saldos.map(s => (
-                <Box
-                  key={`${s.promocion_id}-${s.anio}-${s.mes}`}
-                  sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={700}>{s.lugar}</Typography>
-                    <Typography variant="caption" color="text.secondary">de {MESES[s.mes - 1]} {s.anio}</Typography>
+              {aviso.saldos.map(p => {
+                const prox = p.saldo.proximo_vencimiento
+                return (
+                  <Box
+                    key={p.id}
+                    sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={700}>{p.lugar}</Typography>
+                      {prox && prox.monto < p.saldo.disponible && (
+                        <Typography variant="caption" color="text.secondary">{fmtARS(prox.monto)} vence primero</Typography>
+                      )}
+                    </Box>
+                    {prox && <VencimientoChip venceEl={prox.vence_el} hoy={hoy} />}
+                    <Typography fontWeight={800} color="primary.main" sx={{ ml: 'auto' }}>{fmtARS(p.saldo.disponible)}</Typography>
                   </Box>
-                  <VencimientoChip venceEl={s.vence_el as string} hoy={hoy} />
-                  <Typography fontWeight={800} color="primary.main" sx={{ ml: 'auto' }}>{fmtARS(s.reintegrado)}</Typography>
-                </Box>
-              ))}
+                )
+              })}
             </Box>
           </Box>
         )}

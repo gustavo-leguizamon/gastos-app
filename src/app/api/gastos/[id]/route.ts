@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { toGastoResponse } from '@/lib/gastos-compute'
 import { resolveConcepto } from '@/lib/conceptos'
+import { promocionFechaDeBody } from '@/lib/promociones-compute'
 
 const INCLUDE = {
   casa: true,
@@ -47,6 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       categoriaId: body.categoria_id ?? null,
       // Sólo se toca si viene en el body: un PUT parcial no debe soltar la promo asociada.
       promocionId: body.promocion_id === undefined ? undefined : body.promocion_id ?? null,
+      promocionFecha: promocionFechaDeBody(body, true),
       etiquetas: { set: (body.etiqueta_ids ?? []).map((id: number) => ({ id })) },
       esTarjeta: body.es_tarjeta ?? false,
     },

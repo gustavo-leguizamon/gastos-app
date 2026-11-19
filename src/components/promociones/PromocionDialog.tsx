@@ -70,6 +70,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
   const [notas, setNotas] = useState('')
   const [vigenteDesde, setVigenteDesde] = useState('')
   const [vigenteHasta, setVigenteHasta] = useState('')
+  const [diaReinicio, setDiaReinicio] = useState('1')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -91,7 +92,13 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     setNotas(editando?.notas ?? '')
     setVigenteDesde(editando?.vigente_desde ?? '')
     setVigenteHasta(editando?.vigente_hasta ?? '')
+    setDiaReinicio(String(editando?.dia_reinicio ?? 1))
   }, [open, editando])
+
+  // El reinicio sólo importa si la promo dura más que un mes: una vigencia dentro del mismo mes
+  // calendario es un único ciclo.
+  const variosMeses = !(vigenteDesde && vigenteHasta && vigenteDesde.slice(0, 7) === vigenteHasta.slice(0, 7))
+  const diaReinicioNum = variosMeses ? Number(diaReinicio) : 1
 
   // Las dadas de baja no se ofrecen para promos nuevas, pero una ya elegida se conserva.
   const opcionesMedios = useMemo(
@@ -119,6 +126,9 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     if (dias.length === 0) return toast.error('Elegí al menos un día')
     if (tarjetaIds.length === 0 && !efectivo) return toast.error('Elegí al menos un medio de pago')
     if (vigenteDesde && vigenteHasta && vigenteHasta < vigenteDesde) return toast.error('La vigencia termina antes de empezar')
+    if (!(Number.isInteger(diaReinicioNum) && diaReinicioNum >= 1 && diaReinicioNum <= 31)) {
+      return toast.error('El día de reinicio debe estar entre 1 y 31')
+    }
 
     setSaving(true)
     try {
@@ -140,6 +150,7 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
           notas,
           vigente_desde: vigenteDesde || null,
           vigente_hasta: vigenteHasta || null,
+          dia_reinicio: diaReinicioNum,
         }),
       })
       const d = await res.json().catch(() => ({}))
@@ -264,6 +275,24 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
           <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
             Fuera de ese rango no se sugiere ni cuenta en el mes. Sirve cuando la promo arranca o termina a mitad de mes.
           </Typography>
+
+          {variosMeses && (
+            <>
+              <AppTextField
+                label="El tope se reinicia el día"
+                size="small"
+                fullWidth
+                value={diaReinicio}
+                onChange={e => setDiaReinicio(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                inputProps={{ inputMode: 'numeric' }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
+                Casi siempre el 1. Si es otro día (por ejemplo el 5), el tope corre del 5 al 4 del mes siguiente: lo que
+                no usaste del tope se pierde al reiniciarse, pero lo que ya te reintegraron queda como saldo a favor
+                hasta que lo uses o venza.
+              </Typography>
+            </>
+          )}
 
           <AppTextField label="Notas" size="small" fullWidth multiline minRows={2} value={notas} onChange={e => setNotas(e.target.value)} />
           <AppToggle label="Promoción activa" checked={activa} onChange={e => setActiva(e.target.checked)} />
