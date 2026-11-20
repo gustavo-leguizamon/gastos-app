@@ -25,7 +25,7 @@ import AsociarGastosDialog from '@/components/promociones/AsociarGastosDialog'
 import UsoPromoDialog from '@/components/promociones/UsoPromoDialog'
 import { useGastosStore } from '@/store/gastosStore'
 import { shiftMonth } from '@/lib/fechas'
-import { DIAS_SEMANA, coincideModalidad, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia, totalesPromociones } from '@/lib/promociones-compute'
+import { DIAS_SEMANA, coincideModalidad, diaSemanaDeFecha, ordenarPorDisponible, promosDelDia, textoFaltaTope, textoReintegro, totalesPromociones } from '@/lib/promociones-compute'
 import type { FiltroModalidad } from '@/lib/promociones-compute'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
@@ -223,12 +223,12 @@ export default function PromocionesPage() {
                       return (
                         <Box key={p.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                           <Typography fontWeight={700} sx={{ minWidth: 120 }}>{p.lugar}</Typography>
-                          <Typography fontWeight={800} color="primary.main">{p.porcentaje}%</Typography>
+                          <Typography fontWeight={800} color="primary.main">{textoReintegro(p)}</Typography>
                           <MediosPromo promo={p} size={20} />
                           <Typography variant="body2" color={completa ? 'success.main' : 'text.secondary'}>
                             {completa
                               ? 'Tope alcanzado este mes'
-                              : `Podés recuperar ${fmtARS(p.progreso.disponible)} · gastando ${fmtARS(p.progreso.gasto_restante)} más`}
+                              : `Podés recuperar ${fmtARS(p.progreso.disponible)} · ${textoFaltaTope(p, p.progreso)}`}
                           </Typography>
                         </Box>
                       )

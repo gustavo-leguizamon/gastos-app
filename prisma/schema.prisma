@@ -8,15 +8,15 @@ datasource db {
 }
 
 model Moneda {
-  id           Int                @id @default(autoincrement())
-  codigo       String             @unique
-  nombre       String
-  simbolo      String
-  gastos       Gasto[]
-  ingresos     Ingreso[]
-  inversiones  Inversion[]
-  operaciones  OperacionDivisa[]
-  cotizaciones CotizacionDivisa[]
+  id                Int                @id @default(autoincrement())
+  codigo            String             @unique
+  nombre            String
+  simbolo           String
+  gastos            Gasto[]
+  ingresos          Ingreso[]
+  inversiones       Inversion[]
+  operaciones       OperacionDivisa[]
+  cotizaciones      CotizacionDivisa[]
   plataformasDivisa PlataformaDivisa[]
 }
 
@@ -46,7 +46,7 @@ model Tarjeta {
 }
 
 model TarjetaCierre {
-  id                 Int      @id @default(autoincrement())
+  id                 Int       @id @default(autoincrement())
   tarjetaId          Int
   mes                Int
   anio               Int
@@ -56,8 +56,8 @@ model TarjetaCierre {
   /// Cuándo el cron copió automáticamente el resumen de este período al mes siguiente
   /// (una vez pasada `fechaCierre`). null = todavía no. Ver src/lib/tarjetas-autocopia.ts.
   autoCopiadoAt      DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   tarjeta Tarjeta @relation(fields: [tarjetaId], references: [id], onDelete: Cascade)
 
@@ -134,10 +134,10 @@ model ObjetivoAhorro {
 // Etiqueta: corte transversal (varias por gasto/item) — labels que se solapan a propósito
 // (ej. "Viaje", "Deducible", "Compartido"). Migradas desde el viejo M2M de Categoria.
 model Etiqueta {
-  id     Int                      @id @default(autoincrement())
-  nombre String                   @unique
-  gastos Gasto[]                  @relation("GastoEtiquetas")
-  items  GastoItem[]              @relation("GastoItemEtiquetas")
+  id          Int                      @id @default(autoincrement())
+  nombre      String                   @unique
+  gastos      Gasto[]                  @relation("GastoEtiquetas")
+  items       GastoItem[]              @relation("GastoItemEtiquetas")
   reglas      CategoriaEtiquetaRegla[]
   promociones Promocion[]              @relation("PromocionEtiquetas")
 }
@@ -209,9 +209,9 @@ model Gasto {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  categoriaId Int?
+  categoriaId    Int?
   /// Promoción de reintegro a la que cuenta este gasto (asociación explícita, ver Promocion).
-  promocionId Int?
+  promocionId    Int?
   /// Fecha de compra con la promo (YYYY-MM-DD): decide a qué ciclo de la promo cuenta el gasto
   /// cuando se reinicia otro día que el 1. null = cuenta en el ciclo que empieza en su `mes`.
   promocionFecha String?
@@ -475,30 +475,38 @@ model PushSubscription {
 /// opcionales) sólo sirven para **sugerir** la promo al cargar un gasto que coincida con
 /// **cualquiera** de ellos y para listar candidatos a asociar.
 model Promocion {
-  id           Int      @id @default(autoincrement())
-  lugar        String
+  id             Int      @id @default(autoincrement())
+  lugar          String
   /// LEGACY: antes la promo tenía un solo concepto. Ahora son varios (`conceptos`, M2M); la
   /// migración copió este valor a la tabla puente. La app ya no lo lee ni lo escribe — queda
   /// hasta una migración posterior para no romper el código que todavía corre en producción.
-  conceptoId   Int?
-  porcentaje   Float
-  topeMensual  Float
-  dias         Int[]
-  efectivo     Boolean  @default(false)
+  conceptoId     Int?
+  /// `porcentaje` (default) o `monto_fijo`: un monto fijo por cada compra que llegue a
+  /// `compraMinima`, hasta `topeMensual`. Ver `progresoPromocion`.
+  tipo           String   @default("porcentaje")
+  /// % de reintegro; 0 en una promo de monto fijo.
+  porcentaje     Float
+  topeMensual    Float
+  /// Monto fijo: lo que se reintegra por cada compra válida (null en porcentaje).
+  montoReintegro Float?
+  /// Monto fijo: lo mínimo que tiene que tener cada compra (null = cualquiera).
+  compraMinima   Float?
+  dias           Int[]
+  efectivo       Boolean  @default(false)
   /// Dónde vale la promo: `presencial`, `virtual` o `ambas` (default `virtual`).
-  modalidad    String   @default("virtual")
-  activa       Boolean  @default(true)
-  notas        String?
+  modalidad      String   @default("virtual")
+  activa         Boolean  @default(true)
+  notas          String?
   /// Vigencia opcional (YYYY-MM-DD, inclusive). null = sin límite de ese lado. Sirve para no
   /// sugerir ni contar la promo fuera de ese rango; no filtra gastos (no tienen fecha de compra).
-  vigenteDesde String?
-  vigenteHasta String?
+  vigenteDesde   String?
+  vigenteHasta   String?
   /// Día del mes en que el tope se reinicia (1–31, default 1 = mes calendario). El ciclo va del
   /// día de reinicio de un mes al día anterior al reinicio del siguiente; en un mes más corto se
   /// recorta al último día. El ciclo se nombra por el mes en que empieza.
-  diaReinicio  Int      @default(1)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  diaReinicio    Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   conceptos  Concepto[]           @relation("PromocionConceptos")
   categorias Categoria[]          @relation("PromocionCategorias")
@@ -567,19 +575,19 @@ model PromocionReintegro {
 /// Es el "qué": se carga una vez y se reutiliza mes a mes. El nombre es único sin distinguir
 /// mayúsculas (se resuelve en las routes, no con un índice).
 model Articulo {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  unidadId  Int
+  id                Int      @id @default(autoincrement())
+  nombre            String
+  unidadId          Int
   /// null = sin rubro.
-  rubroId   Int?
+  rubroId           Int?
   /// Sólo en artículos en g/ml: true = las cantidades se muestran (y se cargan por defecto) en
   /// kg/l. Es de presentación: las cantidades se guardan siempre en g/ml.
-  mostrarEnMultiplo Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  mostrarEnMultiplo Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  unidad Unidad  @relation(fields: [unidadId], references: [id])
-  rubro  Rubro?  @relation(fields: [rubroId], references: [id], onDelete: SetNull)
+  unidad Unidad            @relation(fields: [unidadId], references: [id])
+  rubro  Rubro?            @relation(fields: [rubroId], references: [id], onDelete: SetNull)
   items  ListaCompraItem[]
 }
 
@@ -587,12 +595,12 @@ model Articulo {
 /// pantalla se elija de las existentes o se agregue una nueva, en vez de tipear texto libre.
 /// Nombre único sin distinguir mayúsculas (se resuelve en las routes).
 model Unidad {
-  id        Int      @id @default(autoincrement())
-  nombre    String   @unique
+  id          Int      @id @default(autoincrement())
+  nombre      String   @unique
   /// "kg" o "l" si esta unidad es la milésima parte de esa base (g → kg, ml → l); null = sin
   /// equivalencia. Permite cargar y ver el precio por kg/litro en artículos comprados en g/ml.
   subunidadDe String?
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   articulos Articulo[]
 }
@@ -612,17 +620,17 @@ model Rubro {
 /// "comprado" se deriva (`cantidadComprada >= cantidad`), no se guarda.
 /// `precioUnitario` null = todavía no se compró / no se sabe (distinto de 0).
 model ListaCompraItem {
-  id             Int      @id @default(autoincrement())
-  articuloId     Int
-  mes            Int
-  anio           Int
-  cantidad       Float    @default(1)
-  precioUnitario Float?
-  cantidadComprada Float  @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  articuloId       Int
+  mes              Int
+  anio             Int
+  cantidad         Float    @default(1)
+  precioUnitario   Float?
+  cantidadComprada Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  articulo Articulo @relation(fields: [articuloId], references: [id], onDelete: Cascade)
+  articulo Articulo            @relation(fields: [articuloId], references: [id], onDelete: Cascade)
   compras  ListaCompraCompra[]
 
   @@unique([articuloId, mes, anio])

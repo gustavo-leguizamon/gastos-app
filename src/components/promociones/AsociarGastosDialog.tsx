@@ -12,6 +12,7 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
+import { reglaDeRespuesta, reintegroDeCompra } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 
 interface Candidato {
@@ -101,7 +102,14 @@ export default function AsociarGastosDialog({ promo, mes, anio, onClose, onSaved
     }
   }
 
-  const total = items?.filter(c => marcados.has(c.id)).reduce((s, c) => s + c.total_ars, 0) ?? 0
+  const fijo = promo.tipo === 'monto_fijo'
+  const regla = reglaDeRespuesta(promo)
+  const elegidos = items?.filter(c => marcados.has(c.id)) ?? []
+  const total = elegidos.reduce((s, c) => s + c.total_ars, 0)
+  // Sin topear, igual que antes: es lo que generan los marcados, el tope lo aplica la card.
+  const reintegroEstimado = fijo
+    ? elegidos.reduce((s, c) => s + reintegroDeCompra(regla, c.total_ars), 0)
+    : (total * promo.porcentaje) / 100
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
@@ -130,6 +138,11 @@ export default function AsociarGastosDialog({ promo, mes, anio, onClose, onSaved
                 {c.fecha_vencimiento.split('-').reverse().join('/')} · {c.descripcion}
                 {c.tarjeta_nombre ? ` · ${c.tarjeta_nombre}` : c.tipo_pago === 'D' ? ' · Débito / Efectivo' : ''}
               </Typography>
+              {fijo && reintegroDeCompra(regla, c.total_ars) === 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  No llega a la compra mínima: no suma reintegro
+                </Typography>
+              )}
               {c.asociado_a_otra && (
                 <Typography variant="caption" color="warning.main">Hoy cuenta para otra promo: marcarlo se la saca</Typography>
               )}
@@ -140,7 +153,7 @@ export default function AsociarGastosDialog({ promo, mes, anio, onClose, onSaved
 
         {items && items.length > 0 && (
           <Typography variant="body2" sx={{ mt: 1.5 }}>
-            Gasto que cuenta: <b>{fmtARS(total)}</b> · reintegro estimado <b>{fmtARS((total * promo.porcentaje) / 100)}</b>
+            Gasto que cuenta: <b>{fmtARS(total)}</b> · reintegro estimado <b>{fmtARS(reintegroEstimado)}</b>
           </Typography>
         )}
       </DialogContent>

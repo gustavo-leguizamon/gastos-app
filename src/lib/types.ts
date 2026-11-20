@@ -529,13 +529,17 @@ export interface ProgresoPromocion {
   consumo_auto: number
   consumo_manual: number
   consumo: number
-  /** Gasto que agota justo el tope (`tope ÷ %`). */
+  /** Gasto que agota justo el tope (`tope ÷ %`, o en monto fijo compras necesarias × mínima). */
   gasto_minimo: number
   gasto_restante: number
   reintegrado: number
   disponible: number
   pct_tope: number
   estado: 'sin_uso' | 'en_curso' | 'tope_alcanzado'
+  /** Monto fijo: compras que llegaron a la mínima en el ciclo (`null` en porcentaje). */
+  compras_validas: number | null
+  /** Monto fijo: compras de la mínima que faltan para el tope (`null` en porcentaje). */
+  compras_restantes: number | null
 }
 
 export interface Promocion {
@@ -548,8 +552,13 @@ export interface Promocion {
   categoria_nombres: string[]
   etiqueta_ids: number[]
   etiqueta_nombres: string[]
+  /** `porcentaje` o `monto_fijo` (un monto por cada compra que llegue a `compra_minima`). */
+  tipo: 'porcentaje' | 'monto_fijo'
+  /** 0 en monto fijo. */
   porcentaje: number
   tope_mensual: number
+  monto_reintegro: number | null
+  compra_minima: number | null
   /** 0 = lunes … 6 = domingo. */
   dias: number[]
   tarjeta_ids: number[]

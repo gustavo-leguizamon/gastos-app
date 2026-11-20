@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   diaSemanaDeFecha,
   diaCoincide,
+  reglaDeRespuesta,
+  reintegroDeCompra,
+  textoFaltaTope,
+  textoReintegro,
+  fechaEnVigencia,
   coincideModalidad,
   parsePromocionBody,
   parseUsoBody,
@@ -79,8 +84,11 @@ describe('parsePromocionBody', () => {
       conceptoIds: [],
       categoriaIds: [],
       etiquetaIds: [],
+      tipo: 'porcentaje',
       porcentaje: 20,
       topeMensual: 10000,
+      montoReintegro: null,
+      compraMinima: null,
       dias: [2, 4],
       tarjetaIds: [2, 1],
       efectivo: false,
@@ -706,5 +714,133 @@ describe('avisoPromociones', () => {
     const r = avisoPromociones([promo(1), conSaldo(2, 100)], 'basura')
     expect(r.deHoy).toEqual([])
     expect(r.saldos).toHaveLength(1)
+  })
+})
+
+describe('fechaEnVigencia', () => {
+  it('sin vigencia o sin fecha válida no descarta nada', () => {
+    expect(fechaEnVigencia({}, '2026-11-03')).toBe(true)
+    expect(fechaEnVigencia({ vigenteDesde: '2026-11-18', vigenteHasta: '2026-11-18' }, null)).toBe(true)
+    expect(fechaEnVigencia({ vigenteDesde: '2026-11-18', vigenteHasta: '2026-11-18' }, 'basura')).toBe(true)
+  })
+
+  it('una promo de un solo día sólo acepta ese día (extremos inclusive)', () => {
+    const promo = { vigenteDesde: '2026-11-18', vigenteHasta: '2026-11-18' }
+    expect(fechaEnVigencia(promo, '2026-11-18')).toBe(true)
+    expect(fechaEnVigencia(promo, '2026-11-17')).toBe(false)
+    expect(fechaEnVigencia(promo, '2026-11-19')).toBe(false)
+  })
+
+  it('un límite abierto de un lado no recorta ese lado', () => {
+    expect(fechaEnVigencia({ vigenteDesde: '2026-11-10' }, '2027-05-01')).toBe(true)
+    expect(fechaEnVigencia({ vigenteDesde: '2026-11-10' }, '2026-11-09')).toBe(false)
+    expect(fechaEnVigencia({ vigenteHasta: '2026-11-10' }, '2020-01-01')).toBe(true)
+    expect(fechaEnVigencia({ vigenteHasta: '2026-11-10' }, '2026-11-11')).toBe(false)
+  })
+})
+
+describe('promos de monto fijo', () => {
+  // $5.000 por compra desde $20.000, tope $15.000 (tres compras).
+  const promo = { tipo: 'monto_fijo', porcentaje: 0, topeMensual: 15000, montoReintegro: 5000, compraMinima: 20000 }
+  /** Intl.NumberFormat usa espacio duro entre el $ y el número. */
+  const plano = (t: string) => t.replace(/\s/g, ' ')
+
+  it('parsePromocionBody: monto > 0, mínima opcional (0 = cualquiera), tope opcional (= un reintegro)', () => {
+    const fijo = (over: Record<string, any> = {}) =>
+      bodyOk({ tipo: 'monto_fijo', porcentaje: undefined, monto_reintegro: 5000, compra_minima: 20000, tope_mensual: 15000, ...over })
+    expect(parsePromocionBody(fijo())).toMatchObject({
+      tipo: 'monto_fijo', porcentaje: 0, montoReintegro: 5000, compraMinima: 20000, topeMensual: 15000,
+    })
+    expect(parsePromocionBody(fijo({ tope_mensual: '' }))).toMatchObject({ topeMensual: 5000 })
+    expect(parsePromocionBody(fijo({ tope_mensual: null }))).toMatchObject({ topeMensual: 5000 })
+    expect(parsePromocionBody(fijo({ compra_minima: '' }))).toMatchObject({ compraMinima: null })
+    expect(parsePromocionBody(fijo({ compra_minima: 0 }))).toMatchObject({ compraMinima: null })
+    expect(parsePromocionBody(fijo({ monto_reintegro: 0 }))).toBeNull()
+    expect(parsePromocionBody(fijo({ monto_reintegro: '' }))).toBeNull()
+    expect(parsePromocionBody(fijo({ compra_minima: -1 }))).toBeNull()
+    expect(parsePromocionBody(fijo({ tope_mensual: 0 }))).toBeNull()
+    expect(parsePromocionBody(bodyOk({ tipo: 'otro' }))).toBeNull()
+  })
+
+  it('parsePromocionBody: sin tipo es porcentaje y descarta monto/mínima', () => {
+    expect(parsePromocionBody(bodyOk({ monto_reintegro: 5000, compra_minima: 100 }))).toMatchObject({
+      tipo: 'porcentaje', porcentaje: 20, montoReintegro: null, compraMinima: null,
+    })
+  })
+
+  it('toPromocionResponse: tipo (porcentaje si la fila no lo tiene), monto y mínima', () => {
+    expect(toPromocionResponse({ id: 1, lugar: 'x', porcentaje: 20 })).toMatchObject({
+      tipo: 'porcentaje', monto_reintegro: null, compra_minima: null,
+    })
+    expect(toPromocionResponse({ id: 1, lugar: 'x', ...promo })).toMatchObject({
+      tipo: 'monto_fijo', monto_reintegro: 5000, compra_minima: 20000,
+    })
+  })
+
+  it('reintegroDeCompra: el monto fijo si llega a la mínima (inclusive), 0 si no', () => {
+    expect(reintegroDeCompra(promo, 20000)).toBe(5000)
+    expect(reintegroDeCompra(promo, 80000)).toBe(5000)
+    expect(reintegroDeCompra(promo, 19999.99)).toBe(0)
+    expect(reintegroDeCompra(promo, -30000)).toBe(0)
+    expect(reintegroDeCompra({ ...promo, compraMinima: null }, 1)).toBe(5000)
+    // En porcentaje es lineal.
+    expect(reintegroDeCompra({ porcentaje: 20, topeMensual: 1000 }, 3000)).toBe(600)
+  })
+
+  it('progresoPromocion: cuenta compra por compra, no la suma', () => {
+    // 15.000 + 15.000 suman 30.000 pero ninguna llega a la mínima.
+    expect(progresoPromocion(promo, 30000, 0, [15000, 15000])).toMatchObject({
+      estado: 'sin_uso', consumo: 30000, reintegrado: 0, disponible: 15000,
+      compras_validas: 0, compras_restantes: 3, gasto_minimo: 60000, gasto_restante: 60000,
+    })
+    expect(progresoPromocion(promo, 45000, 0, [25000, 20000])).toMatchObject({
+      estado: 'en_curso', reintegrado: 10000, disponible: 5000, pct_tope: 67,
+      compras_validas: 2, compras_restantes: 1, gasto_restante: 20000,
+    })
+  })
+
+  it('progresoPromocion: el tope topea, y un tope que no es múltiplo pide una compra más', () => {
+    expect(progresoPromocion(promo, 0, 100000, [20000, 20000, 20000, 40000])).toMatchObject({
+      estado: 'tope_alcanzado', reintegrado: 15000, disponible: 0, compras_restantes: 0, gasto_restante: 0, pct_tope: 100,
+    })
+    const p = progresoPromocion({ ...promo, topeMensual: 12000 }, 0, 0, [20000, 20000])
+    expect(p).toMatchObject({ reintegrado: 10000, disponible: 2000, compras_restantes: 1, gasto_minimo: 60000 })
+  })
+
+  it('progresoPromocion en porcentaje no informa compras', () => {
+    expect(progresoPromocion({ porcentaje: 20, topeMensual: 1000 }, 100, 0, [100])).toMatchObject({
+      compras_validas: null, compras_restantes: null,
+    })
+  })
+
+  it('consumoEnCiclo devuelve cada compra del ciclo (gastos en ARS + usos)', () => {
+    const gastos = [
+      { promocionId: 1, mes: 11, anio: 2026, promocionFecha: null, totalMoneda: 100, tipoCambio: 250 },
+      { promocionId: 2, mes: 11, anio: 2026, promocionFecha: null, totalMoneda: 9999, tipoCambio: 1 },
+      { promocionId: 1, mes: 12, anio: 2026, promocionFecha: null, totalMoneda: 7777, tipoCambio: 1 },
+    ]
+    const r = consumoEnCiclo({ id: 1 }, { mes: 11, anio: 2026 }, gastos, [{ fecha: '2026-11-10', montoGasto: 21000 }])
+    expect(r).toEqual({ auto: 25000, manual: 21000, compras: [25000, 21000] })
+  })
+
+  it('lotesPromocion usa la regla de monto fijo', () => {
+    const g = (total: number) => ({ promocionId: 1, mes: 11, anio: 2026, promocionFecha: null, totalMoneda: total, tipoCambio: 1 })
+    const lotes = lotesPromocion({ id: 1, ...promo }, [g(25000), g(10000)], [], [])
+    expect(lotes.map(l => l.monto)).toEqual([5000])
+  })
+
+  it('textos: reintegro y lo que falta para el tope', () => {
+    const resp = { tipo: 'monto_fijo', porcentaje: 0, monto_reintegro: 5000, compra_minima: 20000 }
+    expect(textoReintegro({ porcentaje: 20 })).toBe('20%')
+    expect(plano(textoReintegro(resp))).toBe('$ 5.000 desde $ 20.000')
+    expect(plano(textoReintegro({ ...resp, compra_minima: null }))).toBe('$ 5.000')
+    expect(plano(textoFaltaTope({}, { gasto_restante: 30000 }))).toBe('gastando $ 30.000 más')
+    expect(plano(textoFaltaTope(resp, { gasto_restante: 40000, compras_restantes: 2 }))).toBe('con 2 compras más de al menos $ 20.000')
+    expect(textoFaltaTope({ tipo: 'monto_fijo' }, { gasto_restante: 0, compras_restantes: 1 })).toBe('con 1 compra más')
+  })
+
+  it('reglaDeRespuesta mapea la respuesta de la API a la regla', () => {
+    expect(reglaDeRespuesta({ tipo: 'monto_fijo', porcentaje: 0, tope_mensual: 15000, monto_reintegro: 5000, compra_minima: 20000 }))
+      .toEqual(promo)
   })
 })
