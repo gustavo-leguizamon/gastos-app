@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
 import AppDateField from '@/components/shared/AppDateField'
 import AppTextField from '@/components/shared/AppTextField'
+import { reglaDeRespuesta, reintegroDeCompra, textoReintegro } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 
 interface Props {
@@ -38,7 +39,8 @@ export default function UsoPromoDialog({ promo, fechaInicial, onClose, onSaved }
   if (!promo) return null
 
   const montoNum = Number(monto.replace(',', '.'))
-  const reintegro = montoNum > 0 ? (montoNum * promo.porcentaje) / 100 : 0
+  const fijo = promo.tipo === 'monto_fijo'
+  const reintegro = montoNum > 0 ? reintegroDeCompra(reglaDeRespuesta(promo), montoNum) : 0
 
   const submit = async () => {
     if (!(montoNum > 0)) return toast.error('Poné cuánto gastaste')
@@ -69,10 +71,15 @@ export default function UsoPromoDialog({ promo, fechaInicial, onClose, onSaved }
             label="Monto gastado ($)" size="small" fullWidth autoFocus value={monto}
             onChange={e => setMonto(e.target.value)} inputProps={{ inputMode: 'decimal' }}
           />
+          {fijo && montoNum > 0 && reintegro === 0 && (
+            <Typography variant="body2" color="warning.main">
+              No llega a la compra mínima ({textoReintegro(promo)}): este uso no suma reintegro.
+            </Typography>
+          )}
           {reintegro > 0 && (
             <Typography variant="body2" color="text.secondary">
               Reintegro estimado: <b>{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(reintegro)}</b>{' '}
-              ({promo.porcentaje}%, sujeto al tope del mes)
+              ({textoReintegro(promo)}, sujeto al tope del mes)
             </Typography>
           )}
           <AppTextField label="Nota (opcional)" size="small" fullWidth value={notas} onChange={e => setNotas(e.target.value)} />

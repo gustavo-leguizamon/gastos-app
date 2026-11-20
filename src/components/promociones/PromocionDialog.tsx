@@ -60,7 +60,10 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
   const [conceptoIds, setConceptoIds] = useState<number[]>([])
   const [categoriaIds, setCategoriaIds] = useState<number[]>([])
   const [etiquetaIds, setEtiquetaIds] = useState<number[]>([])
+  const [tipo, setTipo] = useState<Promocion['tipo']>('porcentaje')
   const [porcentaje, setPorcentaje] = useState('')
+  const [montoReintegro, setMontoReintegro] = useState('')
+  const [compraMinima, setCompraMinima] = useState('')
   const [tope, setTope] = useState('')
   const [dias, setDias] = useState<number[]>([])
   const [tarjetaIds, setTarjetaIds] = useState<number[]>([])
@@ -82,7 +85,10 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     setConceptoIds(editando?.concepto_ids ?? [])
     setCategoriaIds(editando?.categoria_ids ?? [])
     setEtiquetaIds(editando?.etiqueta_ids ?? [])
-    setPorcentaje(editando ? String(editando.porcentaje) : '')
+    setTipo(editando?.tipo ?? 'porcentaje')
+    setPorcentaje(editando && editando.tipo !== 'monto_fijo' ? String(editando.porcentaje) : '')
+    setMontoReintegro(editando?.monto_reintegro != null ? String(editando.monto_reintegro) : '')
+    setCompraMinima(editando?.compra_minima != null ? String(editando.compra_minima) : '')
     setTope(editando ? String(editando.tope_mensual) : '')
     setDias(editando?.dias ?? [])
     setTarjetaIds(editando?.tarjeta_ids ?? [])
@@ -114,14 +120,21 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
     [tarjetas, mes, anio, tarjetaIds],
   )
 
+  const fijo = tipo === 'monto_fijo'
   const pct = Number(porcentaje.replace(',', '.'))
-  const topeNum = Number(tope.replace(',', '.'))
+  const montoNum = Number(montoReintegro.replace(',', '.'))
+  const minimaNum = compraMinima.trim() ? Number(compraMinima.replace(',', '.')) : 0
+  // En monto fijo el tope es opcional: vacío = un solo reintegro por ciclo.
+  const topeNum = fijo && !tope.trim() ? montoNum : Number(tope.replace(',', '.'))
   // El dato que hace útil la promo: cuánto hay que gastar para exprimir el tope.
-  const gastoMinimo = pct > 0 && topeNum > 0 ? topeNum / (pct / 100) : null
+  const gastoMinimo = !fijo && pct > 0 && topeNum > 0 ? topeNum / (pct / 100) : null
+  const comprasTope = fijo && montoNum > 0 && topeNum > 0 ? Math.ceil(topeNum / montoNum - 1e-9) : null
 
   const submit = async () => {
     if (!lugar.trim()) return toast.error('Poné el lugar de la promo')
-    if (!(pct > 0 && pct <= 100)) return toast.error('El porcentaje debe estar entre 0 y 100')
+    if (!fijo && !(pct > 0 && pct <= 100)) return toast.error('El porcentaje debe estar entre 0 y 100')
+    if (fijo && !(montoNum > 0)) return toast.error('Poné cuánto te reintegran por compra')
+    if (fijo && !(minimaNum >= 0)) return toast.error('La compra mínima no puede ser negativa')
     if (!(topeNum > 0)) return toast.error('El tope mensual debe ser mayor a 0')
     if (dias.length === 0) return toast.error('Elegí al menos un día')
     if (tarjetaIds.length === 0 && !efectivo) return toast.error('Elegí al menos un medio de pago')
@@ -140,8 +153,11 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
           concepto_ids: conceptoIds,
           categoria_ids: categoriaIds,
           etiqueta_ids: etiquetaIds,
-          porcentaje: pct,
-          tope_mensual: topeNum,
+          tipo,
+          porcentaje: fijo ? null : pct,
+          tope_mensual: fijo && !tope.trim() ? null : topeNum,
+          monto_reintegro: fijo ? montoNum : null,
+          compra_minima: fijo && minimaNum > 0 ? minimaNum : null,
           dias,
           tarjeta_ids: tarjetaIds,
           efectivo,
@@ -170,20 +186,60 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <AppTextField label="Lugar" size="small" fullWidth value={lugar} onChange={e => setLugar(e.target.value)} autoFocus />
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <AppTextField
-              label="Reintegro %" size="small" fullWidth value={porcentaje}
-              onChange={e => setPorcentaje(e.target.value)} inputProps={{ inputMode: 'decimal' }}
-            />
-            <AppTextField
-              label="Tope por mes ($)" size="small" fullWidth value={tope}
-              onChange={e => setTope(e.target.value)} inputProps={{ inputMode: 'decimal' }}
-            />
+          <Box>
+            <Typography variant="caption" color="text.secondary">Tipo de reintegro</Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={tipo}
+              onChange={(_, v) => v && setTipo(v)}
+            >
+              <ToggleButton value="porcentaje">Porcentaje</ToggleButton>
+              <ToggleButton value="monto_fijo">Monto fijo</ToggleButton>
+            </ToggleButtonGroup>
           </Box>
+
+          {fijo ? (
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
+              <AppTextField
+                label="Reintegro por compra ($)" size="small" fullWidth value={montoReintegro}
+                onChange={e => setMontoReintegro(e.target.value)} inputProps={{ inputMode: 'decimal' }}
+              />
+              <AppTextField
+                label="Compra mínima ($)" size="small" fullWidth value={compraMinima}
+                onChange={e => setCompraMinima(e.target.value)} inputProps={{ inputMode: 'decimal' }}
+              />
+              <AppTextField
+                label="Tope por mes ($, opcional)" size="small" fullWidth value={tope}
+                onChange={e => setTope(e.target.value)} inputProps={{ inputMode: 'decimal' }}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <AppTextField
+                label="Reintegro %" size="small" fullWidth value={porcentaje}
+                onChange={e => setPorcentaje(e.target.value)} inputProps={{ inputMode: 'decimal' }}
+              />
+              <AppTextField
+                label="Tope por mes ($)" size="small" fullWidth value={tope}
+                onChange={e => setTope(e.target.value)} inputProps={{ inputMode: 'decimal' }}
+              />
+            </Box>
+          )}
 
           {gastoMinimo != null && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
               Para aprovechar el tope completo tenés que gastar <b>{fmtARS(gastoMinimo)}</b> en el mes.
+            </Typography>
+          )}
+          {comprasTope != null && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
+              Cada compra{minimaNum > 0 ? <> de al menos <b>{fmtARS(minimaNum)}</b></> : null} te devuelve{' '}
+              <b>{fmtARS(montoNum)}</b>.{' '}
+              {comprasTope === 1
+                ? 'Vale una sola vez por mes (sin tope, o con tope igual al reintegro).'
+                : <>Para el tope completo hacen falta <b>{comprasTope}</b> compras en el mes.</>}
             </Typography>
           )}
 

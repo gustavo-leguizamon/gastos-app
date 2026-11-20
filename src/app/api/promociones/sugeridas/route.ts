@@ -26,7 +26,7 @@ function idParam(v: string | null): number | null {
  * `coincide: false`): al editar un gasto ya asociado, la opción actual no puede desaparecer
  * del select o se perdería la asociación sin avisar.
  *
- * Devuelve `{ id, lugar, porcentaje, disponible, tope_alcanzado, coincide }[]` — `disponible`
+ * Devuelve `{ id, lugar, tipo, porcentaje, monto_reintegro, compra_minima, disponible, tope_alcanzado, coincide }[]` — `disponible`
  * es lo que queda por reintegrar en ese mes, para que el form lo muestre al elegir.
  */
 export async function GET(req: NextRequest) {
@@ -91,7 +91,10 @@ export async function GET(req: NextRequest) {
     conProgreso.map((p, i) => ({
       id: p.id,
       lugar: p.lugar,
+      tipo: p.tipo,
       porcentaje: p.porcentaje,
+      monto_reintegro: p.monto_reintegro,
+      compra_minima: p.compra_minima,
       disponible: p.progreso.disponible,
       tope_alcanzado: p.progreso.estado === 'tope_alcanzado',
       coincide: candidatas[i].coincide,

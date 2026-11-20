@@ -4,11 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Grid from '@mui/material/Grid'
 import AppSelect from '@/components/shared/AppSelect'
 import AppDateField from '@/components/shared/AppDateField'
+import { textoReintegro } from '@/lib/promociones-compute'
 
 interface Sugerida {
   id: number
   lugar: string
+  tipo: 'porcentaje' | 'monto_fijo'
   porcentaje: number
+  monto_reintegro: number | null
+  compra_minima: number | null
   disponible: number
   tope_alcanzado: boolean
   coincide: boolean
@@ -119,7 +123,7 @@ export default function PromocionGastoField({
     () =>
       opciones.map(o => ({
         value: o.id,
-        label: `${o.lugar} ${o.porcentaje}% · ${o.tope_alcanzado ? 'tope alcanzado' : `quedan ${fmtARS(o.disponible)}`}${o.coincide ? '' : ' (ya no coincide)'}`,
+        label: `${o.lugar} ${textoReintegro(o)} · ${o.tope_alcanzado ? 'tope alcanzado' : `quedan ${fmtARS(o.disponible)}`}${o.coincide ? '' : ' (ya no coincide)'}`,
       })),
     [opciones],
   )

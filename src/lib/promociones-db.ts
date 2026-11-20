@@ -99,7 +99,7 @@ export async function promocionesConProgreso(
     const susGastos = gastos.filter(g => g.promocionId === p.id)
     const susUsos = usos.filter(u => u.promocionId === p.id)
     const susReintegros = reintegros.filter(r => r.promocionId === p.id)
-    const { auto, manual } = consumoEnCiclo(p, ciclo, susGastos, susUsos)
+    const { auto, manual, compras } = consumoEnCiclo(p, ciclo, susGastos, susUsos)
     const usosDelCiclo = susUsos.filter(u => {
       const c = cicloDeFecha(u.fecha, dia)
       return c && c.mes === ciclo.mes && c.anio === ciclo.anio
@@ -114,7 +114,7 @@ export async function promocionesConProgreso(
       usos: usosDelCiclo.map(toUsoResponse),
       /** Vencimiento cargado del reintegro de ESTE ciclo (`null` = nada cargado). */
       reintegro: toReintegroResponse(susReintegros.find(r => r.mes === ciclo.mes && r.anio === ciclo.anio)),
-      progreso: progresoPromocion({ porcentaje: p.porcentaje, topeMensual: p.topeMensual }, auto, manual),
+      progreso: progresoPromocion(p, auto, manual, compras),
     }
 
     if (conSaldo) {
