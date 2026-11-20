@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import {
   criterioCoincide,
   criteriosDe,
+  fechaEnVigencia,
   medioCoincide,
   tieneCriterios,
   whereGastoCriterios,
@@ -15,7 +16,9 @@ import {
  *
  * Candidato = gasto no-resumen que coincide con alguno de los criterios vinculados (concepto,
  * categoría o etiqueta) y cuyo medio de pago entra en la promo, más los que ya están asociados
- * (aunque hoy no coincidan, para poder desasociarlos). 400 si la promo no tiene ningún criterio
+ * (aunque hoy no coincidan, para poder desasociarlos). Los no asociados además tienen que caer
+ * dentro de la vigencia de la promo (`fechaEnVigencia`, sobre `promocionFecha ?? fechaVencimiento`):
+ * una promo de un solo día no ofrece las compras del resto del mes. 400 si la promo no tiene ningún criterio
  * vinculado: sin ellos no hay forma de listar.
  */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -49,7 +52,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .filter(
       g =>
         g.promocionId === id ||
-        (criterioCoincide(criterios, { ...g, etiquetaIds: g.etiquetas.map(e => e.id) }) && medioCoincide(medios, g)),
+        (criterioCoincide(criterios, { ...g, etiquetaIds: g.etiquetas.map(e => e.id) }) &&
+          medioCoincide(medios, g) &&
+          // Fuera de la vigencia no pudo tener la promo. Se mira la fecha de compra con la promo
+          // si la hay; si no, la del gasto (la que muestra la lista).
+          fechaEnVigencia(promo, g.promocionFecha ?? g.fechaVencimiento)),
     )
     .map(g => ({
       id: g.id,

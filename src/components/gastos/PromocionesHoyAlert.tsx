@@ -12,7 +12,7 @@ import Typography from '@mui/material/Typography'
 import LocalOfferIcon from '@mui/icons-material/LocalOffer'
 import MediosPromo from '@/components/promociones/MediosPromo'
 import VencimientoChip from '@/components/promociones/VencimientoChip'
-import { DIAS_SEMANA, avisoPromociones, diaSemanaDeFecha } from '@/lib/promociones-compute'
+import { DIAS_SEMANA, avisoPromociones, diaSemanaDeFecha, textoFaltaTope, textoReintegro } from '@/lib/promociones-compute'
 import type { PromocionConProgreso, PromocionesResponse } from '@/lib/types'
 
 const fmtARS = (n: number) =>
@@ -80,10 +80,10 @@ export default function PromocionesHoyAlert({ habilitado }: Props) {
                   sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}
                 >
                   <Typography fontWeight={700}>{p.lugar}</Typography>
-                  <Typography fontWeight={800} color="primary.main">{p.porcentaje}%</Typography>
+                  <Typography fontWeight={800} color="primary.main">{textoReintegro(p)}</Typography>
                   <MediosPromo promo={p} size={20} />
                   <Typography variant="body2" color="text.secondary" sx={{ flexBasis: { xs: '100%', sm: 'auto' }, ml: { sm: 'auto' } }}>
-                    Podés recuperar {fmtARS(p.progreso.disponible)} · gastando {fmtARS(p.progreso.gasto_restante)} más
+                    Podés recuperar {fmtARS(p.progreso.disponible)} · {textoFaltaTope(p, p.progreso)}
                   </Typography>
                 </Box>
               ))}

@@ -20,7 +20,7 @@ import EventIcon from '@mui/icons-material/Event'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout'
-import { DIAS_CORTOS } from '@/lib/promociones-compute'
+import { DIAS_CORTOS, textoFaltaTope, textoReintegro } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 import MediosPromo from './MediosPromo'
 import VencimientoChip from './VencimientoChip'
@@ -87,7 +87,7 @@ export default function PromoCard({
           <Box sx={{ minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Typography variant="h6" fontWeight={800} noWrap>{promo.lugar}</Typography>
-              <Chip size="small" color={completa ? 'success' : 'primary'} label={`${promo.porcentaje}% · tope ${fmtARS(promo.tope_mensual)}`} />
+              <Chip size="small" color={completa ? 'success' : 'primary'} label={`${textoReintegro(promo)} · tope ${fmtARS(promo.tope_mensual)}`} />
               {!promo.activa && <Chip size="small" label="Inactiva" />}
               {promo.activa && !promo.vigente && <Chip size="small" label="Fuera de vigencia" />}
               {(promo.vigente_desde || promo.vigente_hasta) && (
@@ -153,7 +153,11 @@ export default function PromoCard({
           <Dato
             label="Gasto mínimo p/ el tope"
             valor={fmtARS(p.gasto_minimo)}
-            ayuda={`Lo que hay que gastar en el ${cicloPropio ? 'ciclo' : 'mes'} para que el reintegro llegue justo al tope. Más no suma.`}
+            ayuda={
+              promo.tipo === 'monto_fijo'
+                ? `Compras de la mínima que hacen falta en el ${cicloPropio ? 'ciclo' : 'mes'} para llegar al tope. Comprar más caro no devuelve más.`
+                : `Lo que hay que gastar en el ${cicloPropio ? 'ciclo' : 'mes'} para que el reintegro llegue justo al tope. Más no suma.`
+            }
           />
           <Dato label="Reintegrado" valor={fmtARS(p.reintegrado)} color="success.main" />
           <Dato label="Por reintegrar" valor={fmtARS(p.disponible)} color={completa ? 'text.secondary' : 'primary.main'} />
@@ -232,7 +236,9 @@ export default function PromoCard({
         <Typography variant="body2" color={completa ? 'success.main' : 'text.secondary'} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {completa
             ? <><CheckCircleIcon sx={{ fontSize: 18 }} /> Tope alcanzado: no hace falta gastar más acá.</>
-            : <>Te faltan gastar <b>{fmtARS(p.gasto_restante)}</b> para el reintegro máximo.</>}
+            : promo.tipo === 'monto_fijo'
+              ? <>Para el reintegro máximo, {textoFaltaTope(promo, p)}{p.compras_validas ? ` (llevás ${p.compras_validas} ${p.compras_validas === 1 ? 'compra válida' : 'compras válidas'})` : ''}.</>
+              : <>Te faltan gastar <b>{fmtARS(p.gasto_restante)}</b> para el reintegro máximo.</>}
         </Typography>
 
         {!vinculada && (

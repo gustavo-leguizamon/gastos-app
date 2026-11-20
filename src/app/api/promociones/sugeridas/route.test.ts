@@ -108,7 +108,10 @@ describe('GET /api/promociones/sugeridas', () => {
   it('sugiere la promo con lo que queda por reintegrar', async () => {
     mp.gasto.findMany.mockResolvedValue([gasto(50000)]) // 15.000 reintegrados
     const [s] = await (await GET(url(base))).json()
-    expect(s).toEqual({ id: 1, lugar: 'PedidosYa', porcentaje: 30, disponible: 15000, tope_alcanzado: false, coincide: true })
+    expect(s).toEqual({
+      id: 1, lugar: 'PedidosYa', tipo: 'porcentaje', porcentaje: 30, monto_reintegro: null, compra_minima: null,
+      disponible: 15000, tope_alcanzado: false, coincide: true,
+    })
   })
 
   it('con fecha de compra mira el ciclo de esa fecha según el día de reinicio de la promo', async () => {
@@ -125,6 +128,16 @@ describe('GET /api/promociones/sugeridas', () => {
         { promocionFecha: { gte: '2026-10-05', lte: '2026-11-04' } },
       ],
     })
+  })
+
+  it('monto fijo: sólo cuentan las compras que llegan a la mínima y expone la regla', async () => {
+    // $5.000 por compra desde $20.000, tope $10.000 (dos compras).
+    mp.promocion.findMany.mockResolvedValue([
+      rawPromo({ tipo: 'monto_fijo', porcentaje: 0, topeMensual: 10000, montoReintegro: 5000, compraMinima: 20000 }),
+    ])
+    mp.gasto.findMany.mockResolvedValue([gasto(25000), gasto(15000)]) // la segunda no llega
+    const [s] = await (await GET(url(base))).json()
+    expect(s).toMatchObject({ tipo: 'monto_fijo', monto_reintegro: 5000, compra_minima: 20000, disponible: 5000, tope_alcanzado: false })
   })
 
   it('marca tope alcanzado', async () => {

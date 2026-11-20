@@ -3,7 +3,7 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { DIAS_CORTOS, DIAS_SEMANA, semanaPromos } from '@/lib/promociones-compute'
+import { DIAS_CORTOS, DIAS_SEMANA, semanaPromos, textoReintegro } from '@/lib/promociones-compute'
 import type { PromocionConProgreso } from '@/lib/types'
 import MediosPromo from './MediosPromo'
 
@@ -33,7 +33,7 @@ export function PromoChip({ promo, onClick }: { promo: PromocionConProgreso; onC
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
         <Typography variant="body2" fontWeight={700} noWrap>{promo.lugar}</Typography>
         <Typography variant="body2" fontWeight={800} color={completa ? 'success.main' : 'primary.main'}>
-          {promo.porcentaje}%
+          {textoReintegro(promo)}
         </Typography>
       </Box>
       <Box sx={{ mt: 0.5 }}>

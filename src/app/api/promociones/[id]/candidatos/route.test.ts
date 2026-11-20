@@ -82,4 +82,18 @@ describe('GET /api/promociones/[id]/candidatos', () => {
     expect(r.find((g: any) => g.id === 4)).toMatchObject({ asociado: false, asociado_a_otra: true })
     expect(r[0]).toMatchObject({ descripcion: 'PedidosYa', total_ars: 1000, tarjeta_nombre: 'Visa' })
   })
+
+  it('descarta los no asociados fuera de la vigencia (por fecha de compra con la promo o la del gasto)', async () => {
+    mp.promocion.findUnique.mockResolvedValue({ ...promo, vigenteDesde: '2026-10-18', vigenteHasta: '2026-10-18' })
+    mp.gasto.findMany.mockResolvedValue([
+      gasto({ id: 1, fechaVencimiento: '2026-10-03' }), // antes de la vigencia
+      gasto({ id: 2, fechaVencimiento: '2026-10-18' }), // el día de la promo
+      gasto({ id: 3, fechaVencimiento: '2026-10-25' }), // después
+      gasto({ id: 4, fechaVencimiento: '2026-10-25', promocionFecha: '2026-10-18' }), // compra con la promo ese día
+      gasto({ id: 5, fechaVencimiento: '2026-10-03', promocionId: 1 }), // asociado: se muestra igual
+      gasto({ id: 6, fechaVencimiento: null }), // sin fecha: no hay criterio para descartarlo
+    ])
+    const r = await (await GET(url('mes=10&anio=2026'), params('1'))).json()
+    expect(r.map((g: any) => g.id)).toEqual([2, 4, 5, 6])
+  })
 })

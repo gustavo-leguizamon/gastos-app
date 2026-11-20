@@ -41,13 +41,99 @@ export function coincideModalidad(promo: { modalidad?: string | null }, filtro: 
   return m === 'ambas' || m === filtro
 }
 
+/**
+ * Cómo se calcula el reintegro:
+ * - `porcentaje`: un % de lo gastado en el ciclo, hasta el tope.
+ * - `monto_fijo`: un monto fijo por **cada compra** que llegue a la compra mínima ("$5.000 de
+ *   reintegro en compras desde $20.000"), hasta el tope. Una compra que no llega no suma nada.
+ */
+export const TIPOS_PROMO = ['porcentaje', 'monto_fijo'] as const
+export type TipoPromo = typeof TIPOS_PROMO[number]
+
+/** Lo que define cuánto devuelve una promo (camelCase, fila de Prisma o `PromocionData`). */
+export interface ReglaReintegro {
+  tipo?: string | null
+  porcentaje: number
+  topeMensual: number
+  montoReintegro?: number | null
+  compraMinima?: number | null
+}
+
+export function esMontoFijo(promo: { tipo?: string | null }): boolean {
+  return promo.tipo === 'monto_fijo'
+}
+
+/**
+ * Reintegro **sin topear** que genera una compra de `monto` (ARS). En una promo por porcentaje es
+ * `monto × %` (lineal, así que sumar compras o sumar reintegros da lo mismo); en una de monto fijo
+ * es el monto fijo si la compra llega a la mínima (tolerancia de medio centavo) y 0 si no.
+ */
+export function reintegroDeCompra(promo: ReglaReintegro, monto: number): number {
+  if (!esMontoFijo(promo)) return r2((monto * promo.porcentaje) / 100)
+  if (!(monto > 0)) return 0
+  return monto >= (promo.compraMinima ?? 0) - 0.005 ? r2(promo.montoReintegro ?? 0) : 0
+}
+
+/** La regla de reintegro de una promo tal como la devuelve la API (snake_case), para `reintegroDeCompra` en el cliente. */
+export function reglaDeRespuesta(promo: {
+  tipo?: string | null
+  porcentaje: number
+  tope_mensual: number
+  monto_reintegro?: number | null
+  compra_minima?: number | null
+}): ReglaReintegro {
+  return {
+    tipo: promo.tipo,
+    porcentaje: promo.porcentaje,
+    topeMensual: promo.tope_mensual,
+    montoReintegro: promo.monto_reintegro ?? null,
+    compraMinima: promo.compra_minima ?? null,
+  }
+}
+
+/** Cuánto devuelve la promo, para mostrar: `"20%"` o `"$ 5.000 desde $ 20.000"`. */
+export function textoReintegro(promo: {
+  tipo?: string | null
+  porcentaje: number
+  monto_reintegro?: number | null
+  compra_minima?: number | null
+}): string {
+  if (promo.tipo !== 'monto_fijo') return `${promo.porcentaje}%`
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+  const monto = fmt(promo.monto_reintegro ?? 0)
+  return promo.compra_minima ? `${monto} desde ${fmt(promo.compra_minima)}` : monto
+}
+
+/**
+ * Lo que falta para el tope, para mostrar después de "Podés recuperar $X · ": en porcentaje
+ * `"gastando $ 30.000 más"`; en monto fijo `"con 2 compras más de al menos $ 20.000"`.
+ */
+export function textoFaltaTope(
+  promo: { tipo?: string | null; compra_minima?: number | null },
+  progreso: { gasto_restante: number; compras_restantes?: number | null },
+): string {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+  if (promo.tipo !== 'monto_fijo') return `gastando ${fmt(progreso.gasto_restante)} más`
+  const n = progreso.compras_restantes ?? 0
+  const minima = promo.compra_minima ? ` de al menos ${fmt(promo.compra_minima)}` : ''
+  return `con ${n} ${n === 1 ? 'compra' : 'compras'} más${minima}`
+}
+
 export interface PromocionData {
   lugar: string
   conceptoIds: number[]
   categoriaIds: number[]
   etiquetaIds: number[]
+  tipo: TipoPromo
+  /** 0 en una promo de monto fijo. */
   porcentaje: number
   topeMensual: number
+  /** Sólo en monto fijo (`null` en porcentaje). */
+  montoReintegro: number | null
+  /** Sólo en monto fijo: lo mínimo que tiene que tener cada compra. `null` = cualquier compra. */
+  compraMinima: number | null
   dias: number[]
   tarjetaIds: number[]
   efectivo: boolean
@@ -76,8 +162,11 @@ function parseFechaOpcional(v: unknown): string | null | false {
  * Valida y normaliza el body de alta/edición de una promoción (snake_case → camelCase).
  * Devuelve `null` si es inválido, para que la route responda 400 sin tocar la DB.
  *
- * Reglas: lugar no vacío; porcentaje en `(0, 100]`; tope mensual `> 0` (la cuenta de "cuánto
- * hay que gastar para llegar al tope" divide por el porcentaje y no tiene sentido sin tope);
+ * Reglas: lugar no vacío; `tipo` `porcentaje` (default) o `monto_fijo`. En porcentaje, % en
+ * `(0, 100]` y tope mensual `> 0` (la cuenta de "cuánto hay que gastar para llegar al tope"
+ * divide por el porcentaje y no tiene sentido sin tope). En monto fijo, `monto_reintegro > 0`,
+ * `compra_minima` opcional `>= 0` (vacía o 0 = cualquier compra) y tope opcional: sin tope vale
+ * `monto_reintegro` (un solo reintegro por ciclo); el porcentaje se guarda en 0;
  * al menos un día; al menos un medio de pago — una promo sin tarjetas ni efectivo no
  * aplicaría nunca; y, si hay vigencia, fechas válidas con `hasta >= desde`.
  */
@@ -87,10 +176,27 @@ export function parsePromocionBody(body: any): PromocionData | null {
   const lugar = typeof body.lugar === 'string' ? body.lugar.trim().replace(/\s+/g, ' ') : ''
   if (!lugar) return null
 
-  const porcentaje = Number(body.porcentaje)
-  if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje > 100) return null
+  // Sin `tipo` = porcentaje (todas las promos anteriores); un valor desconocido es inválido.
+  const tipo = body.tipo == null || body.tipo === '' ? 'porcentaje' : body.tipo
+  if (!TIPOS_PROMO.includes(tipo)) return null
 
-  const topeMensual = Number(body.tope_mensual)
+  let porcentaje = 0
+  let montoReintegro: number | null = null
+  let compraMinima: number | null = null
+  const vacio = (v: unknown) => v == null || v === ''
+  if (tipo === 'porcentaje') {
+    porcentaje = Number(body.porcentaje)
+    if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje > 100) return null
+  } else {
+    montoReintegro = Number(body.monto_reintegro)
+    if (!Number.isFinite(montoReintegro) || montoReintegro <= 0) return null
+    compraMinima = vacio(body.compra_minima) ? null : Number(body.compra_minima)
+    if (compraMinima != null && (!Number.isFinite(compraMinima) || compraMinima < 0)) return null
+    if (compraMinima === 0) compraMinima = null
+  }
+
+  // En monto fijo el tope es opcional: sin tope = un solo reintegro por ciclo.
+  const topeMensual = tipo === 'monto_fijo' && vacio(body.tope_mensual) ? (montoReintegro as number) : Number(body.tope_mensual)
   if (!Number.isFinite(topeMensual) || topeMensual <= 0) return null
 
   const diasRaw: unknown[] = Array.isArray(body.dias) ? body.dias : []
@@ -129,8 +235,11 @@ export function parsePromocionBody(body: any): PromocionData | null {
     conceptoIds,
     categoriaIds,
     etiquetaIds,
+    tipo,
     porcentaje: r2(porcentaje),
     topeMensual: r2(topeMensual),
+    montoReintegro: montoReintegro == null ? null : r2(montoReintegro),
+    compraMinima: compraMinima == null ? null : r2(compraMinima),
     dias,
     tarjetaIds,
     efectivo,
@@ -180,8 +289,11 @@ export function toPromocionResponse(row: any) {
     categoria_nombres: categorias.map(c => c.nombre),
     etiqueta_ids: etiquetas.map(e => e.id),
     etiqueta_nombres: etiquetas.map(e => e.nombre),
+    tipo: esMontoFijo(row) ? 'monto_fijo' : 'porcentaje',
     porcentaje: row.porcentaje,
     tope_mensual: row.topeMensual,
+    monto_reintegro: row.montoReintegro ?? null,
+    compra_minima: row.compraMinima ?? null,
     dias: [...(row.dias ?? [])].sort((a: number, b: number) => a - b),
     tarjeta_ids: tarjetas.map(t => t.id),
     tarjetas: tarjetas.map(t => ({
@@ -326,20 +438,27 @@ export interface GastoDeCiclo extends GastoConsumo {
 /**
  * Consumo de una promo en un ciclo: los gastos asociados que caen en ese ciclo (por su fecha de
  * compra, o por su mes si no la tienen) + los usos manuales cuya fecha cae en él.
+ *
+ * `compras` son los montos (ARS) de cada gasto y cada uso por separado: una promo de monto fijo
+ * mira compra por compra si llega a la mínima, y eso no se puede reconstruir desde las sumas.
  */
 export function consumoEnCiclo(
   promo: { id: number; diaReinicio?: number | null },
   ciclo: { mes: number; anio: number },
   gastos: GastoDeCiclo[],
   usos: { fecha: string; montoGasto: number }[],
-): { auto: number; manual: number } {
+): { auto: number; manual: number; compras: number[] } {
   const dia = diaReinicioDe(promo)
-  const auto = consumoAutomatico(promo.id, gastos.filter(g => mismoCiclo(cicloDeGasto(g, dia), ciclo)))
-  const manual = r2(usos.reduce((s, u) => {
+  const delCiclo = gastos.filter(g => g.promocionId === promo.id && mismoCiclo(cicloDeGasto(g, dia), ciclo))
+  const usosDelCiclo = usos.filter(u => {
     const c = cicloDeFecha(u.fecha, dia)
-    return c && mismoCiclo(c, ciclo) ? s + u.montoGasto : s
-  }, 0))
-  return { auto, manual }
+    return !!c && mismoCiclo(c, ciclo)
+  })
+  return {
+    auto: consumoAutomatico(promo.id, delCiclo),
+    manual: r2(usosDelCiclo.reduce((s, u) => s + u.montoGasto, 0)),
+    compras: [...delCiclo.map(g => r2(g.totalMoneda * g.tipoCambio)), ...usosDelCiclo.map(u => u.montoGasto)],
+  }
 }
 
 /**
@@ -348,7 +467,7 @@ export function consumoEnCiclo(
  * generan lote. Ordenados por ciclo.
  */
 export function lotesPromocion(
-  promo: { id: number; porcentaje: number; topeMensual: number; diaReinicio?: number | null },
+  promo: { id: number; diaReinicio?: number | null } & ReglaReintegro,
   gastos: GastoDeCiclo[],
   usos: { fecha: string; montoGasto: number }[],
   reintegros: { mes: number; anio: number; venceEl: string | null; utilizado: boolean }[],
@@ -363,8 +482,8 @@ export function lotesPromocion(
 
   const lotes: LoteReintegro[] = []
   for (const [, c] of Array.from(ciclos.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-    const { auto, manual } = consumoEnCiclo(promo, c, gastos, usos)
-    const monto = progresoPromocion(promo, auto, manual).reintegrado
+    const { auto, manual, compras } = consumoEnCiclo(promo, c, gastos, usos)
+    const monto = progresoPromocion(promo, auto, manual, compras).reintegrado
     if (monto <= 0) continue
     const fila = reintegros.find(r => mismoCiclo(r, c))
     lotes.push({
@@ -619,6 +738,23 @@ export function vigenteEnCiclo(
 }
 
 /**
+ * Si una fecha puntual `YYYY-MM-DD` cae dentro de la vigencia de la promo (inclusive en los
+ * dos extremos; sin límite de un lado = abierta de ese lado). Sin fecha válida no hay criterio
+ * y no se descarta nada. A diferencia de `vigenteEnCiclo` (¿vale en *algún* día del ciclo?),
+ * mira el día exacto: es lo que decide si un gasto del mes es candidato a la promo.
+ */
+export function fechaEnVigencia(
+  promo: { vigenteDesde?: string | null; vigenteHasta?: string | null },
+  fecha: unknown,
+): boolean {
+  if (!mesAnioDeFecha(fecha)) return true
+  const f = fecha as string
+  if (promo.vigenteDesde && f < promo.vigenteDesde) return false
+  if (promo.vigenteHasta && f > promo.vigenteHasta) return false
+  return true
+}
+
+/**
  * Fecha de compra con la promo que se guarda en el gasto (`Gasto.promocionFecha`):
  * - `undefined` = no tocar (PUT parcial sin las claves de promo).
  * - `null` = sin fecha: sin promo, o fecha vacía/inválida (cuenta en el ciclo de su mes).
@@ -678,6 +814,10 @@ export interface ProgresoPromocion {
   /** Porcentaje del tope ya usado, recortado a `[0, 100]`. */
   pct_tope: number
   estado: EstadoPromocion
+  /** Monto fijo: compras que llegaron a la mínima en el ciclo. `null` en una promo por porcentaje. */
+  compras_validas: number | null
+  /** Monto fijo: cuántas compras de la mínima faltan para el tope (0 si se llegó). `null` en porcentaje. */
+  compras_restantes: number | null
 }
 
 /**
@@ -688,13 +828,21 @@ export interface ProgresoPromocion {
  *   sobre la mesa; gastar más no suma. Es la cifra para decidir cuánto comprar.
  * - Un consumo negativo (más devoluciones que compras) se toma como 0: no hay reintegro
  *   negativo.
+ *
+ * En una promo de **monto fijo** (`compras` = el monto de cada compra del ciclo):
+ * - `reintegrado = min(compras que llegan a la mínima × monto fijo, tope)`.
+ * - `gasto_minimo = compras necesarias para el tope × compra mínima`: lo justo, en compras de la
+ *   mínima. Comprar más caro no devuelve más; partir en compras chicas no devuelve nada.
+ * - `gasto_restante` = las compras que faltan × la mínima (`compras_restantes`).
  */
 export function progresoPromocion(
-  promo: { porcentaje: number; topeMensual: number },
+  promo: ReglaReintegro,
   consumoAuto: number,
   consumoManual: number,
+  compras: number[] = [],
 ): ProgresoPromocion {
   const consumo = r2(consumoAuto + consumoManual)
+  if (esMontoFijo(promo)) return progresoMontoFijo(promo, consumoAuto, consumoManual, consumo, compras)
   const base = Math.max(0, consumo)
   const tasa = promo.porcentaje / 100
   const gastoMinimo = r2(promo.topeMensual / tasa)
@@ -712,6 +860,41 @@ export function progresoPromocion(
     disponible: alcanzado ? 0 : disponible,
     pct_tope: Math.min(100, Math.max(0, Math.round((reintegrado / promo.topeMensual) * 100))),
     estado: alcanzado ? 'tope_alcanzado' : base > 0 ? 'en_curso' : 'sin_uso',
+    compras_validas: null,
+    compras_restantes: null,
+  }
+}
+
+function progresoMontoFijo(
+  promo: ReglaReintegro,
+  consumoAuto: number,
+  consumoManual: number,
+  consumo: number,
+  compras: number[],
+): ProgresoPromocion {
+  const monto = promo.montoReintegro ?? 0
+  const minima = promo.compraMinima ?? 0
+  const validas = compras.filter(c => reintegroDeCompra(promo, c) > 0).length
+  const bruto = validas * monto
+  const reintegrado = r2(Math.min(bruto, promo.topeMensual))
+  const alcanzado = monto > 0 && bruto >= promo.topeMensual - 0.005
+  // Compras de la mínima que hacen falta para llegar al tope (la última puede pasarse: un tope que
+  // no es múltiplo del monto se completa con una compra más, topeada).
+  const necesarias = monto > 0 ? Math.ceil(promo.topeMensual / monto - 1e-9) : 0
+  const faltan = alcanzado ? 0 : Math.max(0, necesarias - validas)
+
+  return {
+    consumo_auto: r2(consumoAuto),
+    consumo_manual: r2(consumoManual),
+    consumo,
+    gasto_minimo: r2(necesarias * minima),
+    gasto_restante: r2(faltan * minima),
+    reintegrado,
+    disponible: alcanzado ? 0 : r2(Math.max(0, promo.topeMensual - reintegrado)),
+    pct_tope: Math.min(100, Math.max(0, Math.round((reintegrado / promo.topeMensual) * 100))),
+    estado: alcanzado ? 'tope_alcanzado' : validas > 0 ? 'en_curso' : 'sin_uso',
+    compras_validas: validas,
+    compras_restantes: faltan,
   }
 }
 
