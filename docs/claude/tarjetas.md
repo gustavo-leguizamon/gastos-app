@@ -161,6 +161,16 @@ Cada card:
 Si no hay ninguna tarjeta, el componente no renderiza. Refresca con `refreshKey` del store.
 
 
+## Proyección de cuotas comprometidas
+
+Botón **"Cuotas"** en el header de `/gastos` (icono en mobile) → `CuotasProyeccionDialog`: cuánto queda comprometido en cuotas de tarjeta **en cada mes desde el consultado hasta la última cuota**. Existe porque la copia automática arrastra las cuotas de a un mes (recién al pasar cada cierre), así que en la grilla no se ve lo de marzo o abril. **No persiste nada** — por eso las compras en cuotas con crédito **no** generan gastos en los meses siguientes como el débito (duplicarían el sub-item que trae la copia del resumen).
+
+- **Fuente** (`GET /api/tarjetas/cuotas-proyeccion?mes&anio[&casa_id]`): sub-items con `cuotaActual`/`cuotasTotales` e `incluyeEnTotal` de los resúmenes (`esTarjeta`). Por tarjeta y casa se toma el **último resumen ≤ al mes** (la base: si el del mes todavía no se copió, sirve el anterior, hasta 12 meses atrás) **más todos los posteriores** (los que creó un pago posterior al cierre). Los anteriores a la base no entran, para que una cuota borrada en el mes no resucite (`seleccionarResumenes`).
+- **Dedup** (`proyectarCuotas`, `src/lib/cuotas-proyeccion.ts`): una compra = tarjeta + casa + concepto + monto + cuotas totales + **período de origen** (período del resumen − (cuota − 1)), igual en todas sus apariciones. Dos compras idénticas en el mismo resumen son dos: multiplicidad por resumen, máximo entre resúmenes.
+- **Respuesta**: `meses` (`{ mes, anio, total, cantidad }` desde el consultado, inclusive), `compras` (concepto, tarjeta, monto de la cuota, origen/última, `cuotas` restantes con su número, `pendiente`), `total_pendiente` (desde el mes) y `total_futuro` (desde el siguiente). Compras ordenadas por la que termina antes.
+- **UI**: tarjetas Este mes / Próximo mes / Resta después de este mes, barras por mes **apiladas por tarjeta** (clic en un mes filtra la lista), y lista de compras con cuota X/N, fin, monto y lo que resta, con barra de cuotas pagadas.
+- **Límites**: sólo ve las cuotas que ya son sub-ítems de un resumen (un gasto con crédito sin pago registrado no se propagó todavía); no proyecta consumos sin cuotas ni cargos del banco.
+
 ## Generar el cierre del próximo mes
 
 Los `TarjetaCierre` se cargaban a mano mes por mes, aunque el dato para derivarlos ya estuviera guardado: **`fechaProximoCierre` de un período es la `fechaCierre` del siguiente**. Olvidarse no es cosmético — sin el cierre del mes, `POST /api/gastos/[id]/pagos` responde **400** y la propagación del pago a la tarjeta se rompe.
