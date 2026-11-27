@@ -32,10 +32,10 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
-import CreditCardIcon from '@mui/icons-material/CreditCard'
 import ChecklistIcon from '@mui/icons-material/Checklist'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
-import BrandLogo from '@/components/shared/BrandLogo'
+import MarcaLogo from '@/components/shared/MarcaLogo'
+import TarjetaConMarca, { type TarjetaConMarcaData } from '@/components/shared/TarjetaConMarca'
 import BancoLogo from '@/components/shared/BancoLogo'
 import CategoriasCell from '@/components/shared/CategoriasCell'
 import BulkAccionesBar from './BulkAccionesBar'
@@ -50,6 +50,7 @@ import CopiarGastoDialog from './CopiarGastoDialog'
 import EvolucionGastoDialog from './EvolucionGastoDialog'
 import MoverGastoDialog from './MoverGastoDialog'
 import { hasBancoIcono } from '@/lib/bancos'
+import { tarjetaTitulo } from '@/lib/marcas'
 import { checkSubitemsTotal } from '@/lib/subitems-total'
 import { matchBusqueda } from '@/lib/gastos-filtro'
 import { totalesSeleccion } from '@/lib/gastos-seleccion'
@@ -130,6 +131,17 @@ function SubtotalDifiereIcon({
       </Box>
     </Tooltip>
   )
+}
+
+/** Datos de la tarjeta de un gasto en la forma que pide `TarjetaConMarca`. */
+function tarjetaDeGasto(g: Gasto, iconos: Record<number, string>): TarjetaConMarcaData {
+  return {
+    nombre: g.tarjeta_nombre ?? '',
+    banco: g.tarjeta_banco,
+    banco_logo: g.tarjeta_banco_logo,
+    banco_icono: g.tarjeta_id != null ? iconos[g.tarjeta_id] : undefined,
+    marca: g.tarjeta_marca,
+  }
 }
 
 // Badge superpuesto en una esquina del chip "Crédito" (marca a la derecha, banco
@@ -403,14 +415,8 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   ) : 'Sin cierre cargado para este mes/año — configurarlo en /configuracion'
                 }
               >
-                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, ml: 0.5 }}>
-                  <BancoLogo
-                    banco={row.tarjeta_banco_logo}
-                    icono={row.tarjeta_id != null ? tarjetaIconos[row.tarjeta_id] : undefined}
-                    bancoTexto={row.tarjeta_banco}
-                    size={18}
-                  />
-                  <BrandLogo marca={row.tarjeta_marca} width={30} height={22} />
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}>
+                  <TarjetaConMarca t={tarjetaDeGasto(row, tarjetaIconos)} size={20} tooltip={false} />
                 </Box>
               </Tooltip>
             )}
@@ -476,9 +482,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
       renderCell: ({ value, row }) => {
         if (row._type === 'item' || row._type === 'items_total') return null
         const showTarjeta = value === 'C' && row.tarjeta_id != null
-        const tarjetaTitle = row.tarjeta_banco
-          ? `${row.tarjeta_nombre} (${row.tarjeta_banco})`
-          : row.tarjeta_nombre ?? ''
+        const tarjetaTitle = tarjetaTitulo(tarjetaDeGasto(row, tarjetaIconos))
         const bancoIcono = row.tarjeta_id != null ? tarjetaIconos[row.tarjeta_id] : undefined
         return (
           <Box sx={{ position: 'relative', display: 'inline-flex' }}>
@@ -491,7 +495,7 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
             {showTarjeta && (
               <Tooltip title={tarjetaTitle}>
                 <Box sx={{ ...badgeSx, top: -9, right: -12 }}>
-                  <BrandLogo marca={row.tarjeta_marca} width={26} height={18} />
+                  <MarcaLogo marca={row.tarjeta_marca} size={18} />
                 </Box>
               </Tooltip>
             )}
@@ -852,15 +856,9 @@ export default function GastosTable({ filtros, refreshKey, estadoPago, busqueda,
                   <WarningAmberIcon sx={{ fontSize: 14, color: '#f59e0b', flexShrink: 0 }} />
                 )}
                 {(g.tarjeta_id || g.es_tarjeta) && (
-                  <Tooltip title={g.tarjeta_nombre ? (g.tarjeta_banco ? `${g.tarjeta_nombre} (${g.tarjeta_banco})` : g.tarjeta_nombre) : ''}>
-                    <Box sx={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 0.25 }}>
-                      <BancoLogo
-                        banco={g.tarjeta_banco_logo}
-                        icono={g.tarjeta_id != null ? tarjetaIconos[g.tarjeta_id] : undefined}
-                        bancoTexto={g.tarjeta_banco}
-                        size={18}
-                      />
-                      <BrandLogo marca={g.tarjeta_marca} width={28} height={20} />
+                  <Tooltip title={g.tarjeta_id || g.tarjeta_nombre ? tarjetaTitulo(tarjetaDeGasto(g, tarjetaIconos)) : ''}>
+                    <Box sx={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
+                      <TarjetaConMarca t={tarjetaDeGasto(g, tarjetaIconos)} size={20} tooltip={false} />
                     </Box>
                   </Tooltip>
                 )}

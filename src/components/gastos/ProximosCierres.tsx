@@ -7,11 +7,10 @@ import Card from '@mui/material/Card'
 import LinearProgress from '@mui/material/LinearProgress'
 import Typography from '@mui/material/Typography'
 import Tooltip from '@mui/material/Tooltip'
-import BrandLogo from '@/components/shared/BrandLogo'
-import BancoLogo from '@/components/shared/BancoLogo'
-import { marcaColor } from '@/components/shared/TarjetaLogo'
+import TarjetaConMarca from '@/components/shared/TarjetaConMarca'
+import { marcaColor, tarjetaTitulo } from '@/lib/marcas'
 import type { EstadoCiclo } from '@/lib/cierres'
-import type { FiltrosGastos, TarjetaMarca } from '@/lib/types'
+import type { FiltrosGastos } from '@/lib/types'
 
 type TarjetaCiclo = {
   id: number
@@ -83,7 +82,7 @@ export default function ProximosCierres({ filtros, refreshKey }: Props) {
           const cerrada = t.estado === 'cerrado'
           // La tarjeta cerrada se muestra como siempre (tintada con el color de la marca);
           // la que todavía no cerró va grisada, para que el estado se lea de un vistazo.
-          const accent = marcaColor((t.marca ?? null) as TarjetaMarca | null) ?? '#6366f1'
+          const accent = marcaColor(t.marca) ?? '#6366f1'
           // `por_cerrar` = el resumen de este período todavía está abierto y cierra en breve.
           // Va en ámbar y no en el gris de las abiertas porque es el estado accionable: es la
           // última ventana para cargarle consumos antes de que el resumen quede fijo.
@@ -95,7 +94,7 @@ export default function ProximosCierres({ filtros, refreshKey }: Props) {
               title={
                 <Box>
                   <Typography variant="caption" sx={{ display: 'block' }}>
-                    <strong>{t.nombre}</strong>{t.marca ? ` · ${t.marca}` : ''}
+                    <strong>{tarjetaTitulo(t)}</strong>
                   </Typography>
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     <strong>Cierre:</strong> {t.fecha_cierre || '—'}
@@ -149,8 +148,7 @@ export default function ProximosCierres({ filtros, refreshKey }: Props) {
                     ...(cerrada ? {} : { filter: 'grayscale(1)', opacity: 0.65 }),
                   }}
                 >
-                  <BrandLogo marca={t.marca} width={44} height={32} />
-                  <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
+                  <TarjetaConMarca t={t} size={28} tooltip={false} />
                   <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.2 }} noWrap>
                       {titulo}

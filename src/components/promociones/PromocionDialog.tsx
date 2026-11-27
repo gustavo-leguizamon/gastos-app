@@ -11,7 +11,7 @@ import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import toast from 'react-hot-toast'
-import { TarjetaOpcion } from '@/components/shared/TarjetaIconos'
+import { TarjetaOpcion, tarjetaLabel, ordenarTarjetas } from '@/components/shared/TarjetaIconos'
 import AppDateField from '@/components/shared/AppDateField'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
 import AppTextField from '@/components/shared/AppTextField'
@@ -108,15 +108,12 @@ export default function PromocionDialog({ open, onClose, onSaved, editando, tarj
 
   // Las dadas de baja no se ofrecen para promos nuevas, pero una ya elegida se conserva.
   const opcionesMedios = useMemo(
-    () => [EFECTIVO_OPCION, ...tarjetasVisiblesEn(tarjetas, mes, anio, tarjetaIds).map(t => {
-      // Mismo formato que el select de tarjeta en la carga de gastos: logo de la marca + "Nombre (Banco)".
-      const label = `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`
-      return {
-        value: t.id,
-        label,
-        render: () => <TarjetaOpcion t={t} />,
-      }
-    })],
+    () => [EFECTIVO_OPCION, ...ordenarTarjetas(tarjetasVisiblesEn(tarjetas, mes, anio, tarjetaIds)).map(t => ({
+      // Mismo formato que el select de tarjeta en la carga de gastos: ícono + "Banco (Marca)".
+      value: t.id,
+      label: tarjetaLabel(t),
+      render: () => <TarjetaOpcion t={t} />,
+    }))],
     [tarjetas, mes, anio, tarjetaIds],
   )
 

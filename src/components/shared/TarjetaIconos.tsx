@@ -1,9 +1,8 @@
 'use client'
 
 import Box from '@mui/material/Box'
-import BancoLogo from './BancoLogo'
-import BrandLogo from './BrandLogo'
-import { hasBancoIcono } from '@/lib/bancos'
+import TarjetaConMarca from './TarjetaConMarca'
+import { tarjetaTitulo } from '@/lib/marcas'
 
 export interface TarjetaIconosData {
   nombre: string
@@ -13,24 +12,22 @@ export interface TarjetaIconosData {
   marca?: string | null
 }
 
-/** Texto de una tarjeta en los selectores: "Nombre (Banco)". */
-export function tarjetaLabel(t: Pick<TarjetaIconosData, 'nombre' | 'banco'>): string {
-  return `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`
+/** Texto de una tarjeta en los selectores: "Banco (Marca)", igual que los tooltips (`tarjetaTitulo`). */
+export function tarjetaLabel(t: TarjetaIconosData): string {
+  return tarjetaTitulo(t)
 }
 
-/** Iconos de una tarjeta para selectores: primero el del banco (si hay) y luego el de la marca. */
+/** Las tarjetas ordenadas por su texto, así el select queda agrupado por banco. */
+export function ordenarTarjetas<T extends TarjetaIconosData>(tarjetas: T[]): T[] {
+  return [...tarjetas].sort((a, b) => tarjetaLabel(a).localeCompare(tarjetaLabel(b), 'es', { sensitivity: 'base' }))
+}
+
+/** Ícono de una tarjeta para selectores: el del banco con la marca en la esquina (`TarjetaConMarca`). */
 export function TarjetaIconos({ t }: { t: TarjetaIconosData }) {
-  return (
-    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-      {hasBancoIcono(t.banco_icono, t.banco_logo, t.banco) && (
-        <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={22} />
-      )}
-      <BrandLogo marca={t.marca} width={30} height={22} />
-    </Box>
-  )
+  return <TarjetaConMarca t={t} size={22} tooltip={false} />
 }
 
-/** Opción de select/multiselect: iconos de banco + marca y luego el texto. */
+/** Opción de select/multiselect: ícono de la tarjeta (banco + marca en la esquina) y luego el texto. */
 export function TarjetaOpcion({ t }: { t: TarjetaIconosData }) {
   return (
     <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>

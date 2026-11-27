@@ -7,7 +7,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
 import AppSelect from '@/components/shared/AppSelect'
 import AppMultiSelect from '@/components/shared/AppMultiSelect'
-import { TarjetaOpcion } from '@/components/shared/TarjetaIconos'
+import { TarjetaOpcion, tarjetaLabel, ordenarTarjetas } from '@/components/shared/TarjetaIconos'
 import { shiftMonth } from '@/lib/fechas'
 import type { FiltrosReporte, Casa, Categoria, Etiqueta, Tarjeta, Concepto } from '@/lib/types'
 
@@ -126,9 +126,9 @@ export default function ReportesFiltros({ filtros, setFiltros, preset, setPreset
         />
         <AppMultiSelect
           label="Tarjetas"
-          options={tarjetas.map((t) => ({
+          options={ordenarTarjetas(tarjetas).map((t) => ({
             value: t.id,
-            label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
+            label: tarjetaLabel(t),
             render: () => <TarjetaOpcion t={t} />,
           }))}
           value={filtros.tarjeta_ids}
