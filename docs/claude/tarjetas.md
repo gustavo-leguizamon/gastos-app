@@ -2,15 +2,19 @@
 
 ## Logos de marca
 
-Cada `Tarjeta` tiene campo opcional `marca` (nullable: `visa | mastercard | amex | diners | discover | jcb | otra`). Se setea en `/configuracion` → Tarjetas → form. Render con `TarjetaLogo` (`src/components/shared/TarjetaLogo.tsx`) usando `react-icons/fa` (`FaCcVisa`, `FaCcMastercard`, `FaCcAmex`, `FaCcDinersClub`, `FaCcDiscover`, `FaCcJcb`) en colores institucionales. Si `otra` o `null`, fallback `CreditCardIcon` MUI. Constante exportada `MARCAS` lista las opciones para selects.
+Cada `Tarjeta` tiene campo opcional `marca` (nullable: `visa | mastercard | amex | diners | discover | jcb | otra`). Se setea en `/configuracion` → Tarjetas → form. Los gastos response exponen `tarjeta_marca?: TarjetaMarca | null`, `tarjeta_nombre` y `tarjeta_banco`. Migración `20260516020000_add_tarjeta_marca` agrega columna `marca TEXT NULL`.
 
-`TarjetaLogo` usado en: configuración de tarjetas, `GastoForm` (dentro de `MenuItem` del select Tarjeta), `GastosTable` (reemplaza `CreditCardIcon` en `es_tarjeta=true`, en Tooltip de fechas). Los gastos response exponen `tarjeta_marca?: TarjetaMarca | null`, `tarjeta_nombre` y `tarjeta_banco`.
+**Regla: la marca se dibuja siempre con `MarcaLogo`, en un único formato.** Tres piezas, y ninguna otra parte de la app dibuja marcas:
 
-**Badge de marca en el chip "Crédito"** (`GastosTable`, columna `tipo_pago`): cuando `tipo_pago === 'C'` y hay `tarjeta_id`, se superpone un `BrandLogo` (26x18, sobre fondo `background.paper` con `boxShadow`) en la esquina superior derecha del chip, dentro de un `Tooltip` que muestra `Nombre (Banco)` (o solo `Nombre` si no hay banco). En la vista mobile (card), el `BrandLogo` que ya se muestra junto a la descripción lleva el mismo `Tooltip`.
+- **`src/lib/marcas.ts`** (datos, puro, testeado en `marcas.test.ts`): `MARCAS` (opciones de los selects), `MARCA_ESTILOS` (label, `fondo` del logo y `acento` — no siempre coinciden: Mastercard va sobre blanco con acento rojo), `resolveMarca` (valor guardado o texto libre → marca; reconoce además Cabal y Naranja X; `otra`/vacío/desconocido → `null`), `marcaColor` (acento, para tintar cards como en `/configuracion` y `ProximosCierres`), `marcaLabel` y `marcaAncho` (relación 44:32).
+- **`MarcaLogo`** (`src/components/shared/MarcaLogo.tsx`): el logo — SVG inline con el rectángulo del color oficial y el nombre/emblema (viewBox 44×32). Prop `size` = **alto** en px; el ancho sale de la relación, así nadie lo deforma. Sin marca reconocida, `CreditCardIcon`. Usado en `GastosTable` (escritorio, chip "Crédito", mobile), `ProximosCierres`, `/configuracion`, `TarjetaIconos` (selectores de tarjeta) y `TarjetaConMarca`.
+- **`TarjetaConMarca`** (`src/components/shared/TarjetaConMarca.tsx`): ícono compacto de una tarjeta — logo del banco con la `MarcaLogo` chiquita en la esquina superior derecha (≈80% del ancho, anillo del color del fondo), o la marca a tamaño completo si no hay banco. Tooltip "Banco (Marca)" (`tarjetaTitulo`) (prop `tooltip={false}` donde el contenedor ya tiene el suyo o es una opción de select). **Es el formato de la tarjeta en toda la app**: promociones (`MediosPromo`), `ProximosCierres` (alto 28), `/configuracion` (alto 28), selectores (`TarjetaIconos`, alto 22) y `GastosTable` (filas de resumen de tarjeta y vista mobile, alto 20, vía el helper `tarjetaDeGasto`). La única excepción es el chip "Crédito" de la grilla, que lleva banco y marca como dos badges en las esquinas del chip.
 
-Migración `20260516020000_add_tarjeta_marca` agrega columna `marca TEXT NULL`.
+Cambiar un color, un label o el dibujo de una marca se hace **sólo** en esos archivos y aplica en todos lados. El guard `src/components/shared/marca-logo-guard.test.ts` falla si otro archivo usa íconos de tarjeta de `react-icons` (`FaCc*`, `SiVisa`…) o hardcodea los fondos de las marcas. (Antes coexistían `TarjetaLogo` —íconos monocromos `FaCc*`— y `BrandLogo`, y los lugares nuevos quedaban con el formato equivocado; se eliminaron los dos.)
 
-**`BrandLogo`** (`src/components/shared/BrandLogo.tsx`): componente reutilizable que recibe `marca` y devuelve SVG inline estilizado (viewBox 44x32, ~1.4:1). Soporta Visa, Mastercard, Amex, Cabal, Naranja, Diners, Discover, JCB. Fallback `CreditCardIcon`. Provee contraste visual sin assets externos.
+**Cómo se nombra una tarjeta en los tooltips: "Banco (Marca)"** — `tarjetaTitulo` (`src/lib/marcas.ts`, testeado), lo mismo que se ve en el ícono. Banco = el texto libre o, si falta, el de la lista (`otro` no cuenta); marca = `marcaLabel`. Sin marca reconocida el paréntesis lleva el nombre de la tarjeta (dos tarjetas del mismo banco no quedan iguales; si coincide con el banco se omite); sin banco, "Nombre (Marca)". Lo usan `TarjetaConMarca`, el chip "Crédito" y la vista mobile de `GastosTable`, `ProximosCierres` y el texto de las opciones de todos los selectores de tarjeta (`tarjetaLabel`). Antes cada lugar armaba su texto (`Nombre (Banco)`, `Nombre · Marca`) y con tarjetas llamadas como su marca salía repetida ("American express · American Express"). Todo tooltip nuevo que nombre una tarjeta debe usar esta función.
+
+**Badge de marca en el chip "Crédito"** (`GastosTable`, columna `tipo_pago`): cuando `tipo_pago === 'C'` y hay `tarjeta_id`, se superpone un `MarcaLogo` (alto 18, sobre fondo `background.paper` con `boxShadow`) en la esquina superior derecha del chip, dentro de un `Tooltip` "Banco (Marca)" (`tarjetaTitulo`). En la vista mobile (card), el `MarcaLogo` que ya se muestra junto a la descripción lleva el mismo `Tooltip`.
 
 ## Logo del banco emisor
 
@@ -47,11 +51,11 @@ Puro, testeado en `bancos.test.ts`; es la fuente de verdad del badge:
 **`BancoLogo`** (`src/components/shared/BancoLogo.tsx`) resuelve en este orden: **1)** `icono` (imagen subida) → `<img>` a `size` con `objectFit: contain`, `borderRadius` y **placa blanca de fondo** (los logos suelen ser oscuros con fondo transparente y así se leen en tema claro y oscuro); **2)** badge de la lista fija — SVG inline (viewBox 32x32, `rx=7`) con la sigla en blanco sobre el color del banco, o `AccountBalanceIcon` gris para `otro`; **3)** `null`, así el caller no reserva espacio.
 
 Se muestra en:
-- **`GastosTable`, columna `tipo_pago`**: superpuesto en la esquina **superior izquierda** del chip "Crédito" (`size=18`), en espejo del `BrandLogo` de la marca que va arriba a la derecha. Ambos usan el helper `badgeSx` del módulo y el mismo `Tooltip` `Nombre (Banco)`. Sólo cuando `tipo_pago === 'C'` y hay `tarjeta_id`.
-- **`GastosTable`, columna `_expand`** (filas de **resumen de tarjeta**, `es_tarjeta`): a la izquierda del `BrandLogo` de la marca (`size=18`), dentro del mismo `Tooltip` de cierre/vencimiento. La columna mide 112px para que entren warning + toggle + los dos logos.
-- **`GastosTable` vista mobile (card)**: junto al `BrandLogo` que acompaña la descripción.
-- **`/configuracion`** → fila de la tarjeta (`size=24`) y preview del uploader.
-- **`ProximosCierres`** (`size=24`), al lado del `BrandLogo`.
+- **`GastosTable`, columna `tipo_pago`**: superpuesto en la esquina **superior izquierda** del chip "Crédito" (`size=18`), en espejo del `MarcaLogo` de la marca que va arriba a la derecha. Ambos usan el helper `badgeSx` del módulo y el mismo `Tooltip` "Banco (Marca)". Sólo cuando `tipo_pago === 'C'` y hay `tarjeta_id`.
+- **`GastosTable`, columna `_expand`** (filas de **resumen de tarjeta**, `es_tarjeta`): `TarjetaConMarca` (alto 20, marca en la esquina), dentro del mismo `Tooltip` de cierre/vencimiento. La columna mide 112px para que entren warning + toggle + el logo.
+- **`GastosTable` vista mobile (card)**: `TarjetaConMarca` (alto 20) junto a la descripción.
+- **`/configuracion`** → fila de la tarjeta (`TarjetaConMarca`, alto 28) y preview del uploader.
+- **`ProximosCierres`**: `TarjetaConMarca` (alto 28).
 
 **Cómo llega cada campo al cliente:**
 - `tarjeta_banco_logo` viaja en la response de cada gasto (`toGastoResponse` → `g.tarjeta?.bancoLogo ?? null`) — es un slug corto.
@@ -77,7 +81,7 @@ Las fechas `fechaCierre`, `fechaVencimiento`, `fechaProximoCierre` viven en `Tar
 
 El gasto "resumen de tarjeta" sigue como contenedor (`esTarjeta = true`) pero ya no guarda fechas. Migración `20260516010000_add_tarjeta_cierre` crea la tabla, backfillea desde gastos `esTarjeta = true` (uno por `(tarjetaId, mes, anio)`, menor `id` si duplicados), y dropea columnas `fechaCierre`/`fechaProximoCierre` de `Gasto`.
 
-Las responses de `/api/gastos` incluyen campo opcional **`cierre`** matcheando el `TarjetaCierre` para `(gasto.tarjetaId, gasto.mes, gasto.anio)` (forma: `{ fecha_cierre, fecha_vencimiento, fecha_proximo_cierre } | null`). Se incluye `tarjeta: { include: { cierres: true } }` en la query y se filtra en `toGastoResponse`. `GastosTable` lo usa para el tooltip del `CreditCardIcon` en filas `es_tarjeta = true`.
+Las responses de `/api/gastos` incluyen campo opcional **`cierre`** matcheando el `TarjetaCierre` para `(gasto.tarjetaId, gasto.mes, gasto.anio)` (forma: `{ fecha_cierre, fecha_vencimiento, fecha_proximo_cierre } | null`). Se incluye `tarjeta: { include: { cierres: true } }` en la query y se filtra en `toGastoResponse`. `GastosTable` lo usa para el tooltip del logo de la marca (`MarcaLogo`) en filas `es_tarjeta = true`.
 
 ## Propagación de pagos a la tarjeta
 
@@ -151,12 +155,12 @@ La regla de la que sale todo: **el cierre que se mide es siempre el primero que 
 Con la `fechaCierre` ya pasada y sin `fechaProximoCierre` no queda nada que medir y el estado vuelve a `sin_fecha`, que es como se venían mostrando esas tarjetas.
 
 Cada card:
-- `<BrandLogo marca={t.marca} width={44} height={32} />` + `BancoLogo` (`size=24`).
+- `<TarjetaConMarca t={t} size={28} tooltip={false} />` (banco con la marca en la esquina; sin banco, la marca sola).
 - Banco (o nombre si no hay banco) como texto principal.
 - **Nombre de la tarjeta** como caption (se omite si el título ya es el nombre, es decir cuando la tarjeta no tiene banco).
-- Tooltip con las 3 fechas + el estado del ciclo.
+- Tooltip encabezado por "Banco (Marca)" (`tarjetaTitulo`), las 3 fechas y el estado del ciclo.
 
-**Estética unificada con `/configuracion`:** ambos usan `BrandLogo` con dimensiones idénticas (44x32) y el mismo wrapper (borde + `bgcolor` tintados con `marcaColor(t.marca)`). Helper `marcaColor` exportado desde `TarjetaLogo.tsx`.
+**Estética unificada con `/configuracion`:** ambos usan `TarjetaConMarca` con el mismo tamaño (alto 28) y el mismo wrapper (borde + `bgcolor` tintados con `marcaColor(t.marca)`). Helper `marcaColor` exportado desde `src/lib/marcas.ts`.
 
 Si no hay ninguna tarjeta, el componente no renderiza. Refresca con `refreshKey` del store.
 
@@ -224,4 +228,4 @@ El módulo lee el par en las **dos convenciones** (`bajaMes`/`baja_mes`) porque 
 
 ## Selectores de tarjeta: banco + marca
 
-Todos los selectores de tarjeta (`GastoForm` medio de pago y tarjeta, `FiltrosGastos`, `ReportesFiltros`, `PromocionDialog`) usan `TarjetaOpcion` / `TarjetaIconos` (`src/components/shared/TarjetaIconos.tsx`): primero el icono del **banco** (`BancoLogo`, sólo si hay imagen subida o se resuelve el banco), luego el de la **marca** (`BrandLogo`) y después el texto `Nombre (Banco)`. En el campo cerrado del select (`adornment`) se muestran los mismos dos iconos. Todo selector de tarjeta nuevo debe usar estos componentes.
+Todos los selectores de tarjeta (`GastoForm` medio de pago y tarjeta, `FiltrosGastos`, `ReportesFiltros`, `PromocionDialog`) usan `TarjetaOpcion` / `TarjetaIconos` (`src/components/shared/TarjetaIconos.tsx`): el ícono de la tarjeta (`TarjetaConMarca`, alto 22, sin tooltip: logo del **banco** con la **marca** en la esquina, o la marca sola si no hay banco) y después el texto **"Banco (Marca)"** (`tarjetaLabel`, que delega en `tarjetaTitulo`: el mismo texto que los tooltips, y también el `label` de la opción con el que se busca y se muestra el chip elegido). Las opciones van **ordenadas por ese texto** (`ordenarTarjetas`), así quedan agrupadas por banco. En el campo cerrado del select (`adornment`) se muestra el mismo ícono. Todo selector de tarjeta nuevo debe usar estos componentes (`TarjetaOpcion` + `tarjetaLabel` + `ordenarTarjetas`), nunca armar el texto a mano.
