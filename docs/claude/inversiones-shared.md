@@ -83,7 +83,7 @@ El listener `document` keydown en `AppDataGrid` solo dispara si la fila seleccio
 
 **`render` vs `adornment`**: `render?: () => ReactNode` dibuja el item del **dropdown**; `adornment?: () => ReactNode` dibuja un ícono junto al valor **ya seleccionado** dentro del input (se inyecta como `startAdornment`, preservando el `params.InputProps.startAdornment` de MUI cuando la opción no lo define). Se pasan juntos cuando el campo cerrado tiene que leerse igual que la opción elegida — ej. el logo de marca en los selects de tarjeta de `GastoForm`.
 
-Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `render` + `adornment` para `BrandLogo`, Casa, Moneda, **Categoría con `onCreate`**), `GastoItemDialog` (Categoría con `onCreate`), `CopiarGastoDialog`/`CopiarMesDialog` (Mes/Año), `configuracion` (Casa por defecto).
+Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `render` + `adornment` para `MarcaLogo`, Casa, Moneda, **Categoría con `onCreate`**), `GastoItemDialog` (Categoría con `onCreate`), `CopiarGastoDialog`/`CopiarMesDialog` (Mes/Año), `configuracion` (Casa por defecto).
 
 **Excepción:** `configuracion/page.tsx` → `estim_missing_behavior` (2 opciones) sigue con `Select` clásico.
 
@@ -100,7 +100,7 @@ Usado en: `FiltrosGastos` (Casa), `GastoForm` (Medio de pago / Tarjeta con `rend
 
 Las filas sintéticas (`__create` de `onCreate`, `__expand` de `destacadas`) se inyectan en `filterOptions` y se interceptan en `onChange`: no son valores, así que no entran al `onChange` del padre.
 
-Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas del gasto y **Etiquetas de la propina**, las dos con `onCreate` + `destacadas`), `GastoItemDialog` (Etiquetas con `onCreate` + `destacadas`, en alta y en edición inline), `EtiquetasPorCategoria` (las dos listas de reglas del ABM), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`, Conceptos), `FiltrosGastos` (Categorías, Etiquetas, Tarjetas con `render` para `BrandLogo`).
+Usado para relaciones M2M / etiquetas: `GastoForm` (Etiquetas del gasto y **Etiquetas de la propina**, las dos con `onCreate` + `destacadas`), `GastoItemDialog` (Etiquetas con `onCreate` + `destacadas`, en alta y en edición inline), `EtiquetasPorCategoria` (las dos listas de reglas del ABM), `ReportesFiltros` (Categorías, Etiquetas, Tarjetas con `render` para `MarcaLogo`, Conceptos), `FiltrosGastos` (Categorías, Etiquetas, Tarjetas con `render` para `MarcaLogo`).
 
 ## CategoriasCell
 

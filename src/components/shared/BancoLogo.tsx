@@ -23,7 +23,7 @@ interface Props {
  *   2. badge de la lista fija (sigla sobre el color institucional),
  *   3. `null` — no hay nada que mostrar y el caller no reserva espacio.
  *
- * El badge es SVG inline (sin assets externos), mismo criterio que `BrandLogo`.
+ * El badge es SVG inline (sin assets externos), mismo criterio que `MarcaLogo`.
  * La lista de bancos y el match viven en `@/lib/bancos`.
  */
 export default function BancoLogo({ banco, icono, bancoTexto, size = 20 }: Props) {

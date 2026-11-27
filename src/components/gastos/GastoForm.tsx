@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { TarjetaOpcion, TarjetaIconos } from '@/components/shared/TarjetaIconos'
+import { TarjetaOpcion, TarjetaIconos, tarjetaLabel, ordenarTarjetas } from '@/components/shared/TarjetaIconos'
 import PromocionGastoField from './PromocionGastoField'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -339,9 +339,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
   const medioPagoValue = tipoPago === 'C' ? (tarjetaId ? `C:${tarjetaId}` : null) : 'D'
   const medioPagoOptions = useMemo(() => ([
     { value: 'D', label: 'Débito / Efectivo' },
-    ...tarjetasDisponibles.map(t => ({
+    ...ordenarTarjetas(tarjetasDisponibles).map(t => ({
       value: `C:${t.id}`,
-      label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
+      label: tarjetaLabel(t),
       render: () => <TarjetaOpcion t={t} />,
       adornment: () => <TarjetaIconos t={t} />,
     })),
@@ -374,9 +374,9 @@ export default function GastoForm({ gasto, defaultMes, defaultAnio, onSubmit, fo
       render={({ field }) => (
         <AppSelect
           label={`Tarjeta${tipoPago === 'C' ? '' : ' (opcional)'}`}
-          options={tarjetasDisponibles.map(t => ({
+          options={ordenarTarjetas(tarjetasDisponibles).map(t => ({
             value: t.id,
-            label: `${t.nombre}${t.banco ? ` (${t.banco})` : ''}`,
+            label: tarjetaLabel(t),
             render: () => <TarjetaOpcion t={t} />,
             adornment: () => <TarjetaIconos t={t} />,
           }))}

@@ -37,12 +37,11 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import TarjetaCierres from '@/components/configuracion/TarjetaCierres'
 import ConceptosManager from '@/components/configuracion/ConceptosManager'
 import NotificacionesCard from '@/components/configuracion/NotificacionesCard'
-import { MARCAS, marcaColor } from '@/components/shared/TarjetaLogo'
-import BancoLogo from '@/components/shared/BancoLogo'
+import { MARCAS, marcaColor } from '@/lib/marcas'
 import IconoBancoUpload from '@/components/shared/IconoBancoUpload'
 import { BANCOS } from '@/lib/bancos'
 import { tarjetaActivaEn } from '@/lib/tarjetas-baja'
-import BrandLogo from '@/components/shared/BrandLogo'
+import TarjetaConMarca from '@/components/shared/TarjetaConMarca'
 import AppSelect from '@/components/shared/AppSelect'
 import ClasificadorManager from '@/components/configuracion/ClasificadorManager'
 import EtiquetasPorCategoria from '@/components/configuracion/EtiquetasPorCategoria'
@@ -516,8 +515,7 @@ export default function ConfiguracionPage() {
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, ...(activa ? {} : { filter: 'grayscale(1)', opacity: 0.6 }) }}>
-                                <BrandLogo marca={t.marca} width={44} height={32} />
-                                <BancoLogo banco={t.banco_logo} icono={t.banco_icono} bancoTexto={t.banco} size={24} />
+                                <TarjetaConMarca t={t} size={28} tooltip={false} />
                                 <ListItemText primary={t.nombre} secondary={t.banco ?? undefined} />
                               </Box>
                               {t.baja_mes != null && t.baja_anio != null && (
